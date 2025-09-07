@@ -12,23 +12,14 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: 20,
   },
   menuButton: {
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 8,
     marginBottom: 10,
   },
   menuText: {
     color: "#023047",
-    fontWeight: "bold",
-  },
-  logoutButton: {
-    marginTop: 20,
-    backgroundColor: "#fb8500",
-    padding: 12,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  logoutText: {
-    color: "#fff",
     fontWeight: "bold",
   },
   contentContainer: {
@@ -59,5 +50,19 @@ export const dashboardStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: "center",
+  },
+  // 🔹 Botón de logout más pequeño
+  smallLogoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fb8500",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  logoutText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
 });
