@@ -32,17 +32,12 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  mobileBottomMenuContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
+  // 🔹 Menú inferior en mobile (estilo base, sin posición absoluta)
   mobileBottomMenu: {
     flexDirection: "row",
     justifyContent: "space-around",
     backgroundColor: "#cfd8dc",
-    paddingVertical: 5,
+    paddingVertical: 10,
   },
   bottomMenuButton: {
     flex: 1,

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { View, ScrollView, Platform } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
@@ -21,6 +21,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Dashboard">;
 export default function Dashboard({ navigation }: Props) {
   const [selected, setSelected] = useState("Resumen");
   const isMobile = Platform.OS === "android" || Platform.OS === "ios";
+  const insets = useSafeAreaInsets();
 
   const renderContent = () => {
     switch (selected) {
@@ -38,18 +39,32 @@ export default function Dashboard({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View style={{ flex: 1, flexDirection: isMobile ? "column" : "row" }}>
-          {!isMobile && (
-            <DashboardMenu selected={selected} setSelected={setSelected} />
-          )}
-          <View style={styles.contentContainer}>{renderContent()}</View>
-        </View>
-      </ScrollView>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+      <View style={{ flex: 1, flexDirection: isMobile ? "column" : "row" }}>
+        {/* Sidebar en web / tablet */}
+        {!isMobile && (
+          <DashboardMenu selected={selected} setSelected={setSelected} />
+        )}
 
+        {/* Contenedor de contenido scrollable */}
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: isMobile ? 60 : 0, // espacio para menú mobile
+          }}
+          style={{ flex: 1, backgroundColor: "#f5f5f5" }} // mismo fondo que el contenido
+        >
+          <View style={styles.contentContainer}>{renderContent()}</View>
+        </ScrollView>
+      </View>
+
+      {/* Menú fijo en mobile */}
       {isMobile && (
-        <DashboardMenu selected={selected} setSelected={setSelected} isMobile />
+        <DashboardMenu
+          selected={selected}
+          setSelected={setSelected}
+          isMobile
+        />
       )}
     </SafeAreaView>
   );
