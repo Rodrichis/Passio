@@ -32,6 +32,16 @@ yarn-error.*
 
 # local env files
 .env*.local
+# env files
+.env
+.env.*
+!.env.example
 
+# Firebase nativo (si alguna vez usas config nativa)
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
+# Windows
+Thumbs.db
 # typescript
 *.tsbuildinfo
