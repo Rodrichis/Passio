@@ -32,7 +32,6 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  // 🔹 Menú inferior en mobile (estilo base, sin posición absoluta)
   mobileBottomMenu: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -46,7 +45,6 @@ export const dashboardStyles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  // 🔹 Botón de logout más pequeño
   smallLogoutButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -59,5 +57,37 @@ export const dashboardStyles = StyleSheet.create({
   logoutText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+
+  // 🔹 NUEVOS estilos para el panel de Ajustes
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 15,
+    color: "#023047",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+    marginTop: 10,
+    marginBottom: 4,
+    color: "#333",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    backgroundColor: "#fff",
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    backgroundColor: "#219ebc",
+    paddingVertical: 10,
+    borderRadius: 8,
   },
 });
