@@ -13,6 +13,8 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import ColorPicker from "react-native-color-picker-wheel";
+import { Platform, Linking } from "react-native";
+import { APP_BASE_URL } from "@env"; 
 
 type RootStackParamList = {
   Login: undefined;
@@ -31,6 +33,12 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [mostrarColorPicker, setMostrarColorPicker] = useState(false);
 
   const uid = auth.currentUser?.uid;
+const baseURL =
+  Platform.OS === "web" && typeof window !== "undefined"
+    ? window.location.origin
+    : (APP_BASE_URL || "http://192.168.100.162:8082"); // ⬅️ pon tu IP:PUERTO en dev si no usas .env
+
+const registroURL = `${baseURL}/register/${uid}`;
 
   // 🔹 Cargar información de la empresa desde Firestore
   useEffect(() => {
@@ -73,7 +81,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     alert("✅ Cambios guardados correctamente");
     console.log("✅ Empresa actualizada:", empresa);
   } catch (err: any) {
-    console.error("🔥 Error al guardar cambios:", err);
+    console.error(" Error al guardar cambios:", err);
     alert("❌ No se pudo guardar. Intenta nuevamente.");
   } finally {
     setSaving(false);
@@ -99,8 +107,68 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   }
 
   return (
+    
     <ScrollView style={{ paddingHorizontal: 10 }}>
       <Text style={styles.sectionTitle}>Ajustes de Empresa</Text>
+      {/* 🔗 Link de registro (dev/prod) */}
+<Text style={styles.sectionTitle}>Link de registro</Text>
+<View
+  style={{
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+    marginBottom: 16,
+  }}
+>
+  <Text selectable style={{ color: "#333", marginBottom: 10 }}>
+    {registroURL}
+  </Text>
+
+  <View style={{ flexDirection: "row", gap: 10 }}>
+    <TouchableOpacity
+      onPress={() => Linking.openURL(registroURL)}
+      style={{
+        backgroundColor: "#2196F3",
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 8,
+      }}
+    >
+      <Text style={{ color: "#fff", fontWeight: "bold" }}>
+        Abrir en navegador
+      </Text>
+    </TouchableOpacity>
+
+    {/* Copiar solo en web (sin instalar libs) */}
+    {Platform.OS === "web" &&
+      typeof navigator !== "undefined" &&
+      (navigator as any).clipboard && (
+        <TouchableOpacity
+          onPress={async () => {
+            try {
+              await (navigator as any).clipboard.writeText(registroURL);
+              alert("Link copiado");
+            } catch (e) {
+              console.log(e);
+            }
+          }}
+          style={{
+            borderWidth: 1,
+            borderColor: "#2196F3",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 8,
+            backgroundColor: "#E3F2FD",
+          }}
+        >
+          <Text style={{ color: "#0D47A1", fontWeight: "bold" }}>Copiar</Text>
+        </TouchableOpacity>
+      )}
+  </View>
+</View>
+
 
       {/* 🔹 Nombre + Teléfono en una fila */}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -235,6 +303,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </Text>
   </View>
 )}
+
 
       </View>
 
