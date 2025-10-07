@@ -8,5 +8,6 @@ declare module "@env" {
   export const FIREBASE_MESSAGING_SENDER_ID: string;
   export const FIREBASE_APP_ID: string;
   export const FIREBASE_measurement_Id:string;
+export const APP_BASE_URL: string;
 
 }
