@@ -18,17 +18,17 @@ type RootStackParamList = {
 
 type Props = NativeStackScreenProps<RootStackParamList, "Dashboard">;
 
+// ...imports
 export default function Dashboard({ navigation }: Props) {
   const [selected, setSelected] = useState("Resumen");
   const isMobile = Platform.OS === "android" || Platform.OS === "ios";
-  const insets = useSafeAreaInsets();
 
   const renderContent = () => {
     switch (selected) {
       case "Resumen":
         return <DashboardContentResumen />;
       case "Clientes":
-        return <DashboardContentClientes />;
+        return <DashboardContentClientes />; // <- FlatList manejará el scroll
       case "Promociones":
         return <DashboardContentPromociones />;
       case "Ajustes":
@@ -38,34 +38,34 @@ export default function Dashboard({ navigation }: Props) {
     }
   };
 
+  const isClientes = selected === "Clientes";
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
       <View style={{ flex: 1, flexDirection: isMobile ? "column" : "row" }}>
-        {/* Sidebar en web / tablet */}
         {!isMobile && (
           <DashboardMenu selected={selected} setSelected={setSelected} />
         )}
 
-        {/* Contenedor de contenido scrollable */}
-        <ScrollView
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: isMobile ? 60 : 0, // espacio para menú mobile
-          }}
-          style={{ flex: 1, backgroundColor: "#f5f5f5" }} // mismo fondo que el contenido
-        >
-          <View style={styles.contentContainer}>{renderContent()}</View>
-        </ScrollView>
+        {/* 👉 Para Clientes NO usamos ScrollView */}
+        {isClientes ? (
+          <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
+            <View style={styles.contentContainer}>{renderContent()}</View>
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: isMobile ? 60 : 0 }}
+            style={{ flex: 1, backgroundColor: "#f5f5f5" }}
+          >
+            <View style={styles.contentContainer}>{renderContent()}</View>
+          </ScrollView>
+        )}
       </View>
 
-      {/* Menú fijo en mobile */}
       {isMobile && (
-        <DashboardMenu
-          selected={selected}
-          setSelected={setSelected}
-          isMobile
-        />
+        <DashboardMenu selected={selected} setSelected={setSelected} isMobile />
       )}
     </SafeAreaView>
   );
 }
+
