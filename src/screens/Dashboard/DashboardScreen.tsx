@@ -8,6 +8,8 @@ import DashboardMenu from "./DashboardMenu";
 import DashboardContentResumen from "./content/DashboardContentResumen";
 import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentPromociones from "./content/DashboardContentPromociones";
+import DashboardContentEscanear from "./content/DashboardContentEscanear";
+import DashboardContentTest from "./content/DashboardContentTest";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 
 type RootStackParamList = {
@@ -31,6 +33,10 @@ export default function Dashboard({ navigation }: Props) {
         return <DashboardContentClientes />; // <- FlatList manejará el scroll
       case "Promociones":
         return <DashboardContentPromociones />;
+      case "Escanear":
+        return <DashboardContentEscanear />;
+      case "Test":
+        return <DashboardContentTest />;
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
       default:

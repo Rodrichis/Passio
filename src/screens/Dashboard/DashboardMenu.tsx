@@ -13,6 +13,8 @@ const menuItems = [
   { name: "Resumen", icon: "home-outline" },
   { name: "Clientes", icon: "people-outline" },
   { name: "Promociones", icon: "pricetag-outline" },
+  { name: "Escanear", icon: "qr-code-outline" },
+  { name: "Test", icon: "flask-outline" },
   { name: "Ajustes", icon: "settings-outline" },
 ];
 
