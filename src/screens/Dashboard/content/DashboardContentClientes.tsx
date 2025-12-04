@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   Platform,
+  TextInput,
 } from "react-native";
 import { auth, db } from "../../../services/firebaseConfig";
 import {
@@ -43,6 +44,8 @@ export default function DashboardContentClientes() {
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const mapDoc = (d: any): Cliente => {
     const data = d.data() || {};
@@ -141,25 +144,27 @@ export default function DashboardContentClientes() {
 
   // --------- Vistas ---------
   const HeaderWeb = () => (
-    <View
-      style={{
-        flexDirection: "row",
-        backgroundColor: "#e3f2fd",
-        borderWidth: 1,
-        borderColor: "#cfd8dc",
-        borderRadius: 8,
-        paddingVertical: 10,
-        paddingHorizontal: 8,
-        marginBottom: 8,
-      }}
-    >
-      <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Nombre</Text>
-      <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Email</Text>
-      <Text style={{ flex: 1.4, fontWeight: "bold", color: "#023047" }}>Teléfono</Text>
-      <Text style={{ flex: 1.2, fontWeight: "bold", color: "#023047", textAlign: "right" }}>
-        SO / Fecha
-      </Text>
-    </View>
+    <TouchableOpacity onPress={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}>
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: "#e3f2fd",
+          borderWidth: 1,
+          borderColor: "#cfd8dc",
+          borderRadius: 8,
+          paddingVertical: 10,
+          paddingHorizontal: 8,
+          marginBottom: 8,
+        }}
+      >
+        <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Nombre</Text>
+        <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Email</Text>
+        <Text style={{ flex: 1.4, fontWeight: "bold", color: "#023047" }}>Teléfono</Text>
+        <Text style={{ flex: 1.2, fontWeight: "bold", color: "#023047", textAlign: "right" }}>
+          SO / Fecha {sortOrder === "desc" ? "↓" : "↑"}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   const RowWeb = ({ item }: { item: Cliente }) => (
@@ -176,16 +181,16 @@ export default function DashboardContentClientes() {
       }}
     >
       <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
-        {item.nombreCompleto || "—"}
+        {item.nombreCompleto || "--"}
       </Text>
       <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
-        {item.email || "—"}
+        {item.email || "--"}
       </Text>
       <Text style={{ flex: 1.4 }} numberOfLines={1} ellipsizeMode="tail">
-        {item.telefono || "—"}
+        {item.telefono || "--"}
       </Text>
       <Text style={{ flex: 1.2, textAlign: "right" }}>
-        {(item.so || "—") +
+        {(item.so || "--") +
           (item.creadoEn ? ` · ${item.creadoEn.toLocaleDateString()}` : "")}
       </Text>
     </View>
@@ -203,15 +208,13 @@ export default function DashboardContentClientes() {
       }}
     >
       <Text style={{ fontWeight: "bold" }} numberOfLines={1}>
-        {item.nombreCompleto || "—"}
+        {item.nombreCompleto || "--"}
       </Text>
 
-      {/* Email debajo, ocupa toda la fila */}
       <Text style={{ color: "#555", marginTop: 2 }} numberOfLines={1} ellipsizeMode="tail">
-        {item.email || "—"}
+        {item.email || "--"}
       </Text>
 
-      {/* Teléfono y SO/fecha en dos columnas */}
       <View
         style={{
           marginTop: 6,
@@ -222,27 +225,63 @@ export default function DashboardContentClientes() {
         }}
       >
         <Text style={{ color: "#666", flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
-          {item.telefono || "—"}
+          {item.telefono || "--"}
         </Text>
         <Text style={{ color: "#666", textAlign: "right", flex: 1 }}>
-          {(item.so || "—") +
+          {(item.so || "--") +
             (item.creadoEn ? ` · ${item.creadoEn.toLocaleDateString()}` : "")}
         </Text>
       </View>
     </View>
   );
 
+  const filteredItems = items.filter((it) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      (it.nombreCompleto || "").toLowerCase().includes(term) ||
+      (it.email || "").toLowerCase().includes(term) ||
+      (it.id || "").toLowerCase().includes(term)
+    );
+  });
+
+  const sortedItems = filteredItems.slice().sort((a, b) => {
+    const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;
+    const bTime = b.creadoEn instanceof Date ? b.creadoEn.getTime() : 0;
+    return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
+  });
+
+  const toggleSort = () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.sectionTitle}>Clientes</Text>
 
+      <TextInput
+        placeholder="Buscar por nombre, email o ID"
+        value={search}
+        onChangeText={setSearch}
+        style={{
+          borderWidth: 1,
+          borderColor: "#ccc",
+          borderRadius: 8,
+          padding: 10,
+          marginBottom: 10,
+          backgroundColor: "#fff",
+        }}
+      />
+
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 
-      {items.length === 0 ? (
-        <Text>No hay clientes registrados aún.</Text>
+      {sortedItems.length === 0 ? (
+        <Text>
+          {items.length === 0
+            ? "No hay clientes registrados aún."
+            : "No se encontraron coincidencias."}
+        </Text>
       ) : (
         <FlatList
-          data={items}
+          data={sortedItems}
           keyExtractor={(it) => it.id}
           ListHeaderComponent={IS_WEB ? <HeaderWeb /> : null}
           renderItem={({ item }) =>
