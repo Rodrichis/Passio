@@ -28,7 +28,7 @@ export default function Dashboard({ navigation }: Props) {
   const renderContent = () => {
     switch (selected) {
       case "Principal":
-        return <DashboardContentPrincipal />;
+        return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
       case "Clientes":
         return <DashboardContentClientes />; // <- FlatList manejará el scroll
       case "Promociones":
