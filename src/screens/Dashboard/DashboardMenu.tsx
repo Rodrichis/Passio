@@ -10,7 +10,7 @@ type Props = {
 };
 
 const menuItems = [
-  { name: "Resumen", icon: "home-outline" },
+  { name: "Principal", icon: "home-outline" },
   { name: "Clientes", icon: "people-outline" },
   { name: "Promociones", icon: "pricetag-outline" },
   { name: "Escanear", icon: "qr-code-outline" },
