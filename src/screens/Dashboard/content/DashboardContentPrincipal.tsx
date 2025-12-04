@@ -38,6 +38,8 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const [error, setError] = React.useState<string | null>(null);
   const [totalClientes, setTotalClientes] = React.useState<number | null>(null);
   const [nuevosSemana, setNuevosSemana] = React.useState<number | null>(null);
+  const [androidCount, setAndroidCount] = React.useState<number | null>(null);
+  const [iosCount, setIosCount] = React.useState<number | null>(null);
   const [puntosHoy] = React.useState<number | null>(null); // placeholder sin fuente de datos
   const [actividad, setActividad] = React.useState<ActivityItem[]>([]);
 
@@ -60,6 +62,11 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
 
         const totalSnap = await getCountFromServer(col);
         setTotalClientes(totalSnap.data().count);
+
+        const androidSnap = await getDocs(query(col, where("so", "==", "android")));
+        setAndroidCount(androidSnap.size);
+        const iosSnap = await getDocs(query(col, where("so", "==", "ios")));
+        setIosCount(iosSnap.size);
 
         const oneWeekAgo = Timestamp.fromDate(
           new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
@@ -171,7 +178,12 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
 
       <Text style={styles.sectionTitle}>Resumen de clientes</Text>
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-        <MetricCard label="Clientes totales" value={totalClientes} loading={loading} />
+        <MetricCard
+          label="Clientes totales"
+          value={totalClientes}
+          loading={loading}
+          note={`Android: ${androidCount ?? 0} · iOS: ${iosCount ?? 0}`}
+        />
         <MetricCard label="Nuevos 7 días" value={nuevosSemana} loading={loading} />
         <MetricCard
           label="Puntos otorgados hoy"
