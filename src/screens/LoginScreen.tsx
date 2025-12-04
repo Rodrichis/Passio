@@ -27,9 +27,22 @@ export default function LoginScreen({ navigation }: Props) {
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
+    const emailTrim = email.trim().toLowerCase();
+    const passwordTrim = password.trim();
+
+    if (!emailTrim || !passwordTrim) {
+      setError("Ingresa correo y contraseña.");
+      return;
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim)) {
+      setError("Correo inválido.");
+      return;
+    }
+
     try {
       setError("");
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, emailTrim, passwordTrim);
       navigation.replace("Dashboard");
     } catch {
       setError("Usuario o contraseña incorrectos");

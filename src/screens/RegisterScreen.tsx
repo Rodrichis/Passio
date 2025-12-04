@@ -22,8 +22,22 @@ export default function RegisterScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!empresa || !email || !password) {
+    const empresaTrim = empresa.trim();
+    const emailTrim = email.trim().toLowerCase();
+    const passwordTrim = password.trim();
+
+    if (!empresaTrim || !emailTrim || !passwordTrim) {
       setError("Por favor completa todos los campos.");
+      return;
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim)) {
+      setError("Correo inválido.");
+      return;
+    }
+
+    if (passwordTrim.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
@@ -31,27 +45,26 @@ export default function RegisterScreen({ navigation }: Props) {
       setError("");
       setLoading(true);
 
-      // 🔹 1. Crear usuario en Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const userCredential = await createUserWithEmailAndPassword(auth, emailTrim, passwordTrim);
       const uid = userCredential.user.uid;
 
-     await setDoc(doc(db, "Empresas", uid), {
-  uid,
-  nombre: empresa,
-  Mail: email.trim(),
-  telefono: "",
-  Descripcion: "",
-  ColorPrincipal: "#A99985",
-  LinkRegistro: `https://passio.cl/register/${uid}`,
-  Activo: true,
-  FechaRegistro: new Date(),
-});
+      await setDoc(doc(db, "Empresas", uid), {
+        uid,
+        nombre: empresaTrim,
+        Mail: emailTrim,
+        telefono: "",
+        Descripcion: "",
+        ColorPrincipal: "#A99985",
+        LinkRegistro: `https://passio.cl/register/${uid}`,
+        Activo: true,
+        FechaRegistro: new Date(),
+      });
 
-      console.log("✅ Empresa registrada correctamente");
+      console.log("Empresa registrada correctamente");
       navigation.replace("Dashboard");
     } catch (err: any) {
-      console.error("❌ Error al registrar empresa:", err);
-      setError(err.message);
+      console.error("Error al registrar empresa:", err);
+      setError(err.message || "No se pudo registrar.");
     } finally {
       setLoading(false);
     }
@@ -98,10 +111,7 @@ export default function RegisterScreen({ navigation }: Props) {
           />
 
           <TouchableOpacity
-            style={[
-              globalStyles.primaryButton,
-              loading && { opacity: 0.6 },
-            ]}
+            style={[globalStyles.primaryButton, loading && { opacity: 0.6 }]}
             onPress={handleRegister}
             disabled={loading}
           >
