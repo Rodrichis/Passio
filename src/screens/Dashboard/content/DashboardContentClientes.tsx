@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   TextInput,
+  Modal,
 } from "react-native";
 import { auth, db } from "../../../services/firebaseConfig";
 import {
@@ -46,6 +47,8 @@ export default function DashboardContentClientes() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
+  const [showFilter, setShowFilter] = useState(false);
 
   const mapDoc = (d: any): Cliente => {
     const data = d.data() || {};
@@ -237,12 +240,17 @@ export default function DashboardContentClientes() {
 
   const filteredItems = items.filter((it) => {
     const term = search.trim().toLowerCase();
-    if (!term) return true;
-    return (
+    const termMatch =
+      !term ||
       (it.nombreCompleto || "").toLowerCase().includes(term) ||
       (it.email || "").toLowerCase().includes(term) ||
-      (it.id || "").toLowerCase().includes(term)
-    );
+      (it.id || "").toLowerCase().includes(term);
+
+    const osMatch =
+      filterOS === "all" ||
+      (it.so || "").toLowerCase() === filterOS;
+
+    return termMatch && osMatch;
   });
 
   const sortedItems = filteredItems.slice().sort((a, b) => {
@@ -257,19 +265,143 @@ export default function DashboardContentClientes() {
     <View style={{ flex: 1 }}>
       <Text style={styles.sectionTitle}>Clientes</Text>
 
-      <TextInput
-        placeholder="Buscar por nombre, email o ID"
-        value={search}
-        onChangeText={setSearch}
-        style={{
-          borderWidth: 1,
-          borderColor: "#ccc",
-          borderRadius: 8,
-          padding: 10,
-          marginBottom: 10,
-          backgroundColor: "#fff",
-        }}
-      />
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+        <TextInput
+          placeholder="Buscar por nombre, email o ID"
+          value={search}
+          onChangeText={setSearch}
+          style={{
+            flex: 1,
+            borderWidth: 1,
+            borderColor: "#ccc",
+            borderRadius: 8,
+            padding: 10,
+            backgroundColor: "#fff",
+          }}
+        />
+
+        <TouchableOpacity
+          onPress={() => setShowFilter(true)}
+          style={{
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#cfd8dc",
+            backgroundColor: "#e3f2fd",
+            justifyContent: "center",
+          }}
+        >
+          <Text style={{ color: "#023047", fontWeight: "600" }}>Filtro</Text>
+        </TouchableOpacity>
+      </View>
+
+      {(search.trim() || filterOS !== "all") && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 8,
+          }}
+        >
+          <Text style={{ color: "#023047", fontSize: 13, fontWeight: "600" }}>
+            Filtros aplicados:
+          </Text>
+
+          {search.trim() ? (
+            <View
+              style={{
+                backgroundColor: "#e3f2fd",
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 999,
+              }}
+            >
+              <Text style={{ color: "#023047", fontSize: 12 }}>
+                Busca “{search.trim()}”
+              </Text>
+            </View>
+          ) : null}
+
+          {filterOS !== "all" ? (
+            <View
+              style={{
+                backgroundColor: "#e8f5e9",
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 999,
+              }}
+            >
+              <Text style={{ color: "#2e7d32", fontSize: 12 }}>
+                SO: {filterOS === "ios" ? "Apple (iOS)" : "Android"}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {/* Modal de filtros */}
+      <Modal visible={showFilter} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 10,
+              padding: 16,
+              width: "100%",
+              maxWidth: 320,
+              gap: 10,
+            }}
+          >
+            <Text style={{ fontWeight: "700", fontSize: 16, color: "#023047" }}>
+              Filtrar por sistema operativo
+            </Text>
+            {[
+              { label: "Todos", value: "all" as const },
+              { label: "Apple (iOS)", value: "ios" as const },
+              { label: "Android", value: "android" as const },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => {
+                  setFilterOS(opt.value);
+                  setShowFilter(false);
+                }}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: filterOS === opt.value ? "#2196F3" : "#e0e0e0",
+                  backgroundColor: filterOS === opt.value ? "#E3F2FD" : "#f9f9f9",
+                }}
+              >
+                <Text style={{ color: "#023047", fontWeight: "600" }}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              onPress={() => setShowFilter(false)}
+              style={{
+                marginTop: 4,
+                alignSelf: "flex-end",
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text style={{ color: "#555" }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 
