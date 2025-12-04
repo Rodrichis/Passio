@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { View, TextInput, Text, ScrollView, TouchableOpacity } from "react-native";
+import {
+  View,
+  TextInput,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -20,7 +28,7 @@ export default function LoginScreen({ navigation }: Props) {
 
   const handleLogin = async () => {
     try {
-      setError(""); // Limpia errores previos
+      setError("");
       await signInWithEmailAndPassword(auth, email, password);
       navigation.replace("Dashboard");
     } catch {
@@ -29,52 +37,59 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
-      <View style={globalStyles.container}>
-        <Text style={globalStyles.header}>Passio</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        contentContainerStyle={globalStyles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={globalStyles.container}>
+          <Text style={globalStyles.header}>Passio</Text>
 
-        <View style={globalStyles.card}>
-          <Text style={globalStyles.title}>Login Empresa</Text>
+          <View style={globalStyles.card}>
+            <Text style={globalStyles.title}>Login Empresa</Text>
 
-          <TextInput
-            style={globalStyles.input}
-            placeholder="Correo electrónico"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            returnKeyType="done"
-            autoCapitalize="none"   //Desactiva mayúsculas automáticas
-            autoCorrect={false}     //Desactiva autocorrección
-            onSubmitEditing={handleLogin} // 🔹 Enter hace login
-          />
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Correo electrónico"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              returnKeyType="done"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onSubmitEditing={handleLogin}
+            />
 
-          <TextInput
-            style={globalStyles.input}
-            placeholder="Contraseña"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            returnKeyType="done"
-            autoCapitalize="none"   //Desactiva mayúsculas automáticas
-            autoCorrect={false}     //Desactiva autocorrección
-            onSubmitEditing={handleLogin} // 🔹 Enter hace login
-          />
+            <TextInput
+              style={globalStyles.input}
+              placeholder="Contraseña"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              returnKeyType="done"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onSubmitEditing={handleLogin}
+            />
 
-          {/* 🔹 Mensaje de error justo debajo del formulario */}
-          {error ? <Text style={globalStyles.error}>{error}</Text> : null}
+            {error ? <Text style={globalStyles.error}>{error}</Text> : null}
 
-          <TouchableOpacity style={globalStyles.primaryButton} onPress={handleLogin}>
-            <Text style={globalStyles.buttonText}>Iniciar sesión</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={globalStyles.primaryButton} onPress={handleLogin}>
+              <Text style={globalStyles.buttonText}>Iniciar sesión</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={globalStyles.secondaryButton}
-            onPress={() => navigation.navigate("Register")}
-          >
-            <Text style={globalStyles.buttonTextSecondary}>Registrar nueva empresa</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={globalStyles.secondaryButton}
+              onPress={() => navigation.navigate("Register")}
+            >
+              <Text style={globalStyles.buttonTextSecondary}>Registrar nueva empresa</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

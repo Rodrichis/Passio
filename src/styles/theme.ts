@@ -18,7 +18,7 @@ export const globalStyles = StyleSheet.create({
     padding: 20,
     backgroundColor: COLORS.background,
   },
-  scrollContainer: { flexGrow: 1 },
+  scrollContainer: { flexGrow: 1, justifyContent: "center", paddingVertical: 40 },
   header: {
     fontSize: 32,
     fontWeight: "bold",
