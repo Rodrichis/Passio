@@ -43,12 +43,8 @@ export default function LoginScreen({ navigation }: Props) {
 
     try {
       setError("");
-      const cred = await signInWithEmailAndPassword(auth, emailTrim, passwordTrim);
-      if (cred.user.emailVerified) {
-        navigation.replace("Dashboard");
-      } else {
-        navigation.replace("VerifyEmail", { email: cred.user.email || emailTrim });
-      }
+      await signInWithEmailAndPassword(auth, emailTrim, passwordTrim);
+      // La navegación depende de onAuthStateChanged en App.tsx
     } catch {
       setError("Usuario o contraseña incorrectos");
     }

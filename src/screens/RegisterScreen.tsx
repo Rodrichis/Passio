@@ -68,7 +68,7 @@ export default function RegisterScreen({ navigation }: Props) {
         FechaRegistro: new Date(),
       });
 
-      navigation.replace("VerifyEmail", { email: user.email || emailTrim });
+      // La navegación depende de onAuthStateChanged en App.tsx
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
       setError(err.message || "No se pudo registrar.");
