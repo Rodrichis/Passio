@@ -17,6 +17,7 @@ type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  VerifyEmail: { email?: string };
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, "Login">;
@@ -42,12 +43,18 @@ export default function LoginScreen({ navigation }: Props) {
 
     try {
       setError("");
-      await signInWithEmailAndPassword(auth, emailTrim, passwordTrim);
-      navigation.replace("Dashboard");
+      const cred = await signInWithEmailAndPassword(auth, emailTrim, passwordTrim);
+      if (cred.user.emailVerified) {
+        navigation.replace("Dashboard");
+      } else {
+        navigation.replace("VerifyEmail", { email: cred.user.email || emailTrim });
+      }
     } catch {
       setError("Usuario o contraseña incorrectos");
     }
   };
+
+  const isValid = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim().toLowerCase()) && password.trim().length > 0;
 
   return (
     <KeyboardAvoidingView
@@ -90,7 +97,14 @@ export default function LoginScreen({ navigation }: Props) {
 
             {error ? <Text style={globalStyles.error}>{error}</Text> : null}
 
-            <TouchableOpacity style={globalStyles.primaryButton} onPress={handleLogin}>
+            <TouchableOpacity
+              style={[
+                globalStyles.primaryButton,
+                !isValid && { opacity: 0.6 },
+              ]}
+              onPress={handleLogin}
+              disabled={!isValid}
+            >
               <Text style={globalStyles.buttonText}>Iniciar sesión</Text>
             </TouchableOpacity>
 

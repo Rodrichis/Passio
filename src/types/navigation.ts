@@ -3,6 +3,7 @@ export type RootStackParamList = {
   Register: undefined;
   Dashboard: undefined;
   RegisterClient: { empresaId: string }; 
+  VerifyEmail: { email?: string };
 };
 
 

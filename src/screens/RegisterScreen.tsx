@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, TextInput, Text, ScrollView, TouchableOpacity } from "react-native";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -10,6 +10,7 @@ type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  VerifyEmail: { email?: string };
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
@@ -45,23 +46,29 @@ export default function RegisterScreen({ navigation }: Props) {
       setError("");
       setLoading(true);
 
+      auth.languageCode = "es";
       const userCredential = await createUserWithEmailAndPassword(auth, emailTrim, passwordTrim);
-      const uid = userCredential.user.uid;
+      const user = userCredential.user;
 
-      await setDoc(doc(db, "Empresas", uid), {
-        uid,
+      try {
+        await sendEmailVerification(user);
+      } catch (e) {
+        console.warn("No se pudo enviar verificación de correo:", e);
+      }
+
+      await setDoc(doc(db, "Empresas", user.uid), {
+        uid: user.uid,
         nombre: empresaTrim,
         Mail: emailTrim,
         telefono: "",
         Descripcion: "",
         ColorPrincipal: "#A99985",
-        LinkRegistro: `https://passio.cl/register/${uid}`,
+        LinkRegistro: `https://passio.cl/register/${user.uid}`,
         Activo: true,
         FechaRegistro: new Date(),
       });
 
-      console.log("Empresa registrada correctamente");
-      navigation.replace("Dashboard");
+      navigation.replace("VerifyEmail", { email: user.email || emailTrim });
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
       setError(err.message || "No se pudo registrar.");
@@ -69,6 +76,11 @@ export default function RegisterScreen({ navigation }: Props) {
       setLoading(false);
     }
   };
+
+  const isValid =
+    empresa.trim().length > 0 &&
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim().toLowerCase()) &&
+    password.trim().length >= 6;
 
   return (
     <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
@@ -111,9 +123,12 @@ export default function RegisterScreen({ navigation }: Props) {
           />
 
           <TouchableOpacity
-            style={[globalStyles.primaryButton, loading && { opacity: 0.6 }]}
+            style={[
+              globalStyles.primaryButton,
+              (!isValid || loading) && { opacity: 0.6 },
+            ]}
             onPress={handleRegister}
-            disabled={loading}
+            disabled={!isValid || loading}
           >
             <Text style={globalStyles.buttonText}>
               {loading ? "Registrando..." : "Registrar"}

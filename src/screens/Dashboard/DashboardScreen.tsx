@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { View, ScrollView, Platform } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -11,11 +11,13 @@ import DashboardContentPromociones from "./content/DashboardContentPromociones";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentTest from "./content/DashboardContentTest";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
+import { auth } from "../../services/firebaseConfig";
 
 type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  VerifyEmail: { email?: string };
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, "Dashboard">;
@@ -24,6 +26,13 @@ type Props = NativeStackScreenProps<RootStackParamList, "Dashboard">;
 export default function Dashboard({ navigation }: Props) {
   const [selected, setSelected] = useState("Principal");
   const isMobile = Platform.OS === "android" || Platform.OS === "ios";
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user && !user.emailVerified) {
+      navigation.replace("VerifyEmail", { email: user.email || "" });
+    }
+  }, [navigation]);
 
   const renderContent = () => {
     switch (selected) {
