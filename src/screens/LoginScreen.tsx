@@ -98,6 +98,15 @@ export default function LoginScreen({ navigation }: Props) {
             {error ? <Text style={globalStyles.error}>{error}</Text> : null}
 
             <TouchableOpacity
+              onPress={() => navigation.navigate("ForgotPassword")}
+              style={{ alignSelf: "flex-start", marginBottom: 12 }}
+            >
+              <Text style={{ color: "#1976d2", fontWeight: "600" }}>
+                ¿Olvidaste tu contraseña?
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[
                 globalStyles.primaryButton,
                 !isValid && { opacity: 0.6 },
