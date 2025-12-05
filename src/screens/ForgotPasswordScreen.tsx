@@ -12,6 +12,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [cooldown, setCooldown] = useState<number>(0);
 
   const handleReset = async () => {
     const emailTrim = email.trim().toLowerCase();
@@ -25,12 +26,19 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
       auth.languageCode = "es";
       await sendPasswordResetEmail(auth, emailTrim);
       setStatus("Revisa tu correo para restablecer la contraseña.");
+      setCooldown(60);
     } catch (e: any) {
       setStatus("");
       setError("No se pudo enviar el correo. Intenta nuevamente.");
       console.error(e);
     }
   };
+
+  React.useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
 
   return (
     <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
@@ -54,8 +62,17 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
           {error ? <Text style={globalStyles.error}>{error}</Text> : null}
           {status ? <Text style={{ color: "#023047", marginBottom: 10 }}>{status}</Text> : null}
 
-          <TouchableOpacity style={globalStyles.primaryButton} onPress={handleReset}>
-            <Text style={globalStyles.buttonText}>Enviar link de restablecimiento</Text>
+          <TouchableOpacity
+            style={[
+              globalStyles.primaryButton,
+              cooldown > 0 && { opacity: 0.6 },
+            ]}
+            onPress={handleReset}
+            disabled={cooldown > 0}
+          >
+            <Text style={globalStyles.buttonText}>
+              {cooldown > 0 ? `Reenviar en ${cooldown}s` : "Enviar link de restablecimiento"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
