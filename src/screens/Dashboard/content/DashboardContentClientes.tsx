@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -49,6 +49,13 @@ export default function DashboardContentClientes() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
   const [showFilter, setShowFilter] = useState(false);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailStatus, setEmailStatus] = useState<string>("");
+  const [sending, setSending] = useState(false);
 
   const mapDoc = (d: any): Cliente => {
     const data = d.data() || {};
@@ -126,6 +133,93 @@ export default function DashboardContentClientes() {
     loadFirstPage();
   }, [loadFirstPage]);
 
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return items.filter((it) => {
+      const termMatch =
+        !term ||
+        (it.nombreCompleto || "").toLowerCase().includes(term) ||
+        (it.email || "").toLowerCase().includes(term) ||
+        (it.id || "").toLowerCase().includes(term);
+
+      const osMatch =
+        filterOS === "all" ||
+        (it.so || "").toLowerCase() === filterOS;
+
+      return termMatch && osMatch;
+    });
+  }, [items, search, filterOS]);
+
+  const sortedItems = useMemo(() => {
+    const copy = filteredItems.slice();
+    copy.sort((a, b) => {
+      const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;
+      const bTime = b.creadoEn instanceof Date ? b.creadoEn.getTime() : 0;
+      return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
+    });
+    return copy;
+  }, [filteredItems, sortOrder]);
+
+  const toggleSort = () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const allIds = sortedItems.map((it) => it.id);
+      const next = new Set(prev);
+      const allSelected = allIds.every((id) => next.has(id));
+      if (allSelected) {
+        allIds.forEach((id) => next.delete(id));
+      } else {
+        allIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const selectedCount = selectedIds.size;
+  const allVisibleSelected = sortedItems.length > 0 && sortedItems.every((it) => selectedIds.has(it.id));
+
+  const handleSendEmail = async () => {
+    if (!selectedCount) return;
+    if (!emailSubject.trim() || !emailBody.trim()) {
+      setEmailStatus("Asunto y cuerpo son obligatorios.");
+      return;
+    }
+    setSending(true);
+    setEmailStatus("Enviando (placeholder)...");
+    // Aquí conectarás con tu backend (Resend/Node/Cloud Function)
+    setTimeout(() => {
+      setSending(false);
+      setEmailStatus(`Enviado a ${selectedCount} clientes (simulado).`);
+      setShowEmailModal(false);
+      setEmailSubject("");
+      setEmailBody("");
+    }, 800);
+  };
+
+  // ---- UI components ----
+  const Checkbox = ({ checked }: { checked: boolean }) => (
+    <View
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: "#023047",
+        backgroundColor: checked ? "#2196F3" : "transparent",
+      }}
+    />
+  );
+
   if (!uid) {
     return (
       <View>
@@ -145,29 +239,35 @@ export default function DashboardContentClientes() {
     );
   }
 
-  // --------- Vistas ---------
   const HeaderWeb = () => (
-    <TouchableOpacity onPress={() => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}>
-      <View
-        style={{
-          flexDirection: "row",
-          backgroundColor: "#e3f2fd",
-          borderWidth: 1,
-          borderColor: "#cfd8dc",
-          borderRadius: 8,
-          paddingVertical: 10,
-          paddingHorizontal: 8,
-          marginBottom: 8,
-        }}
-      >
-        <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Nombre</Text>
-        <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Email</Text>
-        <Text style={{ flex: 1.4, fontWeight: "bold", color: "#023047" }}>Teléfono</Text>
-        <Text style={{ flex: 1.2, fontWeight: "bold", color: "#023047", textAlign: "right" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: "#e3f2fd",
+        borderWidth: 1,
+        borderColor: "#cfd8dc",
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
+        marginBottom: 8,
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <TouchableOpacity onPress={toggleSelectAll} style={{ padding: 4 }}>
+        <Checkbox checked={allVisibleSelected} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ flex: 2 }} onPress={toggleSort}>
+        <Text style={{ fontWeight: "bold", color: "#023047" }}>Nombre</Text>
+      </TouchableOpacity>
+      <Text style={{ flex: 2, fontWeight: "bold", color: "#023047" }}>Email</Text>
+      <Text style={{ flex: 1.4, fontWeight: "bold", color: "#023047" }}>Teléfono</Text>
+      <TouchableOpacity style={{ flex: 1.2 }} onPress={toggleSort}>
+        <Text style={{ fontWeight: "bold", color: "#023047", textAlign: "right" }}>
           SO / Fecha {sortOrder === "desc" ? "↓" : "↑"}
         </Text>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 
   const RowWeb = ({ item }: { item: Cliente }) => (
@@ -181,8 +281,13 @@ export default function DashboardContentClientes() {
         paddingVertical: 10,
         paddingHorizontal: 8,
         marginBottom: 8,
+        alignItems: "center",
+        gap: 8,
       }}
     >
+      <TouchableOpacity onPress={() => toggleSelect(item.id)} style={{ padding: 4 }}>
+        <Checkbox checked={selectedIds.has(item.id)} />
+      </TouchableOpacity>
       <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
         {item.nombreCompleto || "--"}
       </Text>
@@ -200,66 +305,48 @@ export default function DashboardContentClientes() {
   );
 
   const CardMobile = ({ item }: { item: Cliente }) => (
-    <View
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: "#e0e0e0",
-      }}
-    >
-      <Text style={{ fontWeight: "bold" }} numberOfLines={1}>
-        {item.nombreCompleto || "--"}
-      </Text>
-
-      <Text style={{ color: "#555", marginTop: 2 }} numberOfLines={1} ellipsizeMode="tail">
-        {item.email || "--"}
-      </Text>
-
+    <TouchableOpacity onPress={() => toggleSelect(item.id)} activeOpacity={0.9}>
       <View
         style={{
-          marginTop: 6,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
+          backgroundColor: "#fff",
+          borderRadius: 12,
+          padding: 12,
+          marginBottom: 10,
+          borderWidth: 1,
+          borderColor: selectedIds.has(item.id) ? "#2196F3" : "#e0e0e0",
         }}
       >
-        <Text style={{ color: "#666", flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
-          {item.telefono || "--"}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 8 }}>
+          <Checkbox checked={selectedIds.has(item.id)} />
+          <Text style={{ fontWeight: "bold", flex: 1 }} numberOfLines={1}>
+            {item.nombreCompleto || "--"}
+          </Text>
+        </View>
+
+        <Text style={{ color: "#555", marginTop: 2 }} numberOfLines={1} ellipsizeMode="tail">
+          {item.email || "--"}
         </Text>
-        <Text style={{ color: "#666", textAlign: "right", flex: 1 }}>
-          {(item.so || "--") +
-            (item.creadoEn ? ` · ${item.creadoEn.toLocaleDateString()}` : "")}
-        </Text>
+
+        <View
+          style={{
+            marginTop: 6,
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: "#666", flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
+            {item.telefono || "--"}
+          </Text>
+          <Text style={{ color: "#666", textAlign: "right", flex: 1 }}>
+            {(item.so || "--") +
+              (item.creadoEn ? ` · ${item.creadoEn.toLocaleDateString()}` : "")}
+          </Text>
+        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
-
-  const filteredItems = items.filter((it) => {
-    const term = search.trim().toLowerCase();
-    const termMatch =
-      !term ||
-      (it.nombreCompleto || "").toLowerCase().includes(term) ||
-      (it.email || "").toLowerCase().includes(term) ||
-      (it.id || "").toLowerCase().includes(term);
-
-    const osMatch =
-      filterOS === "all" ||
-      (it.so || "").toLowerCase() === filterOS;
-
-    return termMatch && osMatch;
-  });
-
-  const sortedItems = filteredItems.slice().sort((a, b) => {
-    const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;
-    const bTime = b.creadoEn instanceof Date ? b.creadoEn.getTime() : 0;
-    return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
-  });
-
-  const toggleSort = () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
 
   return (
     <View style={{ flex: 1 }}>
@@ -302,6 +389,7 @@ export default function DashboardContentClientes() {
             alignItems: "center",
             gap: 6,
             marginBottom: 8,
+            flexWrap: "wrap",
           }}
         >
           <Text style={{ color: "#023047", fontSize: 13, fontWeight: "600" }}>
@@ -339,6 +427,24 @@ export default function DashboardContentClientes() {
           ) : null}
         </View>
       )}
+
+      {/* Botón de envío de correo */}
+      <TouchableOpacity
+        onPress={() => setShowEmailModal(true)}
+        disabled={selectedCount === 0}
+        style={{
+          alignSelf: "flex-start",
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          borderRadius: 8,
+          backgroundColor: selectedCount ? "#2196F3" : "#cfd8dc",
+          marginBottom: 10,
+        }}
+      >
+        <Text style={{ color: selectedCount ? "#fff" : "#777", fontWeight: "600" }}>
+          Enviar correo ({selectedCount})
+        </Text>
+      </TouchableOpacity>
 
       {/* Modal de filtros */}
       <Modal visible={showFilter} transparent animationType="fade">
@@ -399,6 +505,85 @@ export default function DashboardContentClientes() {
             >
               <Text style={{ color: "#555" }}>Cerrar</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de enviar correo */}
+      <Modal visible={showEmailModal} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 10,
+              padding: 16,
+              width: "100%",
+              maxWidth: 420,
+              gap: 10,
+            }}
+          >
+            <Text style={{ fontWeight: "700", fontSize: 16, color: "#023047" }}>
+              Enviar correo ({selectedCount} destinatarios)
+            </Text>
+            <TextInput
+              placeholder="Asunto"
+              value={emailSubject}
+              onChangeText={setEmailSubject}
+              style={{
+                borderWidth: 1,
+                borderColor: "#ccc",
+                borderRadius: 8,
+                padding: 10,
+                backgroundColor: "#fff",
+              }}
+            />
+            <TextInput
+              placeholder="Cuerpo del correo"
+              value={emailBody}
+              onChangeText={setEmailBody}
+              multiline
+              numberOfLines={4}
+              style={{
+                borderWidth: 1,
+                borderColor: "#ccc",
+                borderRadius: 8,
+                padding: 10,
+                backgroundColor: "#fff",
+                minHeight: 100,
+                textAlignVertical: "top",
+              }}
+            />
+            {emailStatus ? (
+              <Text style={{ color: "#023047" }}>{emailStatus}</Text>
+            ) : null}
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 10 }}>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)}>
+                <Text style={{ color: "#555" }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSendEmail}
+                disabled={sending}
+                style={{
+                  backgroundColor: "#2196F3",
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 8,
+                  opacity: sending ? 0.7 : 1,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  {sending ? "Enviando..." : "Enviar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
