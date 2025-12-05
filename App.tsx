@@ -1,6 +1,9 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./src/services/firebaseConfig";
+import { View, Text, ActivityIndicator } from "react-native";
 
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -28,16 +31,49 @@ const linking = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [user, setUser] = React.useState<typeof auth.currentUser>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator size="large" />
+        <Text style={{ marginTop: 8 }}>Cargando sesión...</Text>
+      </View>
+    );
+  }
+
+  const isVerified = !!(user && user.emailVerified);
+
   return (
     <NavigationContainer linking={linking}>
-      <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Register" component={RegisterScreen} />
-        <Stack.Screen name="Dashboard" component={DashboardScreen} />
-        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
-      </Stack.Navigator>
+      {!user ? (
+        <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
+        </Stack.Navigator>
+      ) : !isVerified ? (
+        <Stack.Navigator initialRouteName="VerifyEmail" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
+        </Stack.Navigator>
+      ) : (
+        <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
+        </Stack.Navigator>
+      )}
     </NavigationContainer>
   );
 }
