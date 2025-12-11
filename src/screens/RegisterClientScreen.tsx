@@ -52,6 +52,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [walletLink, setWalletLink] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Anonymous auth to comply with security rules for public form
   useEffect(() => {
@@ -110,12 +111,13 @@ export default function RegisterClientScreen({ route }: Props) {
   };
 
   const handleSubmit = async () => {
+    setFormError(null);
     if (!nombreCompleto.trim() || !email.trim() || !telefono.trim()) {
-      alert("Completa nombre, email y telefono.");
+      setFormError("Completa nombre, email y telefono.");
       return;
     }
     if (!so) {
-      alert("Selecciona tu sistema: iPhone o Android.");
+      setFormError("Selecciona tu sistema: iPhone o Android.");
       return;
     }
     setSaving(true);
@@ -159,12 +161,11 @@ export default function RegisterClientScreen({ route }: Props) {
       } else {
         setWalletStep("error");
         setWalletError(sign?.errorText || create.errorText || "No se pudo generar la tarjeta.");
+        setShowForm(true);
       }
 
-      alert("Registro completado");
     } catch (e) {
       console.error("Error registrando cliente:", e);
-      alert("No se pudo registrar. Intenta nuevamente.");
       setWalletStep("error");
       setWalletError(String(e));
       setShowForm(true);
@@ -353,39 +354,46 @@ export default function RegisterClientScreen({ route }: Props) {
                   {saving ? "Registrando..." : "Registrarme"}
                 </Text>
               </TouchableOpacity>
-            </>
-          ) : null}
 
-          {walletStep === "success" && (
-            <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#e8f5e9" }}>
-              <Text style={{ color: "#2e7d32", fontWeight: "700" }}>Tarjeta creada correctamente.</Text>
-              {walletLink ? (
-                <TouchableOpacity
-                  onPress={() => walletLink && Linking.openURL(walletLink)}
-                  style={{
-                    marginTop: 10,
-                    backgroundColor: "#023047",
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>Agregar a mi wallet</Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={{ marginTop: 8, color: "#023047" }}>
-                  No recibimos un link de tarjeta en la respuesta.
-                </Text>
+              {formError ? (
+                <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {walletStep === "success" && (
+                <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#e8f5e9" }}>
+                  <Text style={{ color: "#2e7d32", fontWeight: "700" }}>Tarjeta creada correctamente.</Text>
+                  {walletLink ? (
+                    <TouchableOpacity
+                      onPress={() => walletLink && Linking.openURL(walletLink)}
+                      style={{
+                        marginTop: 10,
+                        backgroundColor: "#023047",
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "700" }}>Agregar a mi wallet</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={{ marginTop: 8, color: "#023047" }}>
+                      No recibimos un link de tarjeta en la respuesta.
+                    </Text>
+                  )}
+                </View>
               )}
-            </View>
+
+              {walletStep === "error" && walletError ? (
+                <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#ffebee" }}>
+                  <Text style={{ color: "#c62828", fontWeight: "700" }}>No se pudo crear la tarjeta.</Text>
+                  <Text style={{ color: "#c62828" }}>{walletError}</Text>
+                </View>
+              ) : null}
+            </>
           )}
 
-          {walletStep === "error" && walletError ? (
-            <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#ffebee" }}>
-              <Text style={{ color: "#c62828", fontWeight: "700" }}>No se pudo crear la tarjeta.</Text>
-              <Text style={{ color: "#c62828" }}>{walletError}</Text>
-            </View>
-          ) : null}
         </View>
       </ScrollView>
 
@@ -412,7 +420,7 @@ export default function RegisterClientScreen({ route }: Props) {
             }}
           >
             <ActivityIndicator size="large" color="#023047" />
-            <Text style={{ fontWeight: "700", color: "#023047" }}>
+            <Text style={{ fontWeight: "700", color: "#023047", textAlign: "center" }}>
               Estamos generando la tarjeta...
             </Text>
           </View>
