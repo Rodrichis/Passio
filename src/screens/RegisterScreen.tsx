@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, TextInput, Text, ScrollView, TouchableOpacity } from "react-native";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -21,6 +21,13 @@ export default function RegisterScreen({ navigation }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Asegura que al entrar a registro no quedes logueado con otra cuenta previa
+  React.useEffect(() => {
+    if (auth.currentUser) {
+      signOut(auth).catch(() => {});
+    }
+  }, []);
 
   const handleRegister = async () => {
     const empresaTrim = empresa.trim();
