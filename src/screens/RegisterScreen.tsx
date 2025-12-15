@@ -109,7 +109,11 @@ export default function RegisterScreen({ navigation }: Props) {
       // La navegacion depende de onAuthStateChanged en App.tsx
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
-      setError(err.message || "No se pudo registrar.");
+      if (err?.code === "auth/email-already-in-use") {
+        setError("Este correo ya se encuentra registrado. Intenta con otro o inicia sesion.");
+      } else {
+        setError(err.message || "No se pudo registrar.");
+      }
     } finally {
       setLoading(false);
     }
