@@ -53,6 +53,8 @@ export default function RegisterClientScreen({ route }: Props) {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const [birthDate, setBirthDate] = useState<Date | null>(null);
+  const [birthInputWeb, setBirthInputWeb] = useState("");
 
   // Anonymous auth to comply with security rules for public form
   useEffect(() => {
@@ -120,6 +122,10 @@ export default function RegisterClientScreen({ route }: Props) {
       setFormError("Selecciona tu sistema: iPhone o Android.");
       return;
     }
+    if (!birthDate) {
+      setFormError("Selecciona tu fecha de nacimiento.");
+      return;
+    }
     setSaving(true);
     setWalletStep("idle");
     setWalletLink(null);
@@ -134,6 +140,7 @@ export default function RegisterClientScreen({ route }: Props) {
         empresaUid: empresaId,
         creadoEn: serverTimestamp(),
         so,
+        fechaNacimiento: birthDate,
         navegador:
           Platform.select({
             web: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
@@ -145,6 +152,8 @@ export default function RegisterClientScreen({ route }: Props) {
       setNombreCompleto("");
       setEmail("");
       setTelefono("");
+      setBirthDate(null);
+      setBirthInputWeb("");
 
       // Generate and sign wallet pass
       setWalletStep("creating");
@@ -247,7 +256,45 @@ export default function RegisterClientScreen({ route }: Props) {
                 editable={!saving && walletStep !== "creating"}
               />
 
-              <Text>Telefono</Text>
+            <Text>Telefono</Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: "#ccc",
+                  borderRadius: 8,
+                  padding: 10,
+                  backgroundColor: "#fff",
+                  marginBottom: 16,
+                }}
+                value={telefono}
+                onChangeText={setTelefono}
+              placeholder="+56 9 ..."
+              keyboardType="phone-pad"
+              editable={!saving && walletStep !== "creating"}
+            />
+
+            <Text>Fecha de nacimiento</Text>
+            {Platform.OS === "web" ? (
+              <input
+                type="date"
+                value={birthInputWeb}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBirthInputWeb(val);
+                  const d = val ? new Date(val) : null;
+                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                }}
+                style={{
+                  borderWidth: 1,
+                  borderColor: "#ccc",
+                  borderRadius: 8,
+                  padding: 10,
+                  backgroundColor: "#fff",
+                  marginBottom: 16,
+                }}
+                disabled={saving || walletStep === "creating"}
+              />
+            ) : (
               <TextInput
                 style={{
                   borderWidth: 1,
@@ -257,15 +304,19 @@ export default function RegisterClientScreen({ route }: Props) {
                   backgroundColor: "#fff",
                   marginBottom: 16,
                 }}
-                value={telefono}
-                onChangeText={setTelefono}
-                placeholder="+56 9 ..."
-                keyboardType="phone-pad"
+                placeholder="AAAA-MM-DD"
+                value={birthInputWeb}
+                onChangeText={(val) => {
+                  setBirthInputWeb(val);
+                  const d = val ? new Date(val) : null;
+                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                }}
                 editable={!saving && walletStep !== "creating"}
               />
+            )}
 
-              {/* SO selector */}
-              {so && !needsSelector ? (
+            {/* SO selector */}
+            {so && !needsSelector ? (
                 <View
                   style={{
                     flexDirection: "row",
