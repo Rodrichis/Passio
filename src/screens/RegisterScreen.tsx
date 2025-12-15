@@ -45,6 +45,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [passwordHint, setPasswordHint] = useState("");
 
   // Asegura que al entrar a registro no quedes logueado con otra cuenta previa
   useEffect(() => {
@@ -72,8 +73,10 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
 
-    if (passwordTrim.length < 6) {
-      setError("La contrasena debe tener al menos 6 caracteres.");
+    const hasLetter = /[A-Za-z]/.test(passwordTrim);
+    const hasNumber = /\d/.test(passwordTrim);
+    if (passwordTrim.length < 8 || !hasLetter || !hasNumber) {
+      setError("La contrasena debe tener al menos 8 caracteres e incluir letras y numeros.");
       return;
     }
 
@@ -122,7 +125,9 @@ export default function RegisterScreen({ navigation }: Props) {
   const isValid =
     empresa.trim().length > 0 &&
     /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim().toLowerCase()) &&
-    password.trim().length >= 6 &&
+    password.trim().length >= 8 &&
+    /[A-Za-z]/.test(password.trim()) &&
+    /\d/.test(password.trim()) &&
     telefono.trim().length > 0 &&
     region.trim().length > 0 &&
     ciudad.trim().length > 0 &&
@@ -162,11 +167,27 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="Contrasena"
             secureTextEntry
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(v) => {
+              setPassword(v);
+              const hasLetter = /[A-Za-z]/.test(v);
+              const hasNumber = /\d/.test(v);
+              if (v.length === 0) {
+                setPasswordHint("");
+              } else if (v.length < 8 || !hasLetter || !hasNumber) {
+                setPasswordHint("Usa al menos 8 caracteres con letras y numeros.");
+              } else {
+                setPasswordHint("Contraseña fuerte.");
+              }
+            }}
             returnKeyType="done"
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {passwordHint ? (
+            <Text style={{ marginTop: -8, marginBottom: 10, color: passwordHint.includes("fuerte") ? "#2e7d32" : "#fb8500" }}>
+              {passwordHint}
+            </Text>
+          ) : null}
 
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
@@ -174,7 +195,10 @@ export default function RegisterScreen({ navigation }: Props) {
                 style={globalStyles.input}
                 placeholder="Telefono"
                 value={telefono}
-                onChangeText={(v) => setTelefono(v.slice(0, 15))}
+                onChangeText={(v) => {
+                  const digits = v.replace(/\D/g, "");
+                  setTelefono(digits.slice(0, 15));
+                }}
                 keyboardType="phone-pad"
                 returnKeyType="done"
                 autoCapitalize="none"
