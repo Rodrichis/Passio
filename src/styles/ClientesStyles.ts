@@ -62,9 +62,27 @@ export const clientesStyles = StyleSheet.create({
 
   metaRow: {
     marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
   },
   metaText: {
     color: "#607d8b",
+    fontSize: 12,
+    flex: 1,
+  },
+  selectAllButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#cfd8dc",
+    backgroundColor: "#fff",
+  },
+  selectAllButtonText: {
+    color: "#023047",
+    fontWeight: "700",
     fontSize: 12,
   },
 

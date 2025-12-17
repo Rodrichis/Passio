@@ -268,10 +268,14 @@ export default function DashboardContentClientes() {
     const soText = formatSO(item.so);
 
     return (
-      <View style={[cStyles.row, index % 2 === 0 && cStyles.rowEven, selected && cStyles.cardSelected]}>
-        <TouchableOpacity onPress={() => toggleSelect(item.id)} style={cStyles.checkboxHitbox}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => toggleSelect(item.id)}
+        style={[cStyles.row, index % 2 === 0 && cStyles.rowEven, selected && cStyles.cardSelected]}
+      >
+        <View style={cStyles.checkboxHitbox}>
           <Checkbox checked={selected} />
-        </TouchableOpacity>
+        </View>
 
         <View style={[cStyles.nameCell, { flex: 2.8 }]}>
           <Ionicons
@@ -307,7 +311,7 @@ export default function DashboardContentClientes() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -323,8 +327,12 @@ export default function DashboardContentClientes() {
     const soText = formatSO(item.so);
 
     return (
-      <View style={[cStyles.card, selected && cStyles.cardSelected]}>
-        <TouchableOpacity onPress={() => toggleSelect(item.id)} style={cStyles.cardHeader} activeOpacity={0.9}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => toggleSelect(item.id)}
+        style={[cStyles.card, selected && cStyles.cardSelected]}
+      >
+        <View style={cStyles.cardHeader}>
           <Checkbox checked={selected} />
           <Ionicons
             name={icon as any}
@@ -334,7 +342,7 @@ export default function DashboardContentClientes() {
           <Text style={{ fontWeight: "bold", flex: 1 }} numberOfLines={1}>
             {item.nombreCompleto || "--"}
           </Text>
-        </TouchableOpacity>
+        </View>
 
         <View style={cStyles.cardFooter}>
           <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
@@ -358,7 +366,7 @@ export default function DashboardContentClientes() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -454,6 +462,11 @@ export default function DashboardContentClientes() {
           Total: {sortedItems.length}
           {selectedCount ? ` | Seleccionados: ${selectedCount}` : ""}
         </Text>
+        <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
+          <Text style={cStyles.selectAllButtonText}>
+            {allVisibleSelected ? "Quitar seleccion" : "Seleccionar todo"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity
