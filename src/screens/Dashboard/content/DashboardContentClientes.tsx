@@ -149,19 +149,21 @@ export default function DashboardContentClientes() {
     [filteredItems, sortOrder]
   );
 
-  const toggleSort = () =>
-    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+  const toggleSort = useCallback(
+    () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc")),
+    []
+  );
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
       const allIds = sortedItems.map((it) => it.id);
       const next = new Set(prev);
@@ -170,30 +172,30 @@ export default function DashboardContentClientes() {
       else allIds.forEach((id) => next.add(id));
       return next;
     });
-  };
+  }, [sortedItems]);
 
   const selectedCount = selectedIds.size;
   const allVisibleSelected =
     sortedItems.length > 0 && sortedItems.every((it) => selectedIds.has(it.id));
 
-  const openDetail = (client: Cliente) => {
+  const openDetail = useCallback((client: Cliente) => {
     setDetailClient(client);
     setShowDetail(true);
-  };
+  }, []);
 
-  const openSingleEmail = (client: Cliente) => {
+  const openSingleEmail = useCallback((client: Cliente) => {
     setEmailMode("single");
     setEmailTarget(client);
     setEmailStatus("");
     setEmailSubject("");
     setEmailBody("");
     setShowEmailModal(true);
-  };
+  }, []);
 
-  const openPush = (client: Cliente) => {
+  const openPush = useCallback((client: Cliente) => {
     setPushTarget(client);
     setShowPushModal(true);
-  };
+  }, []);
 
   const handleSendEmail = async () => {
     const recipientCount = emailMode === "single" ? (emailTarget ? 1 : 0) : selectedCount;
@@ -222,25 +224,6 @@ export default function DashboardContentClientes() {
       ) : null}
     </View>
   );
-
-  if (!uid) {
-    return (
-      <View>
-        <Text style={styles.sectionTitle}>Clientes</Text>
-        <Text>Debes iniciar sesion para ver tus clientes.</Text>
-      </View>
-    );
-  }
-
-  if (loading) {
-    return (
-      <View>
-        <Text style={styles.sectionTitle}>Clientes</Text>
-        <ActivityIndicator size="large" color="#8ecae6" />
-        <Text>Cargando clientes...</Text>
-      </View>
-    );
-  }
 
   const HeaderWeb = () => (
     <View style={cStyles.headerRow}>
@@ -271,8 +254,15 @@ export default function DashboardContentClientes() {
     </View>
   );
 
-  const RowWeb = ({ item, index }: { item: Cliente; index: number }) => {
-    const selected = selectedIds.has(item.id);
+  const RowWebBase = ({
+    item,
+    index,
+    selected,
+  }: {
+    item: Cliente;
+    index: number;
+    selected: boolean;
+  }) => {
     const fecha = item.ultimaVisita || item.creadoEn;
     const icon = osIconName(item.so);
     const soText = formatSO(item.so);
@@ -321,8 +311,13 @@ export default function DashboardContentClientes() {
     );
   };
 
-  const CardMobile = ({ item }: { item: Cliente }) => {
-    const selected = selectedIds.has(item.id);
+  const CardMobileBase = ({
+    item,
+    selected,
+  }: {
+    item: Cliente;
+    selected: boolean;
+  }) => {
     const fecha = item.ultimaVisita || item.creadoEn;
     const icon = osIconName(item.so);
     const soText = formatSO(item.so);
@@ -366,6 +361,56 @@ export default function DashboardContentClientes() {
       </View>
     );
   };
+
+  const RowWeb = useMemo(
+    () =>
+      React.memo(
+        RowWebBase,
+        (prev, next) =>
+          prev.item === next.item && prev.selected === next.selected && prev.index === next.index
+      ),
+    [openDetail, openPush, openSingleEmail, toggleSelect]
+  );
+
+  const CardMobile = useMemo(
+    () =>
+      React.memo(
+        CardMobileBase,
+        (prev, next) => prev.item === next.item && prev.selected === next.selected
+      ),
+    [openDetail, openPush, openSingleEmail, toggleSelect]
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: Cliente; index: number }) => {
+      const selected = selectedIds.has(item.id);
+      return IS_WEB ? (
+        <RowWeb item={item} index={index} selected={selected} />
+      ) : (
+        <CardMobile item={item} selected={selected} />
+      );
+    },
+    [selectedIds, RowWeb, CardMobile]
+  );
+
+  if (!uid) {
+    return (
+      <View>
+        <Text style={styles.sectionTitle}>Clientes</Text>
+        <Text>Debes iniciar sesion para ver tus clientes.</Text>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View>
+        <Text style={styles.sectionTitle}>Clientes</Text>
+        <ActivityIndicator size="large" color="#8ecae6" />
+        <Text>Cargando clientes...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -590,10 +635,15 @@ export default function DashboardContentClientes() {
           data={sortedItems}
           keyExtractor={(it) => it.id}
           ListHeaderComponent={IS_WEB ? <HeaderWeb /> : null}
-          renderItem={({ item, index }) =>
-            IS_WEB ? <RowWeb item={item} index={index} /> : <CardMobile item={item} />
-          }
+          renderItem={renderItem as any}
+          extraData={selectedIds}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={Platform.OS === "android"}
+          keyboardShouldPersistTaps="handled"
           ListFooterComponent={
             hasMore ? (
               <TouchableOpacity onPress={loadMore} style={cStyles.loadMoreButton}>
