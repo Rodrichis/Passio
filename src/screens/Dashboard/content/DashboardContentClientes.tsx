@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   Modal,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
@@ -28,6 +29,29 @@ import { mapDoc, filterItems, sortItems, Cliente } from "../../../utils/clientes
 const PAGE_SIZE = 20;
 const IS_WEB = Platform.OS === "web";
 
+function osIconName(so?: string) {
+  const s = (so || "").toLowerCase();
+  if (s === "android") return "logo-android";
+  if (s === "ios" || s === "iphone" || s === "apple") return "logo-apple";
+  return "help-circle-outline";
+}
+
+function formatSO(so?: string) {
+  const s = (so || "").toLowerCase();
+  if (s === "ios") return "iOS";
+  if (s === "android") return "Android";
+  return so || "--";
+}
+
+function formatDate(d?: Date | null) {
+  if (!d) return "--";
+  try {
+    return d.toLocaleDateString();
+  } catch {
+    return "--";
+  }
+}
+
 export default function DashboardContentClientes() {
   const uid = auth.currentUser?.uid;
 
@@ -38,17 +62,27 @@ export default function DashboardContentClientes() {
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
   const [showFilter, setShowFilter] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Placeholder email modal (kept)
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailStatus, setEmailStatus] = useState<string>("");
   const [sending, setSending] = useState(false);
+  const [emailMode, setEmailMode] = useState<"bulk" | "single">("bulk");
+  const [emailTarget, setEmailTarget] = useState<Cliente | null>(null);
+
+  const [detailClient, setDetailClient] = useState<Cliente | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [pushTarget, setPushTarget] = useState<Cliente | null>(null);
+  const [showPushModal, setShowPushModal] = useState(false);
 
   const loadFirstPage = useCallback(async () => {
     if (!uid) return;
@@ -115,7 +149,8 @@ export default function DashboardContentClientes() {
     [filteredItems, sortOrder]
   );
 
-  const toggleSort = () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+  const toggleSort = () =>
+    setSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -130,40 +165,61 @@ export default function DashboardContentClientes() {
     setSelectedIds((prev) => {
       const allIds = sortedItems.map((it) => it.id);
       const next = new Set(prev);
-      const allSelected = allIds.every((id) => next.has(id));
-      if (allSelected) {
-        allIds.forEach((id) => next.delete(id));
-      } else {
-        allIds.forEach((id) => next.add(id));
-      }
+      const allSelected = allIds.length > 0 && allIds.every((id) => next.has(id));
+      if (allSelected) allIds.forEach((id) => next.delete(id));
+      else allIds.forEach((id) => next.add(id));
       return next;
     });
   };
 
   const selectedCount = selectedIds.size;
-  const allVisibleSelected = sortedItems.length > 0 && sortedItems.every((it) => selectedIds.has(it.id));
+  const allVisibleSelected =
+    sortedItems.length > 0 && sortedItems.every((it) => selectedIds.has(it.id));
+
+  const openDetail = (client: Cliente) => {
+    setDetailClient(client);
+    setShowDetail(true);
+  };
+
+  const openSingleEmail = (client: Cliente) => {
+    setEmailMode("single");
+    setEmailTarget(client);
+    setEmailStatus("");
+    setEmailSubject("");
+    setEmailBody("");
+    setShowEmailModal(true);
+  };
+
+  const openPush = (client: Cliente) => {
+    setPushTarget(client);
+    setShowPushModal(true);
+  };
 
   const handleSendEmail = async () => {
-    if (!selectedCount) return;
+    const recipientCount = emailMode === "single" ? (emailTarget ? 1 : 0) : selectedCount;
+    if (!recipientCount) return;
     if (!emailSubject.trim() || !emailBody.trim()) {
       setEmailStatus("Asunto y cuerpo son obligatorios.");
       return;
     }
     setSending(true);
     setEmailStatus("Enviando (placeholder)...");
-    // TODO: conectar con backend de correo (Resend/Cloud Function)
     setTimeout(() => {
       setSending(false);
-      setEmailStatus(`Enviado a ${selectedCount} clientes (simulado).`);
+      setEmailStatus(`Enviado a ${recipientCount} cliente(s) (simulado).`);
       setShowEmailModal(false);
       setEmailSubject("");
       setEmailBody("");
+      setEmailTarget(null);
+      setEmailMode("bulk");
     }, 800);
   };
 
   const Checkbox = ({ checked }: { checked: boolean }) => (
     <View style={[cStyles.checkbox, checked && cStyles.checkboxChecked]}>
-      {checked ? <Ionicons name="checkmark" size={14} color="#2e7d32" /> : null}
+      {checked ? (
+        <Ionicons name="checkmark" size={14} color="#2e7d32" />
+      ) : null}
     </View>
   );
 
@@ -191,82 +247,118 @@ export default function DashboardContentClientes() {
       <TouchableOpacity onPress={toggleSelectAll} style={cStyles.checkboxHitbox}>
         <Checkbox checked={allVisibleSelected} />
       </TouchableOpacity>
-      <TouchableOpacity style={{ flex: 2 }} onPress={toggleSort}>
-        <Text style={cStyles.headerText}>Nombre</Text>
+
+      <TouchableOpacity style={{ flex: 2.8 }} onPress={toggleSort}>
+        <Text style={cStyles.headerText}>Cliente</Text>
       </TouchableOpacity>
-      <Text style={[cStyles.headerText, { flex: 2 }]}>Email</Text>
-      <Text style={[cStyles.headerText, { flex: 1.4 }]}>Telefono</Text>
-      <Text style={[cStyles.headerText, { flex: 1, textAlign: "center" }]}>SO</Text>
-      <TouchableOpacity style={{ flex: 1.2 }} onPress={toggleSort}>
+
+      <TouchableOpacity style={{ flex: 1.4 }} onPress={toggleSort}>
         <Text style={[cStyles.headerText, { textAlign: "right" }]}>
-          Última visita {sortOrder === "desc" ? "↓" : "↑"}
+          Ultima visita {sortOrder === "desc" ? "v" : "^"}
         </Text>
       </TouchableOpacity>
+
+      <Text style={[cStyles.headerText, { width: 170, textAlign: "right" }]}>
+        Acciones
+      </Text>
     </View>
   );
 
-  const RowWeb = ({ item }: { item: Cliente }) => {
+  const RowWeb = ({ item, index }: { item: Cliente; index: number }) => {
     const selected = selectedIds.has(item.id);
     const fecha = item.ultimaVisita || item.creadoEn;
+    const icon = osIconName(item.so);
+    const soText = formatSO(item.so);
+
     return (
-      <View style={[cStyles.row, selected && cStyles.cardSelected]}>
+      <View style={[cStyles.row, index % 2 === 0 && cStyles.rowEven, selected && cStyles.cardSelected]}>
         <TouchableOpacity onPress={() => toggleSelect(item.id)} style={cStyles.checkboxHitbox}>
           <Checkbox checked={selected} />
         </TouchableOpacity>
-        <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
-          {item.nombreCompleto || "--"}
-        </Text>
-        <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
-          {item.email || "--"}
-        </Text>
-        <Text style={{ flex: 1.4 }} numberOfLines={1} ellipsizeMode="tail">
-          {item.telefono || "--"}
-        </Text>
-        <Text style={{ flex: 1, textAlign: "center" }}>
-          {item.so || "--"}
-        </Text>
-        <Text style={{ flex: 1.2, textAlign: "right" }}>
-          {fecha ? fecha.toLocaleDateString() : "--"}
-        </Text>
-      </View>
-    );
-  };
 
-  const CardMobile = ({ item }: { item: Cliente }) => (
-    <TouchableOpacity onPress={() => toggleSelect(item.id)} activeOpacity={0.9}>
-      <View
-        style={[
-          cStyles.card,
-          selectedIds.has(item.id) && cStyles.cardSelected,
-        ]}
-      >
-        <View style={cStyles.cardHeader}>
-          <Checkbox checked={selectedIds.has(item.id)} />
-          <Text style={{ fontWeight: "bold", flex: 1 }} numberOfLines={1}>
+        <View style={[cStyles.nameCell, { flex: 2.8 }]}>
+          <Ionicons
+            name={icon as any}
+            size={16}
+            color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
+          />
+          <Text style={cStyles.nameText} numberOfLines={1} ellipsizeMode="tail">
             {item.nombreCompleto || "--"}
           </Text>
         </View>
 
-        <Text style={cStyles.cardSub} numberOfLines={1} ellipsizeMode="tail">
-          {item.email || "--"}
-        </Text>
+        <Text style={{ flex: 1.4, textAlign: "right" }}>{formatDate(fecha)}</Text>
 
-        <View style={cStyles.cardFooter}>
-          <Text style={cStyles.cardFooterText} numberOfLines={1} ellipsizeMode="tail">
-            {item.telefono || "--"}
-          </Text>
-          <View style={{ flexDirection: "column", alignItems: "flex-end", flex: 1 }}>
-            <Text style={cStyles.cardFooterText}>{item.so || "--"}</Text>
-            <Text style={cStyles.cardFooterText}>
-              {(item.ultimaVisita || item.creadoEn)
-                ? (item.ultimaVisita || item.creadoEn)?.toLocaleDateString()
-                : "--"}
-            </Text>
+        <View style={{ width: 170, alignItems: "flex-end" }}>
+          <View style={cStyles.rowActions}>
+            <TouchableOpacity
+              onPress={() => openPush(item)}
+              style={cStyles.iconButton}
+              accessibilityLabel="Enviar notificacion push"
+            >
+              <Ionicons name="notifications-outline" size={18} color="#023047" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => openSingleEmail(item)}
+              style={cStyles.iconButton}
+              accessibilityLabel="Enviar correo"
+            >
+              <Ionicons name="mail-outline" size={18} color="#023047" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
+              <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
+
+  const CardMobile = ({ item }: { item: Cliente }) => {
+    const selected = selectedIds.has(item.id);
+    const fecha = item.ultimaVisita || item.creadoEn;
+    const icon = osIconName(item.so);
+    const soText = formatSO(item.so);
+
+    return (
+      <View style={[cStyles.card, selected && cStyles.cardSelected]}>
+        <TouchableOpacity onPress={() => toggleSelect(item.id)} style={cStyles.cardHeader} activeOpacity={0.9}>
+          <Checkbox checked={selected} />
+          <Ionicons
+            name={icon as any}
+            size={18}
+            color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
+          />
+          <Text style={{ fontWeight: "bold", flex: 1 }} numberOfLines={1}>
+            {item.nombreCompleto || "--"}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={cStyles.cardFooter}>
+          <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
+          <View style={cStyles.rowActions}>
+            <TouchableOpacity
+              onPress={() => openPush(item)}
+              style={cStyles.iconButton}
+              accessibilityLabel="Enviar notificacion push"
+            >
+              <Ionicons name="notifications-outline" size={18} color="#023047" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => openSingleEmail(item)}
+              style={cStyles.iconButton}
+              accessibilityLabel="Enviar correo"
+            >
+              <Ionicons name="mail-outline" size={18} color="#023047" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
+              <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -280,10 +372,7 @@ export default function DashboardContentClientes() {
           style={cStyles.searchInput}
         />
 
-        <TouchableOpacity
-          onPress={() => setShowFilter(true)}
-          style={cStyles.filterButton}
-        >
+        <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
           <Text style={cStyles.filterButtonText}>Filtro</Text>
         </TouchableOpacity>
       </View>
@@ -294,7 +383,7 @@ export default function DashboardContentClientes() {
 
           {search.trim() ? (
             <View style={cStyles.chip}>
-              <Text style={cStyles.chipText}>Busca “{search.trim()}”</Text>
+              <Text style={cStyles.chipText}>Busca "{search.trim()}"</Text>
             </View>
           ) : null}
 
@@ -308,8 +397,20 @@ export default function DashboardContentClientes() {
         </View>
       )}
 
+      <View style={cStyles.metaRow}>
+        <Text style={cStyles.metaText}>
+          Total: {sortedItems.length}
+          {selectedCount ? ` | Seleccionados: ${selectedCount}` : ""}
+        </Text>
+      </View>
+
       <TouchableOpacity
-        onPress={() => setShowEmailModal(true)}
+        onPress={() => {
+          setEmailMode("bulk");
+          setEmailTarget(null);
+          setEmailStatus("");
+          setShowEmailModal(true);
+        }}
         disabled={selectedCount === 0}
         style={[
           cStyles.sendButton,
@@ -358,12 +459,68 @@ export default function DashboardContentClientes() {
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity
-              onPress={() => setShowFilter(false)}
-              style={cStyles.modalClose}
-            >
+            <TouchableOpacity onPress={() => setShowFilter(false)} style={cStyles.modalClose}>
               <Text style={{ color: "#555" }}>Cerrar</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Detalle cliente */}
+      <Modal visible={showDetail} transparent animationType="fade">
+        <View style={cStyles.modalBackdrop}>
+          <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
+            <Text style={cStyles.modalTitle}>Detalle del cliente</Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              <Text style={cStyles.detailTitle}>
+                {detailClient?.nombreCompleto || "--"}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                SO: {formatSO(detailClient?.so)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Email: {detailClient?.email || "--"}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Telefono: {detailClient?.telefono || "--"}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Creado: {formatDate(detailClient?.creadoEn || null)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
+              </Text>
+            </ScrollView>
+            <View style={cStyles.modalActions}>
+              <TouchableOpacity onPress={() => setShowDetail(false)}>
+                <Text style={{ color: "#555" }}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Notificacion push individual (placeholder) */}
+      <Modal visible={showPushModal} transparent animationType="fade">
+        <View style={cStyles.modalBackdrop}>
+          <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
+            <Text style={cStyles.modalTitle}>Notificacion push</Text>
+            <Text style={cStyles.detailRow}>
+              Cliente: {pushTarget?.nombreCompleto || "--"}
+            </Text>
+            <Text style={{ color: "#555" }}>
+              Proximo: enviar una notificacion push individual al cliente (cuando tengas FCM / token asociado a la tarjeta).
+            </Text>
+            <View style={cStyles.modalActions}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPushModal(false);
+                  setPushTarget(null);
+                }}
+              >
+                <Text style={{ color: "#555" }}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -373,8 +530,15 @@ export default function DashboardContentClientes() {
         <View style={cStyles.modalBackdrop}>
           <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
             <Text style={cStyles.modalTitle}>
-              Enviar correo ({selectedCount} destinatarios)
+              {emailMode === "single"
+                ? "Enviar correo (1 destinatario)"
+                : `Enviar correo (${selectedCount} destinatarios)`}
             </Text>
+            {emailMode === "single" && emailTarget ? (
+              <Text style={{ color: "#555" }}>
+                Para: {emailTarget.nombreCompleto || "--"}
+              </Text>
+            ) : null}
             <TextInput
               placeholder="Asunto"
               value={emailSubject}
@@ -389,9 +553,7 @@ export default function DashboardContentClientes() {
               numberOfLines={4}
               style={[cStyles.input, { minHeight: 100, textAlignVertical: "top" }]}
             />
-            {emailStatus ? (
-              <Text style={{ color: "#023047" }}>{emailStatus}</Text>
-            ) : null}
+            {emailStatus ? <Text style={{ color: "#023047" }}>{emailStatus}</Text> : null}
             <View style={cStyles.modalActions}>
               <TouchableOpacity onPress={() => setShowEmailModal(false)}>
                 <Text style={{ color: "#555" }}>Cancelar</Text>
@@ -399,10 +561,7 @@ export default function DashboardContentClientes() {
               <TouchableOpacity
                 onPress={handleSendEmail}
                 disabled={sending}
-                style={[
-                  cStyles.modalPrimaryButton,
-                  sending && { opacity: 0.7 },
-                ]}
+                style={[cStyles.modalPrimaryButton, sending && { opacity: 0.7 }]}
               >
                 <Text style={cStyles.modalPrimaryText}>
                   {sending ? "Enviando..." : "Enviar"}
@@ -417,21 +576,17 @@ export default function DashboardContentClientes() {
 
       {sortedItems.length === 0 ? (
         <Text>
-          {items.length === 0
-            ? "No hay clientes registrados aun."
-            : "No se encontraron coincidencias."}
+          {items.length === 0 ? "No hay clientes registrados aun." : "No se encontraron coincidencias."}
         </Text>
       ) : (
         <FlatList
           data={sortedItems}
           keyExtractor={(it) => it.id}
           ListHeaderComponent={IS_WEB ? <HeaderWeb /> : null}
-          renderItem={({ item }) =>
-            IS_WEB ? <RowWeb item={item} /> : <CardMobile item={item} />
+          renderItem={({ item, index }) =>
+            IS_WEB ? <RowWeb item={item} index={index} /> : <CardMobile item={item} />
           }
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListFooterComponent={
             hasMore ? (
               <TouchableOpacity onPress={loadMore} style={cStyles.loadMoreButton}>

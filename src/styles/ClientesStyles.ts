@@ -60,6 +60,14 @@ export const clientesStyles = StyleSheet.create({
   sendButtonText: { color: "#fff", fontWeight: "600" },
   sendButtonTextDisabled: { color: "#777" },
 
+  metaRow: {
+    marginBottom: 8,
+  },
+  metaText: {
+    color: "#607d8b",
+    fontSize: 12,
+  },
+
   headerRow: {
     flexDirection: "row",
     backgroundColor: "#e3f2fd",
@@ -85,6 +93,19 @@ export const clientesStyles = StyleSheet.create({
     marginBottom: 8,
     alignItems: "center",
     gap: 8,
+  },
+  rowEven: {
+    backgroundColor: "#fafafa",
+  },
+  nameCell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+  },
+  nameText: {
+    fontWeight: "600",
+    color: "#023047",
   },
   card: {
     backgroundColor: "#fff",
@@ -182,5 +203,47 @@ export const clientesStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     backgroundColor: "#fff",
+  },
+
+  rowActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  iconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#cfd8dc",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  detailsButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#cfd8dc",
+    backgroundColor: "#fff",
+  },
+  detailsButtonText: {
+    color: "#023047",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  detailTitle: {
+    fontWeight: "800",
+    fontSize: 16,
+    color: "#023047",
+    marginBottom: 8,
+  },
+  detailRow: {
+    color: "#023047",
+    marginBottom: 6,
   },
 });
