@@ -252,13 +252,20 @@ export default function DashboardContentClientes() {
         <Text style={cStyles.headerText}>Cliente</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={{ flex: 1.4 }} onPress={toggleSort}>
-        <Text style={[cStyles.headerText, { textAlign: "right" }]}>
-          Ultima visita {sortOrder === "desc" ? "v" : "^"}
-        </Text>
+      <TouchableOpacity
+        style={{ flex: 1.4, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
+        onPress={toggleSort}
+      >
+        <Ionicons name="calendar-outline" size={16} color="#023047" />
+        <Text style={[cStyles.headerText, { textAlign: "center" }]}>Ultima visita</Text>
+        <Ionicons
+          name={sortOrder === "desc" ? "chevron-down" : "chevron-up"}
+          size={16}
+          color="#023047"
+        />
       </TouchableOpacity>
 
-      <Text style={[cStyles.headerText, { width: 170, textAlign: "right" }]}>
+      <Text style={[cStyles.headerText, { width: 170, textAlign: "center" }]}>
         Acciones
       </Text>
     </View>
@@ -287,9 +294,9 @@ export default function DashboardContentClientes() {
           </Text>
         </View>
 
-        <Text style={{ flex: 1.4, textAlign: "right" }}>{formatDate(fecha)}</Text>
+        <Text style={{ flex: 1.4, textAlign: "center" }}>{formatDate(fecha)}</Text>
 
-        <View style={{ width: 170, alignItems: "flex-end" }}>
+        <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
           <View style={cStyles.rowActions}>
             <TouchableOpacity
               onPress={() => openPush(item)}
