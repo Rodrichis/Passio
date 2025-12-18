@@ -2,10 +2,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { updateWalletPoints, type WalletApiResponse } from "../../../services/apiWallet";
+import { auth, db } from "../../../services/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 
 type ParsedPayload = {
   idUsuario?: string;
   cantidadPuntos?: number;
+  empresaId?: string;
 };
 
 export default function DashboardContentEscanear() {
@@ -39,6 +42,7 @@ export default function DashboardContentEscanear() {
       return {
         idUsuario: parsed.idUsuario || parsed.userId,
         cantidadPuntos: parsed.cantidadPuntos ?? parsed.puntos ?? parsed.points,
+        empresaId: parsed.empresaId || parsed.empresaUid,
       };
     } catch {
       // fallback: si viene un id plano, lo usamos y puntos = 1
@@ -53,9 +57,44 @@ export default function DashboardContentEscanear() {
       setLoading(true);
       setStatus("Procesando...");
 
+      const empresaId = auth.currentUser?.uid;
+      if (!empresaId) {
+        setStatus("Debes iniciar sesion para escanear.");
+        setLoading(false);
+        return;
+      }
+
       const payload = parseData(data);
       if (!payload.idUsuario) {
         setStatus("No se encontró idUsuario en el QR.");
+        setLoading(false);
+        return;
+      }
+
+      if (payload.empresaId && payload.empresaId !== empresaId) {
+        setStatus("Esta tarjeta no pertenece a tu empresa.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const ref = doc(db, "Empresas", empresaId, "Clientes", payload.idUsuario);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          setStatus("Esta tarjeta no pertenece a tu empresa.");
+          setLoading(false);
+          return;
+        }
+        const cliente = snap.data() as any;
+        const activo = cliente.activo ?? true;
+        if (!activo) {
+          setStatus("Este usuario esta desactivado. No se puede registrar la visita.");
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error("Error validando tarjeta:", e);
+        setStatus("No se pudo validar la tarjeta. Intenta nuevamente.");
         setLoading(false);
         return;
       }
