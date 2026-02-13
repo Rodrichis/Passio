@@ -1,5 +1,6 @@
 // src/services/apiWallet.ts
-const BASE_URL = process.env.EXPO_PUBLIC_WALLET_API_BASE_URL!;
+const ANDROID_BASE_URL = process.env.EXPO_PUBLIC_WALLET_ANDROID_API_BASE_URL;
+const APPLE_BASE_URL = process.env.EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL;
 export const DEFAULT_CLASS_ID = process.env.EXPO_PUBLIC_WALLET_CLASS_ID!;
 
 export interface WalletApiResponse {
@@ -15,7 +16,7 @@ async function callWalletApi(
   body: any
 ): Promise<WalletApiResponse> {
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${ANDROID_BASE_URL}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -102,4 +103,82 @@ export async function createAndSignWallet(params: {
 
   const sign = await signWalletObject({ idUsuario: params.idUsuario });
   return { create, sign };
+}
+
+// --------- Apple Wallet services (separados) ---------
+type ApplePassResponse = WalletApiResponse & {
+  contentType?: string;
+};
+
+async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v1/notificacion", body: any): Promise<ApplePassResponse> {
+  if (!APPLE_BASE_URL) {
+    return { ok: false, status: 0, data: null, errorText: "APPLE_BASE_URL no configurada" };
+  }
+  try {
+    const res = await fetch(`${APPLE_BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    // Apple puede responder bytes (.pkpass) o JSON de error
+    let data: any = null;
+    let rawText: string | undefined;
+    if (contentType.includes("application/json")) {
+      rawText = await res.text();
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = rawText;
+      }
+    } else {
+      // bytes
+      data = await res.arrayBuffer();
+    }
+
+    return {
+      ok: res.ok,
+      status: res.status,
+      data,
+      rawText,
+      contentType,
+      errorText: res.ok ? undefined : rawText,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      errorText: String(e),
+    };
+  }
+}
+
+export async function createApplePass(params: {
+  idUsuario: number | string;
+  cantidad: number;
+  premiosDisponibles: number;
+  nombre: string;
+  apellido: string;
+  codigoQR: string;
+}): Promise<ApplePassResponse> {
+  return callAppleApi("/v1/crearPasses", params);
+}
+
+export async function updateApplePass(params: {
+  idUsuario: number | string;
+  cantidad: number;
+  premiosDisponibles: number;
+}): Promise<ApplePassResponse> {
+  return callAppleApi("/v1/actualizarPase", params);
+}
+
+export async function notifyApplePass(params: {
+  idUsuario: number | string;
+  notificacion: string;
+}): Promise<ApplePassResponse> {
+  return callAppleApi("/v1/notificacion", params);
 }
