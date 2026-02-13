@@ -15,7 +15,7 @@ import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, addDoc, collection, serverTimestamp, deleteDoc } from "firebase/firestore";
-import { createAndSignWallet } from "../services/apiWallet";
+import { createAndSignWallet, createApplePass } from "../services/apiWallet";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
 type SO = "ios" | "android";
@@ -135,66 +135,82 @@ export default function RegisterClientScreen({ route }: Props) {
     setWalletError(null);
     setShowForm(true);
 
-    let createdId: string | null = null;
-
     try {
-      const docRef = await addDoc(collection(db, "Empresas", empresaId, "Clientes"), {
-        nombreCompleto: nombreCompleto.trim(),
-        email: email.trim().toLowerCase(),
-        telefono: telefono.trim(),
-        empresaUid: empresaId,
-        creadoEn: serverTimestamp(),
-        so,
-        fechaNacimiento: birthDate,
-        navegador:
-          Platform.select({
-            web: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-            default: "app",
-          }) || "unknown",
-        activo: true,
-      });
-      createdId = docRef.id;
+      // Pre-generar ID sin escribir en Firestore
+      const newDocRef = doc(collection(db, "Empresas", empresaId, "Clientes"));
+      const clientId = newDocRef.id;
 
-      setNombreCompleto("");
-      setEmail("");
-      setTelefono("");
-      setBirthDate(null);
-      setBirthInputWeb("");
-
-      // Generate and sign wallet pass
+      // Generar y firmar wallet
       setWalletStep("creating");
-      const { create, sign } = await createAndSignWallet({
-        idUsuario: docRef.id,
-        nombreUsuario: nombreCompleto.trim(),
-      });
+      let walletOk = false;
+      let walletLinkLocal: string | null = null;
 
-      if (create.ok && sign?.ok) {
-        const link = extractLink(sign.data) || extractLink(create.data);
-        if (link) setWalletLink(link);
-        setWalletStep("success");
-        setShowForm(false);
+      if (so === "ios") {
+        const parts = nombreCompleto.trim().split(/\s+/);
+        const nombre = parts.shift() || "";
+        const apellido = parts.join(" ") || "Passio";
+        const appleRes = await createApplePass({
+          idUsuario: clientId,
+          cantidad: 0,
+          premiosDisponibles: 0,
+          nombre,
+          apellido,
+          codigoQR: clientId,
+        });
+        if (appleRes.ok) {
+          walletOk = true;
+          walletLinkLocal = null; // se maneja la descarga del pkpass aparte
+        } else {
+          throw new Error(appleRes.errorText || "No se pudo generar la tarjeta (Apple).");
+        }
       } else {
-        setWalletStep("error");
-        setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
-        setWalletError(sign?.errorText || create.errorText || "No se pudo generar la tarjeta.");
-        setShowForm(true);
-        // rollback: eliminar cliente creado
-        if (createdId) {
-          await deleteDoc(doc(db, "Empresas", empresaId, "Clientes", createdId));
+        const { create, sign } = await createAndSignWallet({
+          idUsuario: clientId,
+          nombreUsuario: nombreCompleto.trim(),
+        });
+        if (create.ok && sign?.ok) {
+          walletOk = true;
+          walletLinkLocal = extractLink(sign.data) || extractLink(create.data);
+        } else {
+          throw new Error(sign?.errorText || create.errorText || "No se pudo generar la tarjeta (Android).");
         }
       }
 
-    } catch (e) {
+      // Solo si el wallet fue OK escribimos el cliente en Firestore
+      if (walletOk) {
+        await setDoc(newDocRef, {
+          nombreCompleto: nombreCompleto.trim(),
+          email: email.trim().toLowerCase(),
+          telefono: telefono.trim(),
+          empresaUid: empresaId,
+          creadoEn: serverTimestamp(),
+          so,
+          fechaNacimiento: birthDate,
+          navegador:
+            Platform.select({
+              web: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+              default: "app",
+            }) || "unknown",
+          activo: true,
+        });
+
+        setNombreCompleto("");
+        setEmail("");
+        setTelefono("");
+        setBirthDate(null);
+        setBirthInputWeb("");
+
+        setWalletLink(walletLinkLocal);
+        setWalletStep("success");
+        setWalletFriendlyError(null);
+        setShowForm(false);
+      }
+    } catch (e: any) {
       console.error("Error registrando cliente:", e);
       setWalletStep("error");
       setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
-      setWalletError(String(e));
+      setWalletError(String(e?.message || e));
       setShowForm(true);
-      if (createdId) {
-        try {
-          await deleteDoc(doc(db, "Empresas", empresaId, "Clientes", createdId));
-        } catch {}
-      }
     } finally {
       setSaving(false);
     }
@@ -426,6 +442,11 @@ export default function RegisterClientScreen({ route }: Props) {
               {formError ? (
                 <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
               ) : null}
+              {walletError ? (
+                <Text selectable style={{ marginTop: 8, color: "#c62828" }}>
+                  {walletError}
+                </Text>
+              ) : null}
             </>
           ) : (
             <>
@@ -525,8 +546,7 @@ export default function RegisterClientScreen({ route }: Props) {
             <TouchableOpacity
               onPress={() => {
                 setWalletStep("idle");
-                setWalletError(null);
-                setWalletFriendlyError(null);
+                // Dejamos walletError y walletFriendlyError para depurar
               }}
               style={{
                 marginTop: 4,
