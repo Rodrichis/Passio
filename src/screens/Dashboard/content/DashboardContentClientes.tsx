@@ -6,6 +6,7 @@ import {
   FlatList,
   RefreshControl,
   TouchableOpacity,
+  Pressable,
   Platform,
   TextInput,
   Modal,
@@ -21,6 +22,9 @@ import {
   getDocs,
   startAfter,
   DocumentSnapshot,
+  doc,
+  getDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../../styles/ClientesStyles";
@@ -83,6 +87,10 @@ export default function DashboardContentClientes() {
   const [showDetail, setShowDetail] = useState(false);
   const [pushTarget, setPushTarget] = useState<Cliente | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [deactivateDone, setDeactivateDone] = useState(false);
 
   const loadFirstPage = useCallback(async () => {
     if (!uid) return;
@@ -181,6 +189,9 @@ export default function DashboardContentClientes() {
   const openDetail = useCallback((client: Cliente) => {
     setDetailClient(client);
     setShowDetail(true);
+    setConfirmDeactivate(false);
+    setDeactivateError(null);
+    setDeactivateDone(false);
   }, []);
 
   const openSingleEmail = useCallback((client: Cliente) => {
@@ -196,6 +207,46 @@ export default function DashboardContentClientes() {
     setPushTarget(client);
     setShowPushModal(true);
   }, []);
+
+  const requestDeactivate = () => {
+    setConfirmDeactivate(true);
+    setDeactivateError(null);
+    setDeactivateDone(false);
+  };
+
+  const cancelDeactivate = () => {
+    setConfirmDeactivate(false);
+    setDeactivateError(null);
+  };
+
+  const confirmDeactivateUser = useCallback(async () => {
+    if (!uid || !detailClient?.id) return;
+    setDeactivating(true);
+    setDeactivateError(null);
+    try {
+      const ref = doc(db, "Empresas", uid, "Clientes", detailClient.id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        setDeactivateError("No se encontro el cliente. Refresca e intenta nuevamente.");
+        return;
+      }
+      await updateDoc(ref, {
+        activo: false,
+      });
+
+      setItems((prev) =>
+        prev.map((it) => (it.id === detailClient.id ? { ...it, activo: false } : it))
+      );
+      setDetailClient((prev) => (prev ? { ...prev, activo: false } : prev));
+      setDeactivateDone(true);
+      setConfirmDeactivate(false);
+    } catch (e: any) {
+      console.error("Error desactivando cliente:", e);
+      setDeactivateError("No se pudo desactivar el usuario. Intenta nuevamente.");
+    } finally {
+      setDeactivating(false);
+    }
+  }, [uid, detailClient?.id]);
 
   const handleSendEmail = async () => {
     const recipientCount = emailMode === "single" ? (emailTarget ? 1 : 0) : selectedCount;
@@ -224,6 +275,35 @@ export default function DashboardContentClientes() {
       ) : null}
     </View>
   );
+
+  const ActionIconButton = ({
+    icon,
+    label,
+    onPress,
+  }: {
+    icon: any;
+    label: string;
+    onPress: () => void;
+  }) => {
+    const [hover, setHover] = useState(false);
+    return (
+      <Pressable
+        onPress={onPress}
+        onHoverIn={() => setHover(true)}
+        onHoverOut={() => setHover(false)}
+        style={cStyles.iconButton}
+        accessibilityLabel={label}
+        accessibilityRole="button"
+      >
+        {IS_WEB && hover ? (
+          <View style={cStyles.tooltip}>
+            <Text style={cStyles.tooltipText}>{label}</Text>
+          </View>
+        ) : null}
+        <Ionicons name={icon} size={18} color="#023047" />
+      </Pressable>
+    );
+  };
 
   const HeaderWeb = () => (
     <View style={cStyles.headerRow}>
@@ -292,20 +372,8 @@ export default function DashboardContentClientes() {
 
         <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
           <View style={cStyles.rowActions}>
-            <TouchableOpacity
-              onPress={() => openPush(item)}
-              style={cStyles.iconButton}
-              accessibilityLabel="Enviar notificacion push"
-            >
-              <Ionicons name="notifications-outline" size={18} color="#023047" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => openSingleEmail(item)}
-              style={cStyles.iconButton}
-              accessibilityLabel="Enviar correo"
-            >
-              <Ionicons name="mail-outline" size={18} color="#023047" />
-            </TouchableOpacity>
+            <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
+            <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
               <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
             </TouchableOpacity>
@@ -347,20 +415,8 @@ export default function DashboardContentClientes() {
         <View style={cStyles.cardFooter}>
           <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
           <View style={cStyles.rowActions}>
-            <TouchableOpacity
-              onPress={() => openPush(item)}
-              style={cStyles.iconButton}
-              accessibilityLabel="Enviar notificacion push"
-            >
-              <Ionicons name="notifications-outline" size={18} color="#023047" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => openSingleEmail(item)}
-              style={cStyles.iconButton}
-              accessibilityLabel="Enviar correo"
-            >
-              <Ionicons name="mail-outline" size={18} color="#023047" />
-            </TouchableOpacity>
+            <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
+            <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
               <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
             </TouchableOpacity>
@@ -555,6 +611,56 @@ export default function DashboardContentClientes() {
               <Text style={cStyles.detailRow}>
                 Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
               </Text>
+
+              <View style={cStyles.detailDivider} />
+
+              {deactivateDone ? (
+                <Text style={cStyles.successText}>Usuario desactivado.</Text>
+              ) : null}
+
+              {detailClient?.activo === false ? (
+                <Text style={cStyles.detailRow}>Estado: Desactivado</Text>
+              ) : (
+                <Text style={cStyles.detailRow}>Estado: Activo</Text>
+              )}
+
+              {deactivateError ? (
+                <Text style={cStyles.errorText}>{deactivateError}</Text>
+              ) : null}
+
+              {detailClient?.activo !== false && !confirmDeactivate ? (
+                <TouchableOpacity
+                  onPress={requestDeactivate}
+                  style={[cStyles.dangerButton, deactivating && { opacity: 0.7 }]}
+                  disabled={deactivating}
+                >
+                  <Text style={cStyles.dangerButtonText}>
+                    Desactivar usuario
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {confirmDeactivate ? (
+                <View style={cStyles.confirmBox}>
+                  <Text style={cStyles.confirmText}>
+                    Confirmas desactivar este usuario?
+                  </Text>
+                  <View style={cStyles.confirmActions}>
+                    <TouchableOpacity onPress={cancelDeactivate} disabled={deactivating}>
+                      <Text style={{ color: "#555" }}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={confirmDeactivateUser}
+                      disabled={deactivating}
+                      style={[cStyles.modalPrimaryButton, deactivating && { opacity: 0.7 }]}
+                    >
+                      <Text style={cStyles.modalPrimaryText}>
+                        {deactivating ? "Desactivando..." : "Confirmar"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
             </ScrollView>
             <View style={cStyles.modalActions}>
               <TouchableOpacity onPress={() => setShowDetail(false)}>

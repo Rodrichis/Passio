@@ -238,6 +238,24 @@ export const clientesStyles = StyleSheet.create({
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  tooltip: {
+    position: "absolute",
+    bottom: 40,
+    left: "50%",
+    transform: [{ translateX: -60 }],
+    width: 120,
+    backgroundColor: "#111",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    zIndex: 999,
+  },
+  tooltipText: {
+    color: "#fff",
+    fontSize: 11,
+    textAlign: "center",
   },
 
   detailsButton: {
@@ -262,6 +280,51 @@ export const clientesStyles = StyleSheet.create({
   },
   detailRow: {
     color: "#023047",
+    marginBottom: 6,
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: "#eee",
+    marginVertical: 10,
+  },
+  dangerButton: {
+    marginTop: 8,
+    backgroundColor: "#c62828",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  dangerButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  confirmBox: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#fff8e1",
+    borderWidth: 1,
+    borderColor: "#ffe0b2",
+  },
+  confirmText: {
+    color: "#6d4c41",
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+  },
+  successText: {
+    color: "#2e7d32",
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  errorText: {
+    color: "#c62828",
+    fontWeight: "600",
     marginBottom: 6,
   },
 });
