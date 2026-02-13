@@ -14,7 +14,7 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { createAndSignWallet } from "../services/apiWallet";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
@@ -51,6 +51,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [walletStep, setWalletStep] = useState<"idle" | "creating" | "success" | "error">("idle");
   const [walletLink, setWalletLink] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [walletFriendlyError, setWalletFriendlyError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -114,6 +115,8 @@ export default function RegisterClientScreen({ route }: Props) {
 
   const handleSubmit = async () => {
     setFormError(null);
+    setWalletError(null);
+    setWalletFriendlyError(null);
     if (!nombreCompleto.trim() || !email.trim() || !telefono.trim()) {
       setFormError("Completa nombre, email y telefono.");
       return;
@@ -132,6 +135,8 @@ export default function RegisterClientScreen({ route }: Props) {
     setWalletError(null);
     setShowForm(true);
 
+    let createdId: string | null = null;
+
     try {
       const docRef = await addDoc(collection(db, "Empresas", empresaId, "Clientes"), {
         nombreCompleto: nombreCompleto.trim(),
@@ -148,6 +153,7 @@ export default function RegisterClientScreen({ route }: Props) {
           }) || "unknown",
         activo: true,
       });
+      createdId = docRef.id;
 
       setNombreCompleto("");
       setEmail("");
@@ -169,15 +175,26 @@ export default function RegisterClientScreen({ route }: Props) {
         setShowForm(false);
       } else {
         setWalletStep("error");
+        setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
         setWalletError(sign?.errorText || create.errorText || "No se pudo generar la tarjeta.");
         setShowForm(true);
+        // rollback: eliminar cliente creado
+        if (createdId) {
+          await deleteDoc(doc(db, "Empresas", empresaId, "Clientes", createdId));
+        }
       }
 
     } catch (e) {
       console.error("Error registrando cliente:", e);
       setWalletStep("error");
+      setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
       setWalletError(String(e));
       setShowForm(true);
+      if (createdId) {
+        try {
+          await deleteDoc(doc(db, "Empresas", empresaId, "Clientes", createdId));
+        } catch {}
+      }
     } finally {
       setSaving(false);
     }
@@ -474,6 +491,56 @@ export default function RegisterClientScreen({ route }: Props) {
             <Text style={{ fontWeight: "700", color: "#023047", textAlign: "center" }}>
               Estamos generando la tarjeta...
             </Text>
+          </View>
+        </View>
+      )}
+
+      {walletStep === "error" && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              padding: 16,
+              borderRadius: 12,
+              width: "85%",
+              maxWidth: 360,
+              gap: 10,
+            }}
+          >
+            <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828" }}>
+              No se pudo crear tu wallet
+            </Text>
+            <Text style={{ color: "#444" }}>
+              {walletFriendlyError || "Ocurrió un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setWalletStep("idle");
+                setWalletError(null);
+                setWalletFriendlyError(null);
+              }}
+              style={{
+                marginTop: 4,
+                alignSelf: "flex-end",
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: "#cfd8dc",
+                backgroundColor: "#fff",
+              }}
+            >
+              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
