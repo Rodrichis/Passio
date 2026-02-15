@@ -152,18 +152,18 @@ export default function RegisterClientScreen({ route }: Props) {
       let walletLinkLocal: string | null = null;
 
       if (so === "ios") {
-        const appleRes = await createApplePass({
+        // Nuevo flujo: Apple expone GET directo con los parámetros
+        const query = new URLSearchParams({
           idUsuario: clientId,
+          cantidad: "1", // servicio no permite 0
+          premiosDisponibles: "0",
           nombre,
           apellido,
           codigoQR: clientId,
-        });
-        if (appleRes.ok) {
-          walletOk = true;
-          walletLinkLocal = null; // se maneja la descarga del pkpass aparte
-        } else {
-          throw new Error(appleRes.errorText || "No se pudo generar la tarjeta (Apple).");
-        }
+        }).toString();
+        const directUrl = `${EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL}/v1/crearPasses?${query}`;
+        walletOk = true;
+        walletLinkLocal = directUrl;
       } else {
         const { create, sign } = await createAndSignWallet({
           idUsuario: clientId,
@@ -184,6 +184,7 @@ export default function RegisterClientScreen({ route }: Props) {
           apellido: apellido.trim(),
           email: email.trim().toLowerCase(),
           telefono: telefono.trim(),
+          applePassUrl: walletLinkLocal || null,
           empresaUid: empresaId,
           creadoEn: serverTimestamp(),
           so,
@@ -321,6 +322,8 @@ export default function RegisterClientScreen({ route }: Props) {
                     borderRadius: 8,
                     padding: 10,
                     backgroundColor: "#fff",
+                    height: 42,
+                    width: "100%",
                   }}
                   value={telefono}
                   onChangeText={setTelefono}
@@ -350,6 +353,9 @@ export default function RegisterClientScreen({ route }: Props) {
                       width: "100%",
                       boxSizing: "border-box",
                       minWidth: 0,
+                      height: 42,
+                      appearance: "none",
+                      WebkitAppearance: "none",
                     }}
                     disabled={saving || walletStep === "creating"}
                   />
@@ -362,6 +368,7 @@ export default function RegisterClientScreen({ route }: Props) {
                       padding: 10,
                       backgroundColor: "#fff",
                       width: "100%",
+                      height: 42,
                     }}
                     placeholder="AAAA-MM-DD"
                     value={birthInputWeb}
