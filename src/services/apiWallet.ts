@@ -119,14 +119,34 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Accept: "application/vnd.apple.pkpass, application/json, */*",
       },
       body: JSON.stringify(body),
     });
 
     const contentType = res.headers.get("content-type") || "";
-    // Apple puede responder bytes (.pkpass) o JSON de error
     let data: any = null;
     let rawText: string | undefined;
+
+    // Si no es OK, intentamos leer texto para mostrar detalle
+    if (!res.ok) {
+      rawText = await res.text();
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = rawText;
+      }
+      return {
+        ok: false,
+        status: res.status,
+        data,
+        rawText,
+        contentType,
+        errorText: rawText || `HTTP ${res.status}`,
+      };
+    }
+
+    // Apple puede responder bytes (.pkpass) o JSON de ok
     if (contentType.includes("application/json")) {
       rawText = await res.text();
       try {
@@ -136,7 +156,7 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
       }
     } else {
       // bytes
-      data = await res.arrayBuffer();
+      data = await res.blob();
     }
 
     return {
@@ -159,13 +179,19 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
 
 export async function createApplePass(params: {
   idUsuario: number | string;
-  cantidad: number;
-  premiosDisponibles: number;
   nombre: string;
   apellido: string;
   codigoQR: string;
 }): Promise<ApplePassResponse> {
-  return callAppleApi("/v1/crearPasses", params);
+  const { idUsuario, nombre, apellido, codigoQR } = params;
+  return callAppleApi("/v1/crearPasses", {
+    idUsuario,
+    cantidad: 1,
+    premiosDisponibles: 3,
+    nombre,
+    apellido,
+    codigoQR,
+  });
 }
 
 export async function updateApplePass(params: {

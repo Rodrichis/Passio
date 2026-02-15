@@ -10,11 +10,12 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import { EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL } from "@env";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, addDoc, collection, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, serverTimestamp, deleteDoc, setDoc } from "firebase/firestore";
 import { createAndSignWallet, createApplePass } from "../services/apiWallet";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
@@ -42,7 +43,8 @@ export default function RegisterClientScreen({ route }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [nombreCompleto, setNombreCompleto] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
   const [telefono, setTelefono] = useState("");
   const [so, setSo] = useState<SO | null>(null);
@@ -56,6 +58,10 @@ export default function RegisterClientScreen({ route }: Props) {
   const [formError, setFormError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [birthInputWeb, setBirthInputWeb] = useState("");
+  const [testAppleUrl, setTestAppleUrl] = useState<string | null>(null);
+  const [testAppleMessage, setTestAppleMessage] = useState<string | null>(null);
+  const [testAppleStatus, setTestAppleStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [testAppleError, setTestAppleError] = useState<string | null>(null);
 
   // Anonymous auth to comply with security rules for public form
   useEffect(() => {
@@ -117,8 +123,8 @@ export default function RegisterClientScreen({ route }: Props) {
     setFormError(null);
     setWalletError(null);
     setWalletFriendlyError(null);
-    if (!nombreCompleto.trim() || !email.trim() || !telefono.trim()) {
-      setFormError("Completa nombre, email y telefono.");
+    if (!nombre.trim() || !apellido.trim() || !email.trim() || !telefono.trim()) {
+      setFormError("Completa nombre, apellido, email y telefono.");
       return;
     }
     if (!so) {
@@ -146,13 +152,8 @@ export default function RegisterClientScreen({ route }: Props) {
       let walletLinkLocal: string | null = null;
 
       if (so === "ios") {
-        const parts = nombreCompleto.trim().split(/\s+/);
-        const nombre = parts.shift() || "";
-        const apellido = parts.join(" ") || "Passio";
         const appleRes = await createApplePass({
           idUsuario: clientId,
-          cantidad: 0,
-          premiosDisponibles: 0,
           nombre,
           apellido,
           codigoQR: clientId,
@@ -166,7 +167,7 @@ export default function RegisterClientScreen({ route }: Props) {
       } else {
         const { create, sign } = await createAndSignWallet({
           idUsuario: clientId,
-          nombreUsuario: nombreCompleto.trim(),
+          nombreUsuario: `${nombre.trim()} ${apellido.trim()}`,
         });
         if (create.ok && sign?.ok) {
           walletOk = true;
@@ -179,7 +180,8 @@ export default function RegisterClientScreen({ route }: Props) {
       // Solo si el wallet fue OK escribimos el cliente en Firestore
       if (walletOk) {
         await setDoc(newDocRef, {
-          nombreCompleto: nombreCompleto.trim(),
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
           email: email.trim().toLowerCase(),
           telefono: telefono.trim(),
           empresaUid: empresaId,
@@ -194,7 +196,8 @@ export default function RegisterClientScreen({ route }: Props) {
           activo: true,
         });
 
-        setNombreCompleto("");
+        setNombre("");
+        setApellido("");
         setEmail("");
         setTelefono("");
         setBirthDate(null);
@@ -255,21 +258,40 @@ export default function RegisterClientScreen({ route }: Props) {
 
           {showForm ? (
             <>
-              <Text>Nombre completo</Text>
-              <TextInput
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  marginBottom: 10,
-                }}
-                value={nombreCompleto}
-                onChangeText={setNombreCompleto}
-                placeholder="Tu nombre"
-                editable={!saving && walletStep !== "creating"}
-              />
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text>Nombre</Text>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      padding: 10,
+                      backgroundColor: "#fff",
+                    }}
+                    value={nombre}
+                    onChangeText={setNombre}
+                    placeholder="Tu nombre"
+                    editable={!saving && walletStep !== "creating"}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text>Apellido</Text>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      padding: 10,
+                      backgroundColor: "#fff",
+                    }}
+                    value={apellido}
+                    onChangeText={setApellido}
+                    placeholder="Tu apellido"
+                    editable={!saving && walletStep !== "creating"}
+                  />
+                </View>
+              </View>
 
               <Text>Email</Text>
               <TextInput
@@ -289,64 +311,70 @@ export default function RegisterClientScreen({ route }: Props) {
                 editable={!saving && walletStep !== "creating"}
               />
 
-            <Text>Telefono</Text>
-            <TextInput
-              style={{
-                borderWidth: 1,
-                borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  marginBottom: 16,
-                }}
-                value={telefono}
-                onChangeText={setTelefono}
-              placeholder="+56 9 ..."
-              keyboardType="phone-pad"
-              editable={!saving && walletStep !== "creating"}
-            />
-
-            <Text>Fecha de nacimiento</Text>
-            {Platform.OS === "web" ? (
-              <input
-                type="date"
-                value={birthInputWeb}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setBirthInputWeb(val);
-                  const d = val ? new Date(val) : null;
-                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
-                }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  marginBottom: 16,
-                }}
-                disabled={saving || walletStep === "creating"}
-              />
-            ) : (
-              <TextInput
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  marginBottom: 16,
-                }}
-                placeholder="AAAA-MM-DD"
-                value={birthInputWeb}
-                onChangeText={(val) => {
-                  setBirthInputWeb(val);
-                  const d = val ? new Date(val) : null;
-                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
-                }}
-                editable={!saving && walletStep !== "creating"}
-              />
-            )}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text>Telefono</Text>
+                <TextInput
+                  style={{
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 8,
+                    padding: 10,
+                    backgroundColor: "#fff",
+                  }}
+                  value={telefono}
+                  onChangeText={setTelefono}
+                  placeholder="+56 9 ..."
+                  keyboardType="phone-pad"
+                  editable={!saving && walletStep !== "creating"}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text>Fecha de nacimiento</Text>
+                {Platform.OS === "web" ? (
+                  <input
+                    type="date"
+                    value={birthInputWeb}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBirthInputWeb(val);
+                      const d = val ? new Date(val) : null;
+                      setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                    }}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      padding: 10,
+                      backgroundColor: "#fff",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      minWidth: 0,
+                    }}
+                    disabled={saving || walletStep === "creating"}
+                  />
+                ) : (
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#ccc",
+                      borderRadius: 8,
+                      padding: 10,
+                      backgroundColor: "#fff",
+                      width: "100%",
+                    }}
+                    placeholder="AAAA-MM-DD"
+                    value={birthInputWeb}
+                    onChangeText={(val) => {
+                      setBirthInputWeb(val);
+                      const d = val ? new Date(val) : null;
+                      setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                    }}
+                    editable={!saving && walletStep !== "creating"}
+                  />
+                )}
+              </View>
+            </View>
 
             {/* SO selector */}
             {so && !needsSelector ? (
@@ -439,7 +467,94 @@ export default function RegisterClientScreen({ route }: Props) {
                 </Text>
               </TouchableOpacity>
 
-              {formError ? (
+              {/* Botones de prueba con payload de ejemplo */}
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    setWalletError(null);
+                    setWalletFriendlyError(null);
+                    setTestAppleUrl(null);
+                    setTestAppleMessage(null);
+                    setTestAppleError(null);
+                    setTestAppleStatus("loading");
+                    if (!EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL) {
+                      setWalletError("Base URL de Apple no configurada.");
+                      setTestAppleError("Base URL de Apple no configurada.");
+                      setTestAppleStatus("error");
+                      return;
+                    }
+                    const query = new URLSearchParams({
+                      idUsuario: "100",
+                      cantidad: "1",
+                      premiosDisponibles: "3",
+                      nombre: "Ricardo",
+                      apellido: "Riedman",
+                      codigoQR: "QR-demo",
+                    }).toString();
+                    const directUrl = `${EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL}/v1/crearPasses?${query}`;
+                    setTestAppleUrl(directUrl);
+                    setTestAppleMessage("Estamos generando tu tarjeta...");
+                    if (Platform.OS === "web") {
+                      window.location.href = directUrl;
+                    } else {
+                      Linking.openURL(directUrl);
+                    }
+                    setTestAppleMessage("Tarjeta creada. Si no se descarga automaticamente, usa el boton de descarga.");
+                    setTestAppleStatus("success");
+                  } catch (err) {
+                    console.error("Test Apple error", err);
+                    setWalletError("Test Apple error: " + String(err));
+                    setTestAppleError(String(err));
+                    setTestAppleStatus("error");
+                    setWalletStep("idle");
+                  }
+                }}
+                disabled={saving || walletStep === "creating"}
+                style={{
+                  marginTop: 10,
+                  backgroundColor: "#455a64",
+                  padding: 12,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  opacity: saving || walletStep === "creating" ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>Test Apple (payload ejemplo)</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  try {
+                    setWalletError(null);
+                    setWalletFriendlyError(null);
+                    setTestAppleMessage(null);
+                    const { create, sign } = await createAndSignWallet({
+                      idUsuario: "test-android-100",
+                      nombreUsuario: "Ricardo Riedman",
+                    });
+                    if (create.ok && sign?.ok) {
+                      setWalletError("Test Android OK: se genero el wallet (revisa la respuesta).");
+                    } else {
+                      setWalletError("Test Android fallo: " + (sign?.errorText || create.errorText || "sin detalle"));
+                    }
+                  } catch (err) {
+                    setWalletError("Test Android error: " + String(err));
+                  }
+                }}
+                disabled={saving || walletStep === "creating"}
+                style={{
+                  marginTop: 10,
+                  backgroundColor: "#2e7d32",
+                  padding: 12,
+                  borderRadius: 8,
+                  alignItems: "center",
+                  opacity: saving || walletStep === "creating" ? 0.6 : 1,
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>Test Android (payload ejemplo)</Text>
+              </TouchableOpacity>
+
+{formError ? (
                 <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
               ) : null}
               {walletError ? (
@@ -485,6 +600,87 @@ export default function RegisterClientScreen({ route }: Props) {
 
         </View>
       </ScrollView>
+
+      {testAppleStatus !== "idle" && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              padding: 16,
+              borderRadius: 12,
+              width: "85%",
+              maxWidth: 360,
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
+            {testAppleStatus === "loading" && <ActivityIndicator size="large" color="#023047" />}
+            <Text style={{ fontWeight: "800", fontSize: 16, color: "#023047", textAlign: "center" }}>
+              {testAppleStatus === "loading"
+                ? "Estamos generando la tarjeta..."
+                : testAppleStatus === "success"
+                ? "Tarjeta creada correctamente."
+                : "No se pudo crear tu tarjeta"}
+            </Text>
+            {testAppleStatus === "success" && testAppleMessage ? (
+              <Text style={{ color: "#444", textAlign: "center" }}>{testAppleMessage}</Text>
+            ) : null}
+            {testAppleStatus === "error" && testAppleError ? (
+              <Text style={{ color: "#c62828", textAlign: "center" }}>{testAppleError}</Text>
+            ) : null}
+            {testAppleStatus === "success" && testAppleUrl ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (!testAppleUrl) return;
+                  if (Platform.OS === "web") {
+                    window.location.href = testAppleUrl;
+                  } else {
+                    Linking.openURL(testAppleUrl);
+                  }
+                }}
+                style={{
+                  marginTop: 6,
+                  backgroundColor: "#023047",
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  borderRadius: 8,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>Descargar pase</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={() => {
+                setTestAppleStatus("idle");
+                setTestAppleMessage(null);
+                setTestAppleError(null);
+              }}
+              style={{
+                marginTop: 12,
+                alignSelf: "center",
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: "#cfd8dc",
+                backgroundColor: "#fff",
+              }}
+            >
+              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {walletStep === "creating" && (
         <View
@@ -567,3 +763,11 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
+
+
+
+
+
+
+
+
