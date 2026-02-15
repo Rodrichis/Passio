@@ -32,6 +32,8 @@ function detectarSO(): SO | null {
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
     if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
     if (/Android/i.test(ua)) return "android";
+    // Safari en iPad puede reportar "MacIntel" pero con touchpoints
+    if (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1) return "ios";
   } catch {}
   return null;
 }
