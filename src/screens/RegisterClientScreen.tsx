@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -62,6 +62,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [testAppleMessage, setTestAppleMessage] = useState<string | null>(null);
   const [testAppleStatus, setTestAppleStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testAppleError, setTestAppleError] = useState<string | null>(null);
+  const openedWalletRef = useRef(false);
 
   // Anonymous auth to comply with security rules for public form
   useEffect(() => {
@@ -85,6 +86,23 @@ export default function RegisterClientScreen({ route }: Props) {
       setNeedsSelector(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      openedWalletRef.current = false;
+    }
+  }, [showForm]);
+
+  useEffect(() => {
+    if (!showForm && walletStep === "success" && walletLink && !openedWalletRef.current) {
+      openedWalletRef.current = true;
+      if (Platform.OS === "web") {
+        window.location.href = walletLink;
+      } else {
+        Linking.openURL(walletLink);
+      }
+    }
+  }, [showForm, walletStep, walletLink]);
 
   // Load company data
   useEffect(() => {
@@ -507,7 +525,7 @@ export default function RegisterClientScreen({ route }: Props) {
                       Linking.openURL(directUrl);
                     }
                     setTestAppleMessage("Tarjeta creada. Si no se descarga automaticamente, usa el boton de descarga.");
-                    setTestAppleStatus("success");
+                    setTestAppleStatus("idle");
                   } catch (err) {
                     console.error("Test Apple error", err);
                     setWalletError("Test Apple error: " + String(err));
@@ -561,7 +579,7 @@ export default function RegisterClientScreen({ route }: Props) {
                 <Text style={{ color: "#fff", fontWeight: "700" }}>Test Android (payload ejemplo)</Text>
               </TouchableOpacity>
 
-{formError ? (
+              {formError ? (
                 <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
               ) : null}
               {walletError ? (
@@ -577,7 +595,14 @@ export default function RegisterClientScreen({ route }: Props) {
                   <Text style={{ color: "#2e7d32", fontWeight: "700" }}>Tarjeta creada correctamente.</Text>
                   {walletLink ? (
                     <TouchableOpacity
-                      onPress={() => walletLink && Linking.openURL(walletLink)}
+                      onPress={() => {
+                        if (!walletLink) return;
+                        if (Platform.OS === "web") {
+                          window.location.href = walletLink;
+                        } else {
+                          Linking.openURL(walletLink);
+                        }
+                      }}
                       style={{
                         marginTop: 10,
                         backgroundColor: "#023047",
@@ -608,7 +633,7 @@ export default function RegisterClientScreen({ route }: Props) {
         </View>
       </ScrollView>
 
-      {testAppleStatus !== "idle" && (
+      {testAppleStatus === "loading" && (
         <View
           style={{
             ...StyleSheet.absoluteFillObject,
@@ -630,61 +655,10 @@ export default function RegisterClientScreen({ route }: Props) {
               alignItems: "center",
             }}
           >
-            {testAppleStatus === "loading" && <ActivityIndicator size="large" color="#023047" />}
+            <ActivityIndicator size="large" color="#023047" />
             <Text style={{ fontWeight: "800", fontSize: 16, color: "#023047", textAlign: "center" }}>
-              {testAppleStatus === "loading"
-                ? "Estamos generando la tarjeta..."
-                : testAppleStatus === "success"
-                ? "Tarjeta creada correctamente."
-                : "No se pudo crear tu tarjeta"}
+              Estamos generando la tarjeta...
             </Text>
-            {testAppleStatus === "success" && testAppleMessage ? (
-              <Text style={{ color: "#444", textAlign: "center" }}>{testAppleMessage}</Text>
-            ) : null}
-            {testAppleStatus === "error" && testAppleError ? (
-              <Text style={{ color: "#c62828", textAlign: "center" }}>{testAppleError}</Text>
-            ) : null}
-            {testAppleStatus === "success" && testAppleUrl ? (
-              <TouchableOpacity
-                onPress={() => {
-                  if (!testAppleUrl) return;
-                  if (Platform.OS === "web") {
-                    window.location.href = testAppleUrl;
-                  } else {
-                    Linking.openURL(testAppleUrl);
-                  }
-                }}
-                style={{
-                  marginTop: 6,
-                  backgroundColor: "#023047",
-                  paddingVertical: 10,
-                  paddingHorizontal: 16,
-                  borderRadius: 8,
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Descargar pase</Text>
-              </TouchableOpacity>
-            ) : null}
-            <TouchableOpacity
-              onPress={() => {
-                setTestAppleStatus("idle");
-                setTestAppleMessage(null);
-                setTestAppleError(null);
-              }}
-              style={{
-                marginTop: 12,
-                alignSelf: "center",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "#cfd8dc",
-                backgroundColor: "#fff",
-              }}
-            >
-              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -770,6 +744,7 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
+
 
 
 
