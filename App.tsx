@@ -51,11 +51,14 @@ export default function App() {
     );
   }
 
-  const isVerified = !!(user && user.emailVerified);
+  // Ignoramos usuarios anónimos (p.ej. del formulario público) para no redirigir
+  // a VerifyEmail cuando abrimos la app de empresas.
+  const effectiveUser = user && !user.isAnonymous ? user : null;
+  const isVerified = !!(effectiveUser && effectiveUser.emailVerified);
 
   return (
     <NavigationContainer linking={linking}>
-      {!user ? (
+      {!effectiveUser ? (
         <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
