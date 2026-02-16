@@ -91,6 +91,7 @@ export default function DashboardContentClientes() {
   const [pushBody, setPushBody] = useState("");
   const [pushStatus, setPushStatus] = useState("");
   const [sendingPush, setSendingPush] = useState(false);
+  const [pushSent, setPushSent] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const closePushModal = () => {
@@ -99,6 +100,7 @@ export default function DashboardContentClientes() {
     setPushBody("");
     setPushStatus("");
     setSendingPush(false);
+    setPushSent(false);
   };
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
@@ -217,6 +219,10 @@ export default function DashboardContentClientes() {
 
   const openPush = useCallback((client: Cliente) => {
     setPushTarget(client);
+    setPushBody("");
+    setPushStatus("");
+    setPushSent(false);
+    setSendingPush(false);
     setShowPushModal(true);
   }, []);
 
@@ -691,66 +697,86 @@ export default function DashboardContentClientes() {
             <Text style={cStyles.detailRow}>
               Cliente: {pushTarget?.nombreCompleto || "--"}
             </Text>
-            <TextInput
-              placeholder="Mensaje de la notificacion"
-              value={pushBody}
-              onChangeText={setPushBody}
-              multiline
-              numberOfLines={3}
-              style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
-            />
-            {pushStatus ? <Text style={{ color: "#023047", marginTop: 4 }}>{pushStatus}</Text> : null}
-            <View style={cStyles.modalActions}>
-              <TouchableOpacity
-                onPress={() => {
-                  closePushModal();
-                }}
-                style={{
-                  alignSelf: "center",
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: "#023047",
-                  backgroundColor: "#fff",
-                }}
-              >
-                <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={async () => {
-                  if (!pushTarget?.id || !pushBody.trim()) {
-                    setPushStatus("Ingresa un mensaje.");
-                    return;
-                  }
-                  try {
-                    setSendingPush(true);
-                    setPushStatus("Enviando...");
-                    const resp = await notifyApplePass({
-                      idUsuario: pushTarget.id,
-                      notificacion: pushBody.trim(),
-                    });
-                    if (resp.ok) {
-                      setPushStatus("Notificacion enviada");
-                      setPushBody("");
-                      setTimeout(() => {
-                        closePushModal();
-                      }, 1200);
-                    } else {
-                      setPushStatus(resp.errorText || "No se pudo enviar la notificacion");
-                    }
-                  } catch (err) {
-                    setPushStatus(`Error: ${String(err)}`);
-                  } finally {
-                    setSendingPush(false);
-                  }
-                }}
-                style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
-                disabled={sendingPush}
-              >
-                <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
-              </TouchableOpacity>
-            </View>
+            {pushSent ? (
+              <>
+                <Text style={{ color: "#2e7d32", fontWeight: "700", marginTop: 8 }}>Notificacion enviada.</Text>
+                <View style={cStyles.modalActions}>
+                  <TouchableOpacity
+                    onPress={closePushModal}
+                    style={{
+                      alignSelf: "center",
+                      paddingVertical: 8,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#023047",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <TextInput
+                  placeholder="Mensaje de la notificacion"
+                  value={pushBody}
+                  onChangeText={setPushBody}
+                  multiline
+                  numberOfLines={3}
+                  style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
+                />
+                {pushStatus ? <Text style={{ color: "#023047", marginTop: 4 }}>{pushStatus}</Text> : null}
+                <View style={cStyles.modalActions}>
+                  <TouchableOpacity
+                    onPress={closePushModal}
+                    style={{
+                      alignSelf: "center",
+                      paddingVertical: 8,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#023047",
+                      backgroundColor: "#fff",
+                    }}
+                  >
+                    <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (!pushTarget?.id || !pushBody.trim()) {
+                        setPushStatus("Ingresa un mensaje.");
+                        return;
+                      }
+                      try {
+                        setSendingPush(true);
+                        setPushStatus("Enviando...");
+                        const resp = await notifyApplePass({
+                          idUsuario: pushTarget.id,
+                          notificacion: pushBody.trim(),
+                        });
+                        if (resp.ok) {
+                          setPushStatus("Notificacion enviada");
+                          setPushBody("");
+                          setPushSent(true);
+                        } else {
+                          setPushStatus(resp.errorText || "No se pudo enviar la notificacion");
+                        }
+                      } catch (err) {
+                        setPushStatus(`Error: ${String(err)}`);
+                      } finally {
+                        setSendingPush(false);
+                      }
+                    }}
+                    style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
+                    disabled={sendingPush}
+                  >
+                    <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
