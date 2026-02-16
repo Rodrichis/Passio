@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
+import { notifyApplePass } from "../../../services/apiWallet";
 import {
   collection,
   query,
@@ -87,7 +88,18 @@ export default function DashboardContentClientes() {
   const [showDetail, setShowDetail] = useState(false);
   const [pushTarget, setPushTarget] = useState<Cliente | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
+  const [pushBody, setPushBody] = useState("");
+  const [pushStatus, setPushStatus] = useState("");
+  const [sendingPush, setSendingPush] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+
+  const closePushModal = () => {
+    setShowPushModal(false);
+    setPushTarget(null);
+    setPushBody("");
+    setPushStatus("");
+    setSendingPush(false);
+  };
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [deactivateDone, setDeactivateDone] = useState(false);
@@ -679,17 +691,64 @@ export default function DashboardContentClientes() {
             <Text style={cStyles.detailRow}>
               Cliente: {pushTarget?.nombreCompleto || "--"}
             </Text>
-            <Text style={{ color: "#555" }}>
-              Proximo: enviar una notificacion push individual al cliente (cuando tengas FCM / token asociado a la tarjeta).
-            </Text>
+            <TextInput
+              placeholder="Mensaje de la notificacion"
+              value={pushBody}
+              onChangeText={setPushBody}
+              multiline
+              numberOfLines={3}
+              style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
+            />
+            {pushStatus ? <Text style={{ color: "#023047", marginTop: 4 }}>{pushStatus}</Text> : null}
             <View style={cStyles.modalActions}>
               <TouchableOpacity
                 onPress={() => {
-                  setShowPushModal(false);
-                  setPushTarget(null);
+                  closePushModal();
+                }}
+                style={{
+                  alignSelf: "center",
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#023047",
+                  backgroundColor: "#fff",
                 }}
               >
-                <Text style={{ color: "#555" }}>Cerrar</Text>
+                <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!pushTarget?.id || !pushBody.trim()) {
+                    setPushStatus("Ingresa un mensaje.");
+                    return;
+                  }
+                  try {
+                    setSendingPush(true);
+                    setPushStatus("Enviando...");
+                    const resp = await notifyApplePass({
+                      idUsuario: pushTarget.id,
+                      notificacion: pushBody.trim(),
+                    });
+                    if (resp.ok) {
+                      setPushStatus("Notificacion enviada");
+                      setPushBody("");
+                      setTimeout(() => {
+                        closePushModal();
+                      }, 1200);
+                    } else {
+                      setPushStatus(resp.errorText || "No se pudo enviar la notificacion");
+                    }
+                  } catch (err) {
+                    setPushStatus(`Error: ${String(err)}`);
+                  } finally {
+                    setSendingPush(false);
+                  }
+                }}
+                style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
+                disabled={sendingPush}
+              >
+                <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -781,3 +840,4 @@ export default function DashboardContentClientes() {
     </View>
   );
 }
+
