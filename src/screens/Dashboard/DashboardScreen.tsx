@@ -7,9 +7,7 @@ import DashboardMenu from "./DashboardMenu";
 
 import DashboardContentPrincipal from "./content/DashboardContentPrincipal";
 import DashboardContentClientes from "./content/DashboardContentClientes";
-import DashboardContentPromociones from "./content/DashboardContentPromociones";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
-import DashboardContentTest from "./content/DashboardContentTest";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 import { auth } from "../../services/firebaseConfig";
 
@@ -40,12 +38,8 @@ export default function Dashboard({ navigation }: any) {
         return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
       case "Clientes":
         return <DashboardContentClientes />; // <- FlatList manejará el scroll
-      case "Promociones":
-        return <DashboardContentPromociones />;
       case "Escanear":
         return <DashboardContentEscanear />;
-      case "Test":
-        return <DashboardContentTest />;
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
       default:

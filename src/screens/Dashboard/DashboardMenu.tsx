@@ -12,9 +12,10 @@ type Props = {
 const menuItems = [
   { name: "Principal", icon: "home-outline" },
   { name: "Clientes", icon: "people-outline" },
-  { name: "Promociones", icon: "pricetag-outline" },
+  // Promociones y Test deshabilitados temporalmente
+  // { name: "Promociones", icon: "pricetag-outline" },
   { name: "Escanear", icon: "qr-code-outline" },
-  { name: "Test", icon: "flask-outline" },
+  // { name: "Test", icon: "flask-outline" },
   { name: "Ajustes", icon: "settings-outline" },
 ];
 
