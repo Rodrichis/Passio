@@ -1,9 +1,5 @@
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  initializeAuth,
-  getReactNativePersistence,
-} from "firebase/auth";
+import { getAuth, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
@@ -31,6 +27,8 @@ export const auth =
   Platform.OS === "web"
     ? getAuth(app)
     : initializeAuth(app, {
-        persistence: getReactNativePersistence(AsyncStorage),
+        // dynamic require to avoid bundling issues on web
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        persistence: require("firebase/auth").getReactNativePersistence(AsyncStorage),
       });
 export const db = getFirestore(app);

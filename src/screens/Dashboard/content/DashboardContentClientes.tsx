@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
-import { notifyApplePass } from "../../../services/apiWallet";
+import { notifyApplePass, notifyAndroidPass } from "../../../services/apiWallet";
 import {
   collection,
   query,
@@ -92,6 +92,7 @@ export default function DashboardContentClientes() {
   const [pushStatus, setPushStatus] = useState("");
   const [sendingPush, setSendingPush] = useState(false);
   const [pushSent, setPushSent] = useState(false);
+  const [pushMode, setPushMode] = useState<"single" | "bulk">("single");
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const closePushModal = () => {
@@ -101,6 +102,7 @@ export default function DashboardContentClientes() {
     setPushStatus("");
     setSendingPush(false);
     setPushSent(false);
+    setPushMode("single");
   };
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
@@ -219,6 +221,7 @@ export default function DashboardContentClientes() {
 
   const openPush = useCallback((client: Cliente) => {
     setPushTarget(client);
+    setPushMode("single");
     setPushBody("");
     setPushStatus("");
     setPushSent(false);
@@ -543,28 +546,55 @@ export default function DashboardContentClientes() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        onPress={() => {
-          setEmailMode("bulk");
-          setEmailTarget(null);
-          setEmailStatus("");
-          setShowEmailModal(true);
-        }}
-        disabled={selectedCount === 0}
-        style={[
-          cStyles.sendButton,
-          selectedCount === 0 && cStyles.sendButtonDisabled,
-        ]}
-      >
-        <Text
+      <View style={{ flexDirection: "row", gap: 10, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <TouchableOpacity
+          onPress={() => {
+            setEmailMode("bulk");
+            setEmailTarget(null);
+            setEmailStatus("");
+            setShowEmailModal(true);
+          }}
+          disabled={selectedCount === 0}
           style={[
-            cStyles.sendButtonText,
-            selectedCount === 0 && cStyles.sendButtonTextDisabled,
+            cStyles.sendButton,
+            selectedCount === 0 && cStyles.sendButtonDisabled,
           ]}
         >
-          Enviar correo ({selectedCount})
-        </Text>
-      </TouchableOpacity>
+          <Text
+            style={[
+              cStyles.sendButtonText,
+              selectedCount === 0 && cStyles.sendButtonTextDisabled,
+            ]}
+          >
+            Enviar correo ({selectedCount})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            setPushMode("bulk");
+            setPushTarget(null);
+            setPushStatus("");
+            setPushBody("");
+            setPushSent(false);
+            setSendingPush(false);
+            setShowPushModal(true);
+          }}
+          disabled={selectedCount === 0}
+          style={[
+            cStyles.sendButton,
+            selectedCount === 0 && cStyles.sendButtonDisabled,
+          ]}
+        >
+          <Text
+            style={[
+              cStyles.sendButtonText,
+              selectedCount === 0 && cStyles.sendButtonTextDisabled,
+            ]}
+          >
+            Enviar notificacion ({selectedCount})
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Modal de filtros */}
       <Modal visible={showFilter} transparent animationType="fade">
@@ -695,7 +725,9 @@ export default function DashboardContentClientes() {
           <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
             <Text style={cStyles.modalTitle}>Notificacion push</Text>
             <Text style={cStyles.detailRow}>
-              Cliente: {pushTarget?.nombreCompleto || "--"}
+              {pushMode === "single"
+                ? `Cliente: ${pushTarget?.nombreCompleto || "--"}`
+                : `Destinatarios: ${selectedCount}`}
             </Text>
             {pushSent ? (
               <>
@@ -745,24 +777,32 @@ export default function DashboardContentClientes() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={async () => {
-                      if (!pushTarget?.id || !pushBody.trim()) {
+                      const targets =
+                        pushMode === "single" && pushTarget
+                          ? [pushTarget]
+                          : items.filter((it) => selectedIds.has(it.id));
+                      if (targets.length === 0) {
+                        setPushStatus("No hay destinatarios.");
+                        return;
+                      }
+                      if (!pushBody.trim()) {
                         setPushStatus("Ingresa un mensaje.");
                         return;
                       }
                       try {
                         setSendingPush(true);
                         setPushStatus("Enviando...");
-                        const resp = await notifyApplePass({
-                          idUsuario: pushTarget.id,
-                          notificacion: pushBody.trim(),
-                        });
-                        if (resp.ok) {
-                          setPushStatus("Notificacion enviada");
-                          setPushBody("");
-                          setPushSent(true);
-                        } else {
-                          setPushStatus(resp.errorText || "No se pudo enviar la notificacion");
+                        let okCount = 0;
+                        for (const tgt of targets) {
+                          const isIOS = tgt.so === "ios";
+                          const resp = isIOS
+                            ? await notifyApplePass({ idUsuario: tgt.id, notificacion: pushBody.trim() })
+                            : await notifyAndroidPass({ idUsuario: tgt.id, notificacion: pushBody.trim() });
+                          if (resp.ok) okCount += 1;
                         }
+                        setPushStatus(`Enviadas ${okCount}/${targets.length}`);
+                        setPushBody("");
+                        setPushSent(true);
                       } catch (err) {
                         setPushStatus(`Error: ${String(err)}`);
                       } finally {
@@ -866,4 +906,5 @@ export default function DashboardContentClientes() {
     </View>
   );
 }
+
 

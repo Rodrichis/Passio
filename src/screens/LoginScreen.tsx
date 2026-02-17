@@ -17,6 +17,8 @@ type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  ForgotPassword: undefined;
+  RegisterClient: { empresaId: string };
   VerifyEmail: { email?: string };
 };
 

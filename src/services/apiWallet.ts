@@ -208,3 +208,35 @@ export async function notifyApplePass(params: {
 }): Promise<ApplePassResponse> {
   return callAppleApi("/v1/notificacion", params);
 }
+
+export async function notifyAndroidPass(params: {
+  idUsuario: string;
+  notificacion: string;
+}): Promise<WalletApiResponse> {
+  if (!ANDROID_BASE_URL) {
+    return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
+  }
+  try {
+    const res = await fetch(`${ANDROID_BASE_URL}/notificacion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    const rawText = await res.text();
+    let data: any = null;
+    try {
+      data = rawText ? JSON.parse(rawText) : null;
+    } catch {
+      data = rawText;
+    }
+    return {
+      ok: res.ok,
+      status: res.status,
+      data,
+      rawText,
+      errorText: res.ok ? undefined : rawText,
+    };
+  } catch (e) {
+    return { ok: false, status: 0, data: null, errorText: String(e) };
+  }
+}

@@ -48,6 +48,9 @@ export const clientesStyles = StyleSheet.create({
 
   sendButton: {
     alignSelf: "flex-start",
+    flexGrow: 0,
+    flexShrink: 0,
+    maxWidth: 230,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,

@@ -17,13 +17,13 @@ type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  ForgotPassword: undefined;
+  RegisterClient: { empresaId: string };
   VerifyEmail: { email?: string };
 };
 
-type Props = NativeStackScreenProps<RootStackParamList, "Dashboard">;
-
-// ...imports
-export default function Dashboard({ navigation }: Props) {
+// relajamos tipos de navegación para evitar conflictos en web
+export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
   const isMobile = Platform.OS === "android" || Platform.OS === "ios";
 
