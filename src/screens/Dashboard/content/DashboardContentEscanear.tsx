@@ -1,9 +1,13 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { updateWalletPoints, type WalletApiResponse } from "../../../services/apiWallet";
+import {
+  updateWalletPoints,
+  updateApplePass,
+  type WalletApiResponse,
+} from "../../../services/apiWallet";
 import { auth, db } from "../../../services/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
 type ParsedPayload = {
   idUsuario?: string;
@@ -17,6 +21,7 @@ export default function DashboardContentEscanear() {
   const [status, setStatus] = useState<string>("Apunta al código QR");
   const [result, setResult] = useState<WalletApiResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scanMode, setScanMode] = useState<"visita" | "premio">("visita");
   const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
@@ -55,11 +60,11 @@ export default function DashboardContentEscanear() {
       if (scanned) return;
       setScanned(true);
       setLoading(true);
-      setStatus("Procesando...");
+      setStatus(scanMode === "premio" ? "Procesando (premio)..." : "Procesando (visita)...");
 
       const empresaId = auth.currentUser?.uid;
       if (!empresaId) {
-        setStatus("Debes iniciar sesion para escanear.");
+        setStatus("Debes iniciar sesión para escanear.");
         setLoading(false);
         return;
       }
@@ -77,6 +82,7 @@ export default function DashboardContentEscanear() {
         return;
       }
 
+      let clienteDoc: any = null;
       try {
         const ref = doc(db, "Empresas", empresaId, "Clientes", payload.idUsuario);
         const snap = await getDoc(ref);
@@ -85,10 +91,10 @@ export default function DashboardContentEscanear() {
           setLoading(false);
           return;
         }
-        const cliente = snap.data() as any;
-        const activo = cliente.activo ?? true;
+        clienteDoc = snap.data() as any;
+        const activo = clienteDoc.activo ?? true;
         if (!activo) {
-          setStatus("Este usuario esta desactivado. No se puede registrar la visita.");
+          setStatus("Este usuario está desactivado. No se puede registrar la visita.");
           setLoading(false);
           return;
         }
@@ -99,22 +105,81 @@ export default function DashboardContentEscanear() {
         return;
       }
 
-      const puntos = Number(payload.cantidadPuntos ?? 3);
+      const soCliente = (clienteDoc?.so || "").toLowerCase();
+      const visitasTotalesPrev = Number(clienteDoc?.visitasTotales ?? 0);
+      const cicloPrev = Number(clienteDoc?.cicloVisitas ?? 0);
+      const premiosDispPrev = Number(clienteDoc?.premiosDisponibles ?? 0);
+      const premiosCanjPrev = Number(clienteDoc?.premiosCanjeados ?? 0);
+
+      if (scanMode === "premio" && premiosDispPrev <= 0) {
+        setStatus("No tiene premios disponibles.");
+        setLoading(false);
+        return;
+      }
+
+      let visitasTotales = visitasTotalesPrev;
+      let cicloVisitas = cicloPrev;
+      let premiosDisponibles = premiosDispPrev;
+      let premiosCanjeados = premiosCanjPrev;
+
+      if (scanMode === "visita") {
+        visitasTotales = visitasTotalesPrev + 1;
+        cicloVisitas = cicloPrev + 1;
+        if (cicloVisitas > 10) {
+          cicloVisitas = 1;
+          premiosDisponibles += 1;
+        }
+      } else {
+        // canje premio
+        premiosDisponibles = Math.max(0, premiosDispPrev - 1);
+        premiosCanjeados = premiosCanjPrev + 1;
+      }
+
+      const puntos = Number(payload.cantidadPuntos ?? 1);
+      const basePoints = Number.isFinite(puntos) ? puntos : 1;
+      const finalPoints = scanMode === "premio" ? -Math.abs(basePoints) : basePoints;
 
       try {
-        const res = await updateWalletPoints({
-          idUsuario: payload.idUsuario,
-          cantidadPuntos: Number.isFinite(puntos) ? puntos : 1,
+        // Actualizamos wallet según SO
+        if (soCliente === "ios") {
+          await updateApplePass({
+            idUsuario: payload.idUsuario,
+            cantidad: cicloVisitas || 0,
+            premiosDisponibles,
+          });
+        } else {
+          await updateWalletPoints({
+            idUsuario: payload.idUsuario,
+            cantidadPuntos: finalPoints,
+          });
+        }
+
+        // Actualizamos Firestore
+        const ref = doc(db, "Empresas", empresaId, "Clientes", payload.idUsuario);
+        await updateDoc(ref, {
+          visitasTotales,
+          cicloVisitas,
+          premiosDisponibles,
+          premiosCanjeados,
+          ultimaVisita: serverTimestamp(),
         });
-        setResult(res);
-        setStatus(res.ok ? "Actualización OK" : "Error al actualizar");
+
+        setResult({
+          ok: true,
+          status: 200,
+          data: { visitasTotales, cicloVisitas, premiosDisponibles, premiosCanjeados },
+        });
+        setStatus(
+          scanMode === "premio" ? "Premio registrado" : "Visita registrada"
+        );
       } catch (err) {
+        console.error("Error al actualizar pase:", err);
         setStatus(`Error: ${String(err)}`);
       } finally {
         setLoading(false);
       }
     },
-    [scanned]
+    [scanned, scanMode]
   );
 
   const resetScan = () => {
@@ -162,6 +227,43 @@ export default function DashboardContentEscanear() {
             <ActivityIndicator size="large" color="#fff" />
           </View>
         )}
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+        <TouchableOpacity
+          onPress={() => setScanMode("visita")}
+          style={[
+            styles.actionButton,
+            scanMode === "visita" && styles.actionButtonActive,
+          ]}
+          disabled={loading}
+        >
+          <Text
+            style={[
+              styles.actionButtonText,
+              scanMode === "visita" && styles.actionButtonTextActive,
+            ]}
+          >
+            Contar visita
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setScanMode("premio")}
+          style={[
+            styles.actionButton,
+            scanMode === "premio" && styles.actionButtonActive,
+          ]}
+          disabled={loading}
+        >
+          <Text
+            style={[
+              styles.actionButtonText,
+              scanMode === "premio" && styles.actionButtonTextActive,
+            ]}
+          >
+            Reclamar premio
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {result && (
@@ -239,6 +341,26 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: "#e3f2fd",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#cfd8dc",
+  },
+  actionButtonActive: {
+    backgroundColor: "#023047",
+    borderColor: "#023047",
+  },
+  actionButtonText: {
+    color: "#023047",
+    fontWeight: "700",
+  },
+  actionButtonTextActive: {
+    color: "#fff",
   },
   center: {
     flex: 1,

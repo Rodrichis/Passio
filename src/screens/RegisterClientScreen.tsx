@@ -207,6 +207,7 @@ export default function RegisterClientScreen({ route }: Props) {
           applePassUrl: walletLinkLocal || null,
           empresaUid: empresaId,
           creadoEn: serverTimestamp(),
+          ultimaVisita: serverTimestamp(),
           so,
           fechaNacimiento: birthDate,
           navegador:
@@ -215,6 +216,10 @@ export default function RegisterClientScreen({ route }: Props) {
               default: "app",
             }) || "unknown",
           activo: true,
+          visitasTotales: 1,
+          cicloVisitas: 1,
+          premiosDisponibles: 0,
+          premiosCanjeados: 0,
         });
 
         setNombre("");
@@ -746,7 +751,6 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
-
 
 
 
