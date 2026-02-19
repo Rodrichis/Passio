@@ -260,6 +260,18 @@ export const clientesStyles = StyleSheet.create({
     fontSize: 11,
     textAlign: "center",
   },
+  statBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    backgroundColor: "#fff",
+  },
+  statValue: { color: "#023047", fontWeight: "700", fontSize: 12 },
 
   detailsButton: {
     paddingVertical: 8,

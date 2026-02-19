@@ -9,6 +9,10 @@ export type Cliente = {
   creadoEn?: Date | null;
   ultimaVisita?: Date | null;
   activo?: boolean;
+  visitasTotales?: number;
+  cicloVisitas?: number;
+  premiosDisponibles?: number;
+  premiosCanjeados?: number;
 };
 
 export function mapDoc(d: any): Cliente {
@@ -35,6 +39,10 @@ export function mapDoc(d: any): Cliente {
     creadoEn: creado,
     ultimaVisita,
     activo: data.activo ?? true,
+    visitasTotales: data.visitasTotales ?? 0,
+    cicloVisitas: data.cicloVisitas ?? 0,
+    premiosDisponibles: data.premiosDisponibles ?? 0,
+    premiosCanjeados: data.premiosCanjeados ?? 0,
   };
 }
 

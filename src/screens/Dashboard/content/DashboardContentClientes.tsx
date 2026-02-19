@@ -326,6 +326,32 @@ export default function DashboardContentClientes() {
     );
   };
 
+  const StatBadge = ({
+    icon,
+    label,
+    value,
+  }: {
+    icon: any;
+    label: string;
+    value: number;
+  }) => {
+    const [hover, setHover] = useState(false);
+    return (
+      <Pressable
+        onHoverIn={() => setHover(true)}
+        onHoverOut={() => setHover(false)}
+        style={cStyles.statBadge}
+      >
+        {IS_WEB && hover ? (
+          <View style={cStyles.tooltip}>
+            <Text style={cStyles.tooltipText}>{`${label}: ${value}`}</Text>
+          </View>
+        ) : null}
+        <Ionicons name={icon} size={14} color="#023047" />
+      </Pressable>
+    );
+  };
+
   const HeaderWeb = () => (
     <View style={cStyles.headerRow}>
       <TouchableOpacity onPress={toggleSelectAll} style={cStyles.checkboxHitbox}>
@@ -349,6 +375,10 @@ export default function DashboardContentClientes() {
         />
       </TouchableOpacity>
 
+      <View style={{ flex: 1.6, alignItems: "center", paddingRight: 8 }}>
+        <Text style={[cStyles.headerText, { textAlign: "center" }]}>Estadisticas</Text>
+      </View>
+
       <Text style={[cStyles.headerText, { width: 170, textAlign: "center" }]}>
         Acciones
       </Text>
@@ -367,6 +397,9 @@ export default function DashboardContentClientes() {
     const fecha = item.ultimaVisita || item.creadoEn;
     const icon = osIconName(item.so);
     const soText = formatSO(item.so);
+    const visitasTotales = Number(item.visitasTotales ?? 0);
+    const cicloVisitas = Number(item.cicloVisitas ?? 0);
+    const premiosDisponibles = Number(item.premiosDisponibles ?? 0);
 
     return (
       <TouchableOpacity
@@ -391,6 +424,14 @@ export default function DashboardContentClientes() {
 
         <Text style={{ flex: 1.4, textAlign: "center" }}>{formatDate(fecha)}</Text>
 
+        <View style={{ flex: 1.6, alignItems: "center", paddingRight: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <StatBadge label="Visitas totales" value={visitasTotales} icon="footsteps-outline" />
+            <StatBadge label="Ciclo visitas" value={cicloVisitas} icon="repeat-outline" />
+            <StatBadge label="Premios disponibles" value={premiosDisponibles} icon="gift-outline" />
+          </View>
+        </View>
+
         <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
           <View style={cStyles.rowActions}>
             <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
@@ -414,6 +455,9 @@ export default function DashboardContentClientes() {
     const fecha = item.ultimaVisita || item.creadoEn;
     const icon = osIconName(item.so);
     const soText = formatSO(item.so);
+    const visitasTotales = Number(item.visitasTotales ?? 0);
+    const cicloVisitas = Number(item.cicloVisitas ?? 0);
+    const premiosDisponibles = Number(item.premiosDisponibles ?? 0);
 
     return (
       <TouchableOpacity
@@ -435,6 +479,14 @@ export default function DashboardContentClientes() {
 
         <View style={cStyles.cardFooter}>
           <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <StatBadge label="Visitas totales" value={visitasTotales} icon="footsteps-outline" />
+            <StatBadge label="Ciclo visitas" value={cicloVisitas} icon="repeat-outline" />
+            <StatBadge label="Premios disponibles" value={premiosDisponibles} icon="gift-outline" />
+          </View>
+          <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
+            Visitas: {visitasTotales} · Ciclo: {cicloVisitas} · Premios: {premiosDisponibles}
+          </Text>
           <View style={cStyles.rowActions}>
             <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
             <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
