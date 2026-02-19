@@ -20,6 +20,7 @@ import {
   where,
   Timestamp,
 } from "firebase/firestore";
+import { useIsFocused } from "@react-navigation/native";
 
 type ActivityItem = {
   title: string;
@@ -34,13 +35,14 @@ type Props = {
 
 export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const uid = auth.currentUser?.uid;
+  const isFocused = useIsFocused();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [totalClientes, setTotalClientes] = React.useState<number | null>(null);
   const [nuevosSemana, setNuevosSemana] = React.useState<number | null>(null);
   const [androidCount, setAndroidCount] = React.useState<number | null>(null);
   const [iosCount, setIosCount] = React.useState<number | null>(null);
-  const [puntosHoy] = React.useState<number | null>(null); // placeholder sin fuente de datos
+  const [puntosHoy, setPuntosHoy] = React.useState<number | null>(null);
   const [actividad, setActividad] = React.useState<ActivityItem[]>([]);
 
   const baseURL =
@@ -74,6 +76,12 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
         const weekSnap = await getDocs(query(col, where("creadoEn", ">", oneWeekAgo)));
         setNuevosSemana(weekSnap.size);
 
+        // Visitas registradas hoy (aprox: clientes con ultimaVisita >= inicio del día)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const visitasHoySnap = await getDocs(query(col, where("ultimaVisita", ">", Timestamp.fromDate(startOfDay))));
+        setPuntosHoy(visitasHoySnap.size);
+
         const recentSnap = await getDocs(query(col, orderBy("creadoEn", "desc"), limit(5)));
         const recent = recentSnap.docs.map((d) => {
           const data = d.data() || {};
@@ -98,7 +106,7 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
     };
 
     fetchStats();
-  }, [uid]);
+  }, [uid, isFocused]);
 
   const formatDate = (d?: Date | null) => {
     if (!d) return "";
@@ -186,10 +194,10 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
         />
         <MetricCard label="Nuevos 7 días" value={nuevosSemana} loading={loading} />
         <MetricCard
-          label="Puntos otorgados hoy"
+          label="Visitas registradas hoy"
           value={puntosHoy ?? 0}
           loading={loading}
-          note="Pendiente de origen de datos"
+          note="Clientes con ultima visita marcada hoy"
         />
       </View>
 
