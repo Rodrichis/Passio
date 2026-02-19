@@ -155,6 +155,12 @@ export default function RegisterClientScreen({ route }: Props) {
       setFormError("Selecciona tu fecha de nacimiento.");
       return;
     }
+    const todayMax = new Date();
+    todayMax.setHours(23, 59, 59, 999);
+    if (birthDate.getTime() > todayMax.getTime()) {
+      setFormError("La fecha de nacimiento no puede ser futura.");
+      return;
+    }
     setSaving(true);
     setWalletStep("idle");
     setWalletLink(null);
@@ -340,40 +346,55 @@ export default function RegisterClientScreen({ route }: Props) {
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
               <View style={{ flex: 1 }}>
                 <Text>Telefono</Text>
-                <TextInput
+                <View
                   style={{
+                    flexDirection: "row",
+                    alignItems: "center",
                     borderWidth: 1,
                     borderColor: "#ccc",
                     borderRadius: 8,
-                    padding: 10,
                     backgroundColor: "#fff",
                     height: 42,
                     width: "100%",
+                    paddingHorizontal: 10,
+                    gap: 6,
                   }}
-                  value={telefono}
-                  onChangeText={setTelefono}
-                  placeholder="+56 9 ..."
-                  keyboardType="phone-pad"
-                  editable={!saving && walletStep !== "creating"}
-                />
+                >
+                  <Text style={{ color: "#555", fontWeight: "600" }}>+56</Text>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      paddingHorizontal: 4,
+                    }}
+                    value={telefono}
+                    onChangeText={(val) => {
+                      const digitsOnly = val.replace(/\D+/g, "");
+                      setTelefono(digitsOnly);
+                    }}
+                    keyboardType="numeric"
+                    editable={!saving && walletStep !== "creating"}
+                  />
+                </View>
               </View>
               <View style={{ flex: 1 }}>
                 <Text>Fecha de nacimiento</Text>
-                {Platform.OS === "web" ? (
-                  <input
-                    type="date"
-                    value={birthInputWeb}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setBirthInputWeb(val);
-                      const d = val ? new Date(val) : null;
-                      setBirthDate(d && !isNaN(d.getTime()) ? d : null);
-                    }}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      borderRadius: 8,
-                      padding: 10,
+            {Platform.OS === "web" ? (
+              <input
+                type="date"
+                value={birthInputWeb}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBirthInputWeb(val);
+                  const d = val ? new Date(val) : null;
+                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                }}
+                max={new Date().toISOString().slice(0, 10)}
+                style={{
+                  borderWidth: 1,
+                  borderColor: "#ccc",
+                  borderRadius: 8,
+                  padding: 10,
                       backgroundColor: "#fff",
                       width: "100%",
                       boxSizing: "border-box",
@@ -751,10 +772,6 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
-
-
-
-
 
 
 
