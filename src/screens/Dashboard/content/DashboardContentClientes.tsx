@@ -740,7 +740,16 @@ export default function DashboardContentClientes() {
               {detailClient?.activo !== false && !confirmDeactivate ? (
                 <TouchableOpacity
                   onPress={requestDeactivate}
-                  style={[cStyles.dangerButton, deactivating && { opacity: 0.7 }]}
+                  style={[
+                    cStyles.dangerButton,
+                    {
+                      alignSelf: "flex-start",
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      minWidth: 0,
+                    },
+                    deactivating && { opacity: 0.7 },
+                  ]}
                   disabled={deactivating}
                 >
                   <Text style={cStyles.dangerButtonText}>
@@ -771,9 +780,19 @@ export default function DashboardContentClientes() {
                 </View>
               ) : null}
             </ScrollView>
-            <View style={cStyles.modalActions}>
-              <TouchableOpacity onPress={() => setShowDetail(false)}>
-                <Text style={{ color: "#555" }}>Cerrar</Text>
+            <View style={[cStyles.modalActions, { justifyContent: "center", marginTop: 8 }]}>
+              <TouchableOpacity
+                onPress={() => setShowDetail(false)}
+                style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 18,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: "#cfd8dc",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
               </TouchableOpacity>
             </View>
           </View>
