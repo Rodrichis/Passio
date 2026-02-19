@@ -697,29 +697,33 @@ export default function DashboardContentClientes() {
                 {detailClient?.nombreCompleto || "--"}
               </Text>
               <Text style={cStyles.detailRow}>
-                SO: {formatSO(detailClient?.so)}
-              </Text>
-              <Text style={cStyles.detailRow}>
                 Email: {detailClient?.email || "--"}
               </Text>
               <Text style={cStyles.detailRow}>
                 Telefono: {detailClient?.telefono || "--"}
               </Text>
               <Text style={cStyles.detailRow}>
+                SO: {formatSO(detailClient?.so)}
+              </Text>
+              <Text style={cStyles.detailRow}>
                 Creado: {formatDate(detailClient?.creadoEn || null)}
               </Text>
-          <Text style={cStyles.detailRow}>
-            Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
-          </Text>
-          <Text style={cStyles.detailRow}>
-            Visitas totales: {Number(detailClient?.visitasTotales ?? 0)}
-          </Text>
-          <Text style={cStyles.detailRow}>
-            Ciclo visitas: {Number(detailClient?.cicloVisitas ?? 0)}
-          </Text>
-          <Text style={cStyles.detailRow}>
-            Premios disponibles: {Number(detailClient?.premiosDisponibles ?? 0)}
-          </Text>
+
+              <View style={cStyles.detailDivider} />
+
+              <Text style={cStyles.detailTitle}>Visitas</Text>
+              <Text style={cStyles.detailRow}>
+                Ciclo visitas: {Number(detailClient?.cicloVisitas ?? 0)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Premios disponibles: {Number(detailClient?.premiosDisponibles ?? 0)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Visitas totales: {Number(detailClient?.visitasTotales ?? 0)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
+              </Text>
 
               <View style={cStyles.detailDivider} />
 
@@ -727,11 +731,9 @@ export default function DashboardContentClientes() {
                 <Text style={cStyles.successText}>Usuario desactivado.</Text>
               ) : null}
 
-              {detailClient?.activo === false ? (
-                <Text style={cStyles.detailRow}>Estado: Desactivado</Text>
-              ) : (
-                <Text style={cStyles.detailRow}>Estado: Activo</Text>
-              )}
+              <Text style={cStyles.detailRow}>
+                Estado: {detailClient?.activo === false ? "Desactivado" : "Activo"}
+              </Text>
 
               {deactivateError ? (
                 <Text style={cStyles.errorText}>{deactivateError}</Text>
@@ -986,5 +988,6 @@ export default function DashboardContentClientes() {
     </View>
   );
 }
+
 
 
