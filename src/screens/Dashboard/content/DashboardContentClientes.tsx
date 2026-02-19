@@ -483,9 +483,10 @@ export default function DashboardContentClientes() {
 
         <View style={cStyles.cardFooter}>
           <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
-          <Text style={{ color: "#555", fontSize: 12, marginTop: 4 }}>
-            Visitas: {visitasTotales} · Ciclo: {cicloVisitas} · Premios: {premiosDisponibles}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+            <Ionicons name="gift-outline" size={16} color="#023047" />
+            <Text style={{ color: "#023047", fontWeight: "700" }}>{premiosDisponibles}</Text>
+          </View>
           <View style={cStyles.rowActions}>
             <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
             <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
@@ -707,9 +708,18 @@ export default function DashboardContentClientes() {
               <Text style={cStyles.detailRow}>
                 Creado: {formatDate(detailClient?.creadoEn || null)}
               </Text>
-              <Text style={cStyles.detailRow}>
-                Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
-              </Text>
+          <Text style={cStyles.detailRow}>
+            Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
+          </Text>
+          <Text style={cStyles.detailRow}>
+            Visitas totales: {Number(detailClient?.visitasTotales ?? 0)}
+          </Text>
+          <Text style={cStyles.detailRow}>
+            Ciclo visitas: {Number(detailClient?.cicloVisitas ?? 0)}
+          </Text>
+          <Text style={cStyles.detailRow}>
+            Premios disponibles: {Number(detailClient?.premiosDisponibles ?? 0)}
+          </Text>
 
               <View style={cStyles.detailDivider} />
 
