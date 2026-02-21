@@ -194,10 +194,16 @@ export default function RegisterClientScreen({ route }: Props) {
         const { create, sign } = await createAndSignWallet({
           idUsuario: clientId,
           nombreUsuario: `${nombre.trim()} ${apellido.trim()}`,
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          codigoQR: clientId,
+          cantidad: 1,
+          premios: 0,
         });
+        const signUrl = typeof sign?.data?.url === "string" ? sign.data.url : null;
         if (create.ok && sign?.ok) {
           walletOk = true;
-          walletLinkLocal = extractLink(sign.data) || extractLink(create.data);
+          walletLinkLocal = extractLink(sign.data) || extractLink(create.data) || signUrl;
         } else {
           throw new Error(sign?.errorText || create.errorText || "No se pudo generar la tarjeta (Android).");
         }
@@ -584,11 +590,40 @@ export default function RegisterClientScreen({ route }: Props) {
                     const { create, sign } = await createAndSignWallet({
                       idUsuario: "test-android-100",
                       nombreUsuario: "Ricardo Riedman",
+                      nombre: "Ricardo",
+                      apellido: "Riedman",
+                      codigoQR: "QR-demo",
+                      cantidad: 9,
+                      premios: 4,
                     });
+                    const payloadInfo = {
+                      create: {
+                        ok: create.ok,
+                        status: create.status,
+                        data: create.data,
+                        error: create.errorText,
+                      },
+                      sign: sign
+                        ? {
+                            ok: sign.ok,
+                            status: sign.status,
+                            data: sign.data,
+                            error: sign.errorText,
+                          }
+                        : null,
+                    };
+                    console.log("Test Android respuesta:", payloadInfo);
                     if (create.ok && sign?.ok) {
-                      setWalletError("Test Android OK: se genero el wallet (revisa la respuesta).");
+                      setWalletError(
+                        "Test Android OK. Respuesta:\n" + JSON.stringify(payloadInfo, null, 2)
+                      );
                     } else {
-                      setWalletError("Test Android fallo: " + (sign?.errorText || create.errorText || "sin detalle"));
+                      setWalletError(
+                        "Test Android fallo:\n" +
+                          (sign?.errorText || create.errorText || "sin detalle") +
+                          "\n" +
+                          JSON.stringify(payloadInfo, null, 2)
+                      );
                     }
                   } catch (err) {
                     setWalletError("Test Android error: " + String(err));
@@ -772,7 +807,3 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
-
-
-
-

@@ -46,9 +46,8 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const [actividad, setActividad] = React.useState<ActivityItem[]>([]);
 
   const baseURL =
-    Platform.OS === "web" && typeof window !== "undefined"
-      ? window.location.origin
-      : APP_BASE_URL || "http://10.45.41.36:8082";
+    APP_BASE_URL ||
+    "http://localhost:8081";
 
   const registroURL = uid ? `${baseURL}/register/${uid}` : "";
 

@@ -1,5 +1,6 @@
 // src/services/apiWallet.ts
 const ANDROID_BASE_URL = process.env.EXPO_PUBLIC_WALLET_ANDROID_API_BASE_URL;
+const ANDROID_PREFIX = ANDROID_BASE_URL ? `${ANDROID_BASE_URL}/wallet` : "";
 const APPLE_BASE_URL = process.env.EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL;
 export const DEFAULT_CLASS_ID = process.env.EXPO_PUBLIC_WALLET_CLASS_ID!;
 
@@ -15,8 +16,11 @@ async function callWalletApi(
   path: "/createObject" | "/firma" | "/actualizar",
   body: any
 ): Promise<WalletApiResponse> {
+  if (!ANDROID_PREFIX) {
+    return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
+  }
   try {
-    const res = await fetch(`${ANDROID_BASE_URL}${path}`, {
+    const res = await fetch(`${ANDROID_PREFIX}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -63,13 +67,32 @@ export async function createWalletObject(params: {
   classId?: string;
   idUsuario: string;
   nombreUsuario: string;
+  nombre?: string;
+  apellido?: string;
+  codigoQR?: string;
+  cantidad?: number;
+  premios?: number;
 }): Promise<WalletApiResponse> {
-  const { classId = DEFAULT_CLASS_ID, idUsuario, nombreUsuario } = params;
+  const {
+    classId = DEFAULT_CLASS_ID,
+    idUsuario,
+    nombreUsuario,
+    nombre,
+    apellido,
+    codigoQR,
+    cantidad,
+    premios,
+  } = params;
 
   return callWalletApi("/createObject", {
     classId,
     idUsuario,
     nombreUsuario,
+    ...(nombre ? { nombre } : {}),
+    ...(apellido ? { apellido } : {}),
+    ...(codigoQR ? { codigoQR } : {}),
+    ...(typeof cantidad === "number" ? { cantidad } : {}),
+    ...(typeof premios === "number" ? { premios } : {}),
   });
 }
 
@@ -92,6 +115,11 @@ export async function createAndSignWallet(params: {
   classId?: string;
   idUsuario: string;
   nombreUsuario: string;
+  nombre?: string;
+  apellido?: string;
+  codigoQR?: string;
+  cantidad?: number;
+  premios?: number;
 }): Promise<{
   create: WalletApiResponse;
   sign: WalletApiResponse | null;
@@ -213,11 +241,11 @@ export async function notifyAndroidPass(params: {
   idUsuario: string;
   notificacion: string;
 }): Promise<WalletApiResponse> {
-  if (!ANDROID_BASE_URL) {
+  if (!ANDROID_PREFIX) {
     return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
   }
   try {
-    const res = await fetch(`${ANDROID_BASE_URL}/notificacion`, {
+    const res = await fetch(`${ANDROID_PREFIX}/notificacion`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
