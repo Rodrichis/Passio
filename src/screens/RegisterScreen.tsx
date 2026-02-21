@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { View, TextInput, Text, ScrollView, TouchableOpacity, Modal, ScrollView as RNScrollView } from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -23,7 +23,7 @@ const REGIONES_CHILE = [
   "Coquimbo",
   "Valparaíso",
   "Metropolitana",
-  "O’Higgins",
+  "O'Higgins",
   "Maule",
   "Ñuble",
   "Biobío",
@@ -41,7 +41,7 @@ export default function RegisterScreen({ navigation }: Props) {
   const [telefono, setTelefono] = useState("");
   const [region, setRegion] = useState("");
   const [ciudad, setCiudad] = useState("");
-  const [direccion, setDireccion] = useState("");
+  const [Dirección, setDirección] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
@@ -61,22 +61,22 @@ export default function RegisterScreen({ navigation }: Props) {
     const telefonoTrim = telefono.trim();
     const regionTrim = region.trim();
     const ciudadTrim = ciudad.trim();
-    const direccionTrim = direccion.trim();
+    const DirecciónTrim = Dirección.trim();
 
-    if (!empresaTrim || !emailTrim || !passwordTrim || !telefonoTrim || !regionTrim || !ciudadTrim || !direccionTrim) {
+    if (!empresaTrim || !emailTrim || !passwordTrim || !telefonoTrim || !regionTrim || !ciudadTrim || !DirecciónTrim) {
       setError("Por favor completa todos los campos obligatorios.");
       return;
     }
 
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim)) {
-      setError("Correo invalido.");
+      setError("Correo inválido.");
       return;
     }
 
     const hasLetter = /[A-Za-z]/.test(passwordTrim);
     const hasNumber = /\d/.test(passwordTrim);
     if (passwordTrim.length < 8 || !hasLetter || !hasNumber) {
-      setError("La contrasena debe tener al menos 8 caracteres e incluir letras y numeros.");
+      setError("La Contraseña debe tener al menos 8 caracteres e incluir letras y números.");
       return;
     }
 
@@ -91,7 +91,7 @@ export default function RegisterScreen({ navigation }: Props) {
       try {
         await sendEmailVerification(user);
       } catch (e) {
-        console.warn("No se pudo enviar verificacion de correo:", e);
+        console.warn("No se pudo enviar verificación de correo:", e);
       }
 
       await setDoc(doc(db, "Empresas", user.uid), {
@@ -101,7 +101,7 @@ export default function RegisterScreen({ navigation }: Props) {
         telefono: telefonoTrim,
         region: regionTrim,
         ciudad: ciudadTrim,
-        direccion: direccionTrim,
+        Dirección: DirecciónTrim,
         Descripcion: "",
         ColorPrincipal: "#A99985",
         LinkRegistro: `https://passio.cl/register/${user.uid}`,
@@ -113,7 +113,7 @@ export default function RegisterScreen({ navigation }: Props) {
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
       if (err?.code === "auth/email-already-in-use") {
-        setError("Este correo ya se encuentra registrado. Intenta con otro o inicia sesion.");
+        setError("Este correo ya se encuentra registrado. Intenta con otro o inicia sesión.");
       } else {
         setError(err.message || "No se pudo registrar.");
       }
@@ -131,7 +131,7 @@ export default function RegisterScreen({ navigation }: Props) {
     telefono.trim().length > 0 &&
     region.trim().length > 0 &&
     ciudad.trim().length > 0 &&
-    direccion.trim().length > 0;
+    Dirección.trim().length > 0;
 
   return (
     <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
@@ -153,7 +153,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <TextInput
             style={globalStyles.input}
-            placeholder="Correo electronico"
+            placeholder="Correo electrónico"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -164,7 +164,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <TextInput
             style={globalStyles.input}
-            placeholder="Contrasena"
+            placeholder="Contraseña"
             secureTextEntry
             value={password}
             onChangeText={(v) => {
@@ -174,9 +174,9 @@ export default function RegisterScreen({ navigation }: Props) {
               if (v.length === 0) {
                 setPasswordHint("");
               } else if (v.length < 8 || !hasLetter || !hasNumber) {
-                setPasswordHint("Usa al menos 8 caracteres con letras y numeros.");
+                setPasswordHint("Usa al menos 8 caracteres con letras y números.");
               } else {
-                setPasswordHint("Contraseña fuerte.");
+                setPasswordHint("ContraseÃ±a fuerte.");
               }
             }}
             returnKeyType="done"
@@ -191,20 +191,33 @@ export default function RegisterScreen({ navigation }: Props) {
 
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <TextInput
-                style={globalStyles.input}
-                placeholder="Telefono"
-                value={telefono}
-                onChangeText={(v) => {
-                  const digits = v.replace(/\D/g, "");
-                  setTelefono(digits.slice(0, 15));
-                }}
-                keyboardType="phone-pad"
-                returnKeyType="done"
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={15}
-              />
+              <View
+                style={[
+                  globalStyles.input,
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 10,
+                    paddingVertical: 12,
+                  },
+                ]}
+              >
+                <Text style={{ color: "#555", marginRight: 6 }}>+56</Text>
+                <TextInput
+                  style={{ flex: 1, paddingVertical: 0, paddingHorizontal: 0, outlineStyle: "none" as any }}
+                  placeholder=""
+                  value={telefono}
+                  onChangeText={(v) => {
+                    const digits = v.replace(/\D/g, "");
+                    setTelefono(digits.slice(0, 15));
+                  }}
+                  keyboardType="phone-pad"
+                  returnKeyType="done"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={15}
+                />
+              </View>
             </View>
             <View style={{ flex: 1 }}>
               <TouchableOpacity
@@ -225,7 +238,7 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={{ flex: 1 }}>
               <TextInput
                 style={globalStyles.input}
-                placeholder="Ciudad"
+                placeholder="Comuna"
                 value={ciudad}
                 onChangeText={setCiudad}
                 returnKeyType="done"
@@ -236,9 +249,9 @@ export default function RegisterScreen({ navigation }: Props) {
             <View style={{ flex: 1 }}>
               <TextInput
                 style={globalStyles.input}
-                placeholder="Direccion"
-                value={direccion}
-                onChangeText={setDireccion}
+                placeholder="Dirección"
+                value={Dirección}
+                onChangeText={setDirección}
                 returnKeyType="done"
                 autoCapitalize="sentences"
                 autoCorrect={false}
@@ -329,3 +342,6 @@ export default function RegisterScreen({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
+
