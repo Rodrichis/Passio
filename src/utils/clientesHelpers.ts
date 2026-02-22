@@ -50,7 +50,7 @@ export function filterItems(
   items: Cliente[],
   search: string,
   filterOS: "all" | "ios" | "android",
-  filterPremios: "all" | "with"
+  filterPremios: "all" | "with" | "without"
 ) {
   const term = search.trim().toLowerCase();
   return items.filter((it) => {
@@ -64,9 +64,11 @@ export function filterItems(
       filterOS === "all" ||
       (it.so || "").toLowerCase() === filterOS;
 
+    const premios = Number(it.premiosDisponibles ?? 0);
     const premiosMatch =
       filterPremios === "all" ||
-      Number(it.premiosDisponibles ?? 0) > 0;
+      (filterPremios === "with" && premios > 0) ||
+      (filterPremios === "without" && premios <= 0);
 
     return termMatch && osMatch && premiosMatch;
   });

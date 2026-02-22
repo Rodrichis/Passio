@@ -71,8 +71,14 @@ export default function DashboardContentClientes() {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
-  const [filterPremios, setFilterPremios] = useState<"all" | "with">("all");
+  const [filterPremios, setFilterPremios] = useState<"all" | "with" | "without">("all");
   const [showFilter, setShowFilter] = useState(false);
+  const [showOSDropdown, setShowOSDropdown] = useState(false);
+  const [showPremiosDropdown, setShowPremiosDropdown] = useState(false);
+  const closeDropdowns = () => {
+    setShowOSDropdown(false);
+    setShowPremiosDropdown(false);
+  };
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -587,7 +593,9 @@ export default function DashboardContentClientes() {
 
           {filterPremios !== "all" ? (
             <View style={[cStyles.chip, cStyles.chipGreen]}>
-              <Text style={cStyles.chipGreenText}>Con premios disponibles</Text>
+              <Text style={cStyles.chipGreenText}>
+                {filterPremios === "with" ? "Con premios" : "Sin premios"}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -658,57 +666,122 @@ export default function DashboardContentClientes() {
       {/* Modal de filtros */}
       <Modal visible={showFilter} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
+          {(showOSDropdown || showPremiosDropdown) && (
+            <Pressable
+              onPress={closeDropdowns}
+              style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
+            />
+          )}
           <View style={cStyles.modalCard}>
             <Text style={cStyles.modalTitle}>Filtros</Text>
 
             <Text style={cStyles.optionTitle}>Sistema operativo</Text>
-            {[
-              { label: "Todos", value: "all" as const },
-              { label: "Apple (iOS)", value: "ios" as const },
-              { label: "Android", value: "android" as const },
-            ].map((opt) => (
+            <View
+              style={[
+                cStyles.dropdownContainer,
+                showOSDropdown && { zIndex: 50 },
+              ]}
+            >
               <TouchableOpacity
-                key={opt.value}
-                onPress={() => setFilterOS(opt.value)}
-                style={[
-                  cStyles.optionItem,
-                  filterOS === opt.value && cStyles.optionItemActive,
-                ]}
+                onPress={() => setShowOSDropdown((v) => !v)}
+                style={cStyles.dropdown}
               >
-                <Text
-                  style={[
-                    cStyles.optionText,
-                    filterOS === opt.value && cStyles.optionTextActive,
-                  ]}
-                >
-                  {opt.label}
+                <Text style={cStyles.dropdownText}>
+                  {filterOS === "all" ? "Todos" : filterOS === "ios" ? "Apple (iOS)" : "Android"}
                 </Text>
+                <Ionicons
+                  name={showOSDropdown ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color="#023047"
+                />
               </TouchableOpacity>
-            ))}
+              {showOSDropdown && (
+                <View style={cStyles.dropdownList}>
+                  {[
+                    { label: "Todos", value: "all" as const },
+                    { label: "Apple (iOS)", value: "ios" as const },
+                    { label: "Android", value: "android" as const },
+                  ].map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => {
+                        setFilterOS(opt.value);
+                        setShowOSDropdown(false);
+                      }}
+                      style={[
+                        cStyles.optionItem,
+                        filterOS === opt.value && cStyles.optionItemActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          cStyles.optionText,
+                          filterOS === opt.value && cStyles.optionTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
 
             <Text style={cStyles.optionTitle}>Premios</Text>
-            {[
-              { label: "Todos", value: "all" as const },
-              { label: "Con premios disponibles", value: "with" as const },
-            ].map((opt) => (
+            <View
+              style={[
+                cStyles.dropdownContainer,
+                showPremiosDropdown && { zIndex: 45 },
+              ]}
+            >
               <TouchableOpacity
-                key={opt.value}
-                onPress={() => setFilterPremios(opt.value)}
-                style={[
-                  cStyles.optionItem,
-                  filterPremios === opt.value && cStyles.optionItemActive,
-                ]}
+                onPress={() => setShowPremiosDropdown((v) => !v)}
+                style={cStyles.dropdown}
               >
-                <Text
-                  style={[
-                    cStyles.optionText,
-                    filterPremios === opt.value && cStyles.optionTextActive,
-                  ]}
-                >
-                  {opt.label}
+                <Text style={cStyles.dropdownText}>
+                  {filterPremios === "all"
+                    ? "Todos"
+                    : filterPremios === "with"
+                    ? "Con premios disponibles"
+                    : "Sin premios disponibles"}
                 </Text>
+                <Ionicons
+                  name={showPremiosDropdown ? "chevron-up" : "chevron-down"}
+                  size={18}
+                  color="#023047"
+                />
               </TouchableOpacity>
-            ))}
+              {showPremiosDropdown && (
+                <View style={cStyles.dropdownList}>
+                  {[
+                    { label: "Todos", value: "all" as const },
+                    { label: "Con premios disponibles", value: "with" as const },
+                    { label: "Sin premios disponibles", value: "without" as const },
+                  ].map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => {
+                        setFilterPremios(opt.value);
+                        setShowPremiosDropdown(false);
+                      }}
+                      style={[
+                        cStyles.optionItem,
+                        filterPremios === opt.value && cStyles.optionItemActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          cStyles.optionText,
+                          filterPremios === opt.value && cStyles.optionTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity
               onPress={() => setShowFilter(false)}
