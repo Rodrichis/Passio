@@ -236,7 +236,7 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
             {item.subtitle ? <Text style={{ color: "#555" }}>{item.subtitle}</Text> : null}
             <Text style={{ color: "#777", fontSize: 12 }}>{formatDate(item.date)}</Text>
             <Text style={{ color: "#2196F3", fontSize: 12, marginTop: 4 }}>
-              {item.type === "alta" ? "Alta de cliente" : "Actividad"}
+              {item.type === "alta" ? "Registro de cliente" : "Actividad"}
             </Text>
           </View>
         ))
@@ -277,3 +277,4 @@ function MetricCard({
     </View>
   );
 }
+

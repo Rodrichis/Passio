@@ -49,7 +49,8 @@ export function mapDoc(d: any): Cliente {
 export function filterItems(
   items: Cliente[],
   search: string,
-  filterOS: "all" | "ios" | "android"
+  filterOS: "all" | "ios" | "android",
+  filterPremios: "all" | "with"
 ) {
   const term = search.trim().toLowerCase();
   return items.filter((it) => {
@@ -63,7 +64,11 @@ export function filterItems(
       filterOS === "all" ||
       (it.so || "").toLowerCase() === filterOS;
 
-    return termMatch && osMatch;
+    const premiosMatch =
+      filterPremios === "all" ||
+      Number(it.premiosDisponibles ?? 0) > 0;
+
+    return termMatch && osMatch && premiosMatch;
   });
 }
 

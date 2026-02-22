@@ -71,6 +71,7 @@ export default function DashboardContentClientes() {
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
+  const [filterPremios, setFilterPremios] = useState<"all" | "with">("all");
   const [showFilter, setShowFilter] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -164,8 +165,8 @@ export default function DashboardContentClientes() {
   }, [loadFirstPage]);
 
   const filteredItems = useMemo(
-    () => filterItems(items, search, filterOS),
-    [items, search, filterOS]
+    () => filterItems(items, search, filterOS, filterPremios),
+    [items, search, filterOS, filterPremios]
   );
 
   const sortedItems = useMemo(
@@ -566,7 +567,7 @@ export default function DashboardContentClientes() {
         </TouchableOpacity>
       </View>
 
-      {(search.trim() || filterOS !== "all") && (
+      {(search.trim() || filterOS !== "all" || filterPremios !== "all") && (
         <View style={cStyles.chipsRow}>
           <Text style={cStyles.chipsLabel}>Filtros aplicados:</Text>
 
@@ -581,6 +582,12 @@ export default function DashboardContentClientes() {
               <Text style={cStyles.chipGreenText}>
                 SO: {filterOS === "ios" ? "Apple (iOS)" : "Android"}
               </Text>
+            </View>
+          ) : null}
+
+          {filterPremios !== "all" ? (
+            <View style={[cStyles.chip, cStyles.chipGreen]}>
+              <Text style={cStyles.chipGreenText}>Con premios disponibles</Text>
             </View>
           ) : null}
         </View>
@@ -652,7 +659,9 @@ export default function DashboardContentClientes() {
       <Modal visible={showFilter} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
           <View style={cStyles.modalCard}>
-            <Text style={cStyles.modalTitle}>Filtrar por sistema operativo</Text>
+            <Text style={cStyles.modalTitle}>Filtros</Text>
+
+            <Text style={cStyles.optionTitle}>Sistema operativo</Text>
             {[
               { label: "Todos", value: "all" as const },
               { label: "Apple (iOS)", value: "ios" as const },
@@ -660,10 +669,7 @@ export default function DashboardContentClientes() {
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.value}
-                onPress={() => {
-                  setFilterOS(opt.value);
-                  setShowFilter(false);
-                }}
+                onPress={() => setFilterOS(opt.value)}
                 style={[
                   cStyles.optionItem,
                   filterOS === opt.value && cStyles.optionItemActive,
@@ -680,7 +686,34 @@ export default function DashboardContentClientes() {
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity onPress={() => setShowFilter(false)} style={cStyles.modalClose}>
+            <Text style={cStyles.optionTitle}>Premios</Text>
+            {[
+              { label: "Todos", value: "all" as const },
+              { label: "Con premios disponibles", value: "with" as const },
+            ].map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => setFilterPremios(opt.value)}
+                style={[
+                  cStyles.optionItem,
+                  filterPremios === opt.value && cStyles.optionItemActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    cStyles.optionText,
+                    filterPremios === opt.value && cStyles.optionTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              onPress={() => setShowFilter(false)}
+              style={cStyles.modalClose}
+            >
               <Text style={{ color: "#555" }}>Cerrar</Text>
             </TouchableOpacity>
           </View>
