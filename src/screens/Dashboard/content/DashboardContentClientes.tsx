@@ -308,24 +308,29 @@ export default function DashboardContentClientes() {
     icon,
     label,
     onPress,
+    disabled,
+    tooltipText,
   }: {
     icon: any;
     label: string;
     onPress: () => void;
+    disabled?: boolean;
+    tooltipText?: string;
   }) => {
     const [hover, setHover] = useState(false);
+    const canPress = !disabled;
     return (
       <Pressable
-        onPress={onPress}
+        onPress={canPress ? onPress : undefined}
         onHoverIn={() => setHover(true)}
         onHoverOut={() => setHover(false)}
-        style={cStyles.iconButton}
+        style={[cStyles.iconButton, disabled && { opacity: 0.5 }]}
         accessibilityLabel={label}
         accessibilityRole="button"
       >
         {IS_WEB && hover ? (
           <View style={cStyles.tooltip}>
-            <Text style={cStyles.tooltipText}>{label}</Text>
+            <Text style={cStyles.tooltipText}>{tooltipText || label}</Text>
           </View>
         ) : null}
         <Ionicons name={icon} size={18} color="#023047" />
@@ -446,7 +451,13 @@ export default function DashboardContentClientes() {
         <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
           <View style={cStyles.rowActions}>
             <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
-            <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
+            <ActionIconButton
+              icon="mail-outline"
+              label="Enviar correo"
+              tooltipText="Próximamente"
+              onPress={() => {}}
+              disabled
+            />
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
               <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
             </TouchableOpacity>
@@ -496,7 +507,13 @@ export default function DashboardContentClientes() {
           </View>
           <View style={cStyles.rowActions}>
             <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
-            <ActionIconButton icon="mail-outline" label="Enviar correo" onPress={() => openSingleEmail(item)} />
+            <ActionIconButton
+              icon="mail-outline"
+              label="Enviar correo"
+              tooltipText="Próximamente"
+              onPress={() => {}}
+              disabled
+            />
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
               <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
             </TouchableOpacity>
@@ -615,25 +632,19 @@ export default function DashboardContentClientes() {
 
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
         <TouchableOpacity
-          onPress={() => {
-            setEmailMode("bulk");
-            setEmailTarget(null);
-            setEmailStatus("");
-            setShowEmailModal(true);
-          }}
-          disabled={selectedCount === 0}
+          onPress={() => {}}
+          disabled
           style={[
             cStyles.sendButton,
-            selectedCount === 0 && cStyles.sendButtonDisabled,
+            cStyles.sendButtonDisabled,
           ]}
         >
           <Text
             style={[
-              cStyles.sendButtonText,
-              selectedCount === 0 && cStyles.sendButtonTextDisabled,
+              cStyles.sendButtonTextDisabled,
             ]}
           >
-            Enviar correo ({selectedCount})
+            Enviar correo (próximamente)
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
