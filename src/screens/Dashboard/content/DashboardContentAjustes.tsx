@@ -12,7 +12,6 @@ import { auth, db } from "../../../services/firebaseConfig";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import ColorPicker from "react-native-color-picker-wheel";
 import { Platform, Linking } from "react-native";
 import { APP_BASE_URL } from "@env";
 
@@ -30,7 +29,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [empresa, setEmpresa] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [mostrarColorPicker, setMostrarColorPicker] = useState(false);
 
   const uid = auth.currentUser?.uid;
   const baseURL = APP_BASE_URL || "http://localhost:8081"; // link de registro local o .env
@@ -71,7 +69,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           nombre: empresa.nombre || "",
           Descripcion: empresa.Descripcion || "",
           telefono: empresa.telefono || "",
-          ColorPrincipal: empresa.ColorPrincipal || "#A99985",
         },
         { merge: true } // asegura que actualice sin borrar nada
       );
@@ -168,7 +165,12 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       {/* Nombre + Teléfono en una fila */}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <View style={{ flex: 0.6, marginRight: 8 }}>
-          <Text style={styles.label}>Nombre</Text>
+          <Text style={styles.label}>
+            Nombre empresa{" "}
+            <Text style={{ color: "#607d8b", fontSize: 12 }}>
+              (aparecerá en el formulario de registro de clientes)
+            </Text>
+          </Text>
           <TextInput
             style={styles.input}
             value={empresa?.nombre || ""}
@@ -198,104 +200,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         placeholder="Describe brevemente tu empresa..."
       />
 
-      {/* Selector de color con input HEX */}
-      <Text style={styles.label}>Color principal</Text>
-
-      <View
-        style={{
-          borderWidth: 1,
-          borderColor: "#ccc",
-          borderRadius: 8,
-          padding: 10,
-          backgroundColor: "#fff",
-          marginBottom: 10,
-        }}
-      >
-        {/* Vista previa e input HEX */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setMostrarColorPicker(!mostrarColorPicker)}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                marginRight: 10,
-                backgroundColor: empresa?.ColorPrincipal || "#A99985",
-                borderWidth: 1,
-                borderColor: "#999",
-              }}
-            />
-            <Text style={{ fontWeight: "bold", color: "#333" }}>
-              {empresa?.ColorPrincipal || "#A99985"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Input manual HEX */}
-          <TextInput
-            style={[
-              styles.input,
-              {
-                flex: 0.6,
-                height: 40,
-                marginLeft: 10,
-                textAlign: "center",
-              },
-            ]}
-            placeholder="#A99985"
-            value={empresa?.ColorPrincipal || ""}
-            onChangeText={(color) =>
-              setEmpresa({ ...empresa, ColorPrincipal: color })
-            }
-            autoCapitalize="none"
-          />
-        </View>
-
-        {/* Picker visual */}
-        {mostrarColorPicker && (
-          <View style={{ height: 220 }}>
-            <ColorPicker
-              color={
-                empresa?.ColorPrincipal && /^#[0-9A-Fa-f]{6}$/.test(empresa.ColorPrincipal)
-                  ? empresa.ColorPrincipal
-                  : "#000000"
-              }
-              onColorChange={(val: any) => {
-                const hex =
-                  typeof val === "string" ? val : (val?.hex as string | undefined);
-                if (hex && /^#[0-9A-Fa-f]{6}$/.test(hex)) {
-                  setEmpresa((prev: any) => ({ ...prev, ColorPrincipal: hex }));
-                }
-              }}
-              style={{ flex: 1 }}
-            />
-
-            <Text
-              style={{
-                textAlign: "center",
-                marginTop: 10,
-                fontWeight: "bold",
-                color: empresa?.ColorPrincipal || "#333",
-              }}
-            >
-              {empresa?.ColorPrincipal || ""}
-            </Text>
-          </View>
-        )}
-      </View>
-
       {/* Botón guardar */}
       <TouchableOpacity
         style={[styles.saveButton, saving && { opacity: 0.6 }]}
@@ -318,4 +222,3 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </ScrollView>
   );
 }
-
