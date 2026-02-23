@@ -20,6 +20,7 @@ export default function DashboardContentEscanear() {
   const [scanned, setScanned] = useState(false);
   const [status, setStatus] = useState<string>("Apunta al código QR");
   const [result, setResult] = useState<WalletApiResponse | null>(null);
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanMode, setScanMode] = useState<"visita" | "premio">("visita");
   const [permission, requestPermission] = useCameraPermissions();
@@ -60,11 +61,13 @@ export default function DashboardContentEscanear() {
       if (scanned) return;
       setScanned(true);
       setLoading(true);
+      setFeedback(null);
       setStatus(scanMode === "premio" ? "Procesando (premio)..." : "Procesando (visita)...");
 
       const empresaId = auth.currentUser?.uid;
       if (!empresaId) {
         setStatus("Debes iniciar sesión para escanear.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setLoading(false);
         return;
       }
@@ -72,12 +75,14 @@ export default function DashboardContentEscanear() {
       const payload = parseData(data);
       if (!payload.idUsuario) {
         setStatus("No se encontró idUsuario en el QR.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setLoading(false);
         return;
       }
 
       if (payload.empresaId && payload.empresaId !== empresaId) {
         setStatus("Esta tarjeta no pertenece a tu empresa.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setLoading(false);
         return;
       }
@@ -88,6 +93,7 @@ export default function DashboardContentEscanear() {
         const snap = await getDoc(ref);
         if (!snap.exists()) {
           setStatus("Esta tarjeta no pertenece a tu empresa.");
+          setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
           setLoading(false);
           return;
         }
@@ -95,16 +101,19 @@ export default function DashboardContentEscanear() {
         const activo = clienteDoc.activo ?? true;
         if (!activo) {
           setStatus("Este usuario está desactivado. No se puede registrar la visita.");
+          setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
           setLoading(false);
           return;
         }
       } catch (e) {
         console.error("Error validando tarjeta:", e);
         setStatus("No se pudo validar la tarjeta. Intenta nuevamente.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setLoading(false);
         return;
       }
 
+      const nombreCliente = clienteDoc?.nombreCompleto || clienteDoc?.nombre || "--";
       const soCliente = (clienteDoc?.so || "").toLowerCase();
       const visitasTotalesPrev = Number(clienteDoc?.visitasTotales ?? 0);
       const cicloPrev = Number(clienteDoc?.cicloVisitas ?? 0);
@@ -113,6 +122,7 @@ export default function DashboardContentEscanear() {
 
       if (scanMode === "premio" && premiosDispPrev <= 0) {
         setStatus("No tiene premios disponibles.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setLoading(false);
         return;
       }
@@ -169,12 +179,17 @@ export default function DashboardContentEscanear() {
           status: 200,
           data: { visitasTotales, cicloVisitas, premiosDisponibles, premiosCanjeados },
         });
+        setFeedback({
+          type: "success",
+          message: `Visita otorgada a ${nombreCliente}. Ciclo: ${cicloVisitas} | Visitas totales: ${visitasTotales} | Premios: ${premiosDisponibles}`,
+        });
         setStatus(
           scanMode === "premio" ? "Premio registrado" : "Visita registrada"
         );
       } catch (err) {
         console.error("Error al actualizar pase:", err);
-        setStatus(`Error: ${String(err)}`);
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
+        setStatus("No pudimos leer el pase. Escanea nuevamente.");
       } finally {
         setLoading(false);
       }
@@ -185,6 +200,7 @@ export default function DashboardContentEscanear() {
   const resetScan = () => {
     setScanned(false);
     setResult(null);
+    setFeedback(null);
     setStatus("Apunta al código QR");
   };
 
@@ -266,12 +282,17 @@ export default function DashboardContentEscanear() {
         </TouchableOpacity>
       </View>
 
-      {result && (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultTitle}>Respuesta</Text>
-          <Text style={styles.resultText} selectable>
-            {JSON.stringify(result, null, 2)}
+      {feedback && (
+        <View
+          style={[
+            styles.resultBox,
+            feedback.type === "success" ? styles.resultSuccess : styles.resultError,
+          ]}
+        >
+          <Text style={styles.resultTitle}>
+            {feedback.type === "success" ? "Visita registrada" : "No pudimos leer el pase"}
           </Text>
+          <Text style={styles.resultText}>{feedback.message}</Text>
         </View>
       )}
 
@@ -319,6 +340,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0f2f1",
     padding: 12,
     borderRadius: 8,
+  },
+  resultSuccess: {
+    backgroundColor: "#e8f5e9",
+    borderWidth: 1,
+    borderColor: "#c8e6c9",
+  },
+  resultError: {
+    backgroundColor: "#ffebee",
+    borderWidth: 1,
+    borderColor: "#ffcdd2",
   },
   resultTitle: {
     fontWeight: "700",
