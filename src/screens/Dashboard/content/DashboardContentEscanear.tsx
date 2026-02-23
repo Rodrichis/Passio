@@ -122,7 +122,7 @@ export default function DashboardContentEscanear() {
 
       if (scanMode === "premio" && premiosDispPrev <= 0) {
         setStatus("No tiene premios disponibles.");
-        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
+        setFeedback({ type: "error", message: "El usuario no tiene premios disponibles." });
         setLoading(false);
         return;
       }
@@ -304,6 +304,8 @@ export default function DashboardContentEscanear() {
               ? feedback.action === "premio"
                 ? "Premio canjeado"
                 : "Visita registrada"
+              : feedback.message === "El usuario no tiene premios disponibles."
+              ? "Sin premios disponibles"
               : "No pudimos leer el pase"}
           </Text>
           <Text style={styles.resultText}>{feedback.message}</Text>
