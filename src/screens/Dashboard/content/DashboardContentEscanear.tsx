@@ -15,18 +15,19 @@ type ParsedPayload = {
   empresaId?: string;
 };
 
+type Feedback = { type: "success" | "error"; message: string; action?: "visita" | "premio" };
+
 export default function DashboardContentEscanear() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [status, setStatus] = useState<string>("Apunta al código QR");
   const [result, setResult] = useState<WalletApiResponse | null>(null);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanMode, setScanMode] = useState<"visita" | "premio">("visita");
   const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
-    // solicitamos permiso al montar si aún no se pidió
     if (!permission) {
       requestPermission();
     }
@@ -51,7 +52,6 @@ export default function DashboardContentEscanear() {
         empresaId: parsed.empresaId || parsed.empresaUid,
       };
     } catch {
-      // fallback: si viene un id plano, lo usamos y puntos = 1
       return { idUsuario: raw, cantidadPuntos: 1 };
     }
   };
@@ -140,7 +140,6 @@ export default function DashboardContentEscanear() {
           premiosDisponibles += 1;
         }
       } else {
-        // canje premio
         premiosDisponibles = Math.max(0, premiosDispPrev - 1);
         premiosCanjeados = premiosCanjPrev + 1;
       }
@@ -150,21 +149,25 @@ export default function DashboardContentEscanear() {
       const finalPoints = scanMode === "premio" ? -Math.abs(basePoints) : basePoints;
 
       try {
-        // Actualizamos wallet según SO
-        if (soCliente === "ios") {
-          await updateApplePass({
-            idUsuario: payload.idUsuario,
-            cantidad: cicloVisitas || 0,
-            premiosDisponibles,
-          });
-        } else {
-          await updateWalletPoints({
-            idUsuario: payload.idUsuario,
-            cantidadPuntos: finalPoints,
-          });
+        const walletResp =
+          soCliente === "ios"
+            ? await updateApplePass({
+                idUsuario: payload.idUsuario,
+                cantidad: cicloVisitas || 0,
+                premiosDisponibles,
+              })
+            : await updateWalletPoints({
+                idUsuario: payload.idUsuario,
+                cantidadPuntos: finalPoints,
+              });
+
+        if (!walletResp.ok) {
+          setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
+          setStatus("No pudimos leer el pase. Escanea nuevamente.");
+          setLoading(false);
+          return;
         }
 
-        // Actualizamos Firestore
         const ref = doc(db, "Empresas", empresaId, "Clientes", payload.idUsuario);
         await updateDoc(ref, {
           visitasTotales,
@@ -179,13 +182,20 @@ export default function DashboardContentEscanear() {
           status: 200,
           data: { visitasTotales, cicloVisitas, premiosDisponibles, premiosCanjeados },
         });
-        setFeedback({
-          type: "success",
-          message: `Visita otorgada a ${nombreCliente}. Ciclo: ${cicloVisitas} | Visitas totales: ${visitasTotales} | Premios: ${premiosDisponibles}`,
-        });
-        setStatus(
-          scanMode === "premio" ? "Premio registrado" : "Visita registrada"
+        setFeedback(
+          scanMode === "premio"
+            ? {
+                type: "success",
+                action: "premio",
+                message: `Premio canjeado para ${nombreCliente}. Premios restantes: ${premiosDisponibles} | Visitas totales: ${visitasTotales}`,
+              }
+            : {
+                type: "success",
+                action: "visita",
+                message: `Visita otorgada a ${nombreCliente}. Ciclo: ${cicloVisitas} | Visitas totales: ${visitasTotales} | Premios: ${premiosDisponibles}`,
+              }
         );
+        setStatus(scanMode === "premio" ? "Premio canjeado" : "Visita registrada");
       } catch (err) {
         console.error("Error al actualizar pase:", err);
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
@@ -290,7 +300,11 @@ export default function DashboardContentEscanear() {
           ]}
         >
           <Text style={styles.resultTitle}>
-            {feedback.type === "success" ? "Visita registrada" : "No pudimos leer el pase"}
+            {feedback.type === "success"
+              ? feedback.action === "premio"
+                ? "Premio canjeado"
+                : "Visita registrada"
+              : "No pudimos leer el pase"}
           </Text>
           <Text style={styles.resultText}>{feedback.message}</Text>
         </View>
@@ -357,8 +371,7 @@ const styles = StyleSheet.create({
     color: "#023047",
   },
   resultText: {
-    fontFamily: "monospace",
-    fontSize: 12,
+    fontSize: 13,
     color: "#333",
   },
   button: {
@@ -400,9 +413,3 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 });
-
-
-
-
-
-
