@@ -440,10 +440,13 @@ export default function DashboardContentClientes() {
 
         {IS_WEB ? (
           <View style={{ width: 160, alignItems: "center", paddingRight: 8 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <StatBadge label="Visitas totales" value={visitasTotales} icon="footsteps-outline" />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="gift-outline" size={16} color="#023047" />
+                <Text style={{ color: "#023047", fontWeight: "700" }}>{premiosDisponibles}</Text>
+              </View>
               <StatBadge label="Ciclo visitas" value={cicloVisitas} icon="repeat-outline" />
-              <StatBadge label="Premios disponibles" value={premiosDisponibles} icon="gift-outline" />
+              <StatBadge label="Visitas totales" value={visitasTotales} icon="footsteps-outline" />
             </View>
           </View>
         ) : null}
@@ -834,6 +837,9 @@ export default function DashboardContentClientes() {
               </Text>
               <Text style={cStyles.detailRow}>
                 Premios disponibles: {Number(detailClient?.premiosDisponibles ?? 0)}
+              </Text>
+              <Text style={cStyles.detailRow}>
+                Premios canjeados: {Number(detailClient?.premiosCanjeados ?? 0)}
               </Text>
               <Text style={cStyles.detailRow}>
                 Visitas totales: {Number(detailClient?.visitasTotales ?? 0)}
