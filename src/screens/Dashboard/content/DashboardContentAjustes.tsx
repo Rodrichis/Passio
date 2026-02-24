@@ -6,13 +6,22 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Platform,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { auth, db } from "../../../services/firebaseConfig";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Platform, Linking } from "react-native";
+import { auth, db } from "../../../services/firebaseConfig";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { APP_BASE_URL } from "@env";
 
 type RootStackParamList = {
@@ -25,17 +34,25 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Dashboard">;
 };
 
+type PlanInfo = {
+  nombrePlan?: string;
+  limiteUsuarios?: number;
+  limiteNotificacion?: number;
+  limiteCorreo?: number;
+  precio?: number;
+};
+
 export default function DashboardContentAjustes({ navigation }: Props) {
   const [empresa, setEmpresa] = useState<any>(null);
+  const [planData, setPlanData] = useState<PlanInfo | null>(null);
+  const [contadores, setContadores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const uid = auth.currentUser?.uid;
-  const baseURL = APP_BASE_URL || "http://localhost:8081"; // link de registro local o .env
-
+  const baseURL = APP_BASE_URL || "http://localhost:8081";
   const registroURL = `${baseURL}/register/${uid}`;
 
-  // Cargar información de la empresa desde Firestore
   useEffect(() => {
     const fetchEmpresa = async () => {
       try {
@@ -43,7 +60,36 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         const ref = doc(db, "Empresas", uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          setEmpresa(snap.data());
+          const data = snap.data();
+          setEmpresa(data);
+
+          // Traer límites del plan (colección Planes) para mostrarlos
+          if (data?.plan) {
+            const q = query(
+              collection(db, "Planes"),
+              where("nombrePlan", "==", data.plan)
+            );
+            const res = await getDocs(q);
+            const first = res.docs[0];
+            if (first) {
+              setPlanData(first.data() as PlanInfo);
+            } else {
+              // Fallback: buscar insensible a mayúsculas si el nombre no matchea exacto
+              const all = await getDocs(collection(db, "Planes"));
+              const lower = String(data.plan || "").toLowerCase();
+              const match = all.docs.find(
+                (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
+              );
+              if (match) setPlanData(match.data() as PlanInfo);
+            }
+          }
+
+          // Traer contadores de la empresa
+          const contRef = doc(db, "Empresas", uid, "Contadores", "global");
+          const contSnap = await getDoc(contRef);
+          if (contSnap.exists()) {
+            setContadores(contSnap.data());
+          }
         } else {
           console.warn("No se encontró información de la empresa");
         }
@@ -57,7 +103,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     fetchEmpresa();
   }, [uid]);
 
-  // Guardar cambios en Firestore
   const handleSave = async () => {
     if (!uid || !empresa) return;
     setSaving(true);
@@ -70,7 +115,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           Descripcion: empresa.Descripcion || "",
           telefono: empresa.telefono || "",
         },
-        { merge: true } // asegura que actualice sin borrar nada
+        { merge: true }
       );
       alert("Cambios guardados correctamente");
       console.log("Empresa actualizada:", empresa);
@@ -100,9 +145,71 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     );
   }
 
+  const planInfo: PlanInfo = {
+    nombrePlan: planData?.nombrePlan || empresa?.plan,
+    limiteUsuarios: planData?.limiteUsuarios ?? empresa?.limiteUsuarios,
+    limiteNotificacion: planData?.limiteNotificacion ?? empresa?.limiteNotificacion,
+    limiteCorreo: planData?.limiteCorreo ?? empresa?.limiteCorreo,
+    precio: planData?.precio ?? empresa?.precio,
+  };
+
+  const usados = {
+    usuarios: contadores?.totalUsuarios ?? 0,
+    notificaciones: contadores?.notificacionesMes ?? 0,
+    correos: contadores?.correosMes ?? 0,
+  };
+
   return (
     <ScrollView style={{ paddingHorizontal: 10 }}>
       <Text style={styles.sectionTitle}>Ajustes de Empresa</Text>
+
+      {/* Plan actual */}
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: "#e0e0e0",
+          borderRadius: 10,
+          padding: 12,
+          backgroundColor: "#f7f9fb",
+          marginBottom: 16,
+        }}
+      >
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0d47a1" }}>
+              Plan actual: {planInfo?.nombrePlan || "No definido"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              backgroundColor: "#2196F3",
+            }}
+            onPress={() => alert("Próximamente podrás mejorar tu plan")}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700" }}>Mejorar plan</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ marginTop: 10, gap: 6 }}>
+          <Text style={{ color: "#455a64" }}>
+            Usuarios: {usados.usuarios} / {planInfo.limiteUsuarios ?? "-"}
+          </Text>
+          <Text style={{ color: "#455a64" }}>
+            Notificaciones (mes): {usados.notificaciones} / {planInfo.limiteNotificacion ?? "-"}
+          </Text>
+          <Text style={{ color: "#455a64" }}>
+            Correos (mes): {usados.correos} / {planInfo.limiteCorreo ?? "-"}
+          </Text>
+          {!planData && (
+            <Text style={{ color: "#b71c1c", fontSize: 12 }}>
+              No pudimos leer los límites del plan. Revisa la colección "Planes" y los permisos de lectura.
+            </Text>
+          )}
+        </View>
+      </View>
 
       <Text style={styles.sectionTitle}>Link de registro</Text>
       <View
@@ -129,12 +236,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
               borderRadius: 8,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>
-              Abrir en navegador
-            </Text>
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Abrir en navegador</Text>
           </TouchableOpacity>
 
-          {/* Copiar solo en web (sin instalar libs) */}
           {Platform.OS === "web" &&
             typeof navigator !== "undefined" &&
             (navigator as any).clipboard && (
@@ -207,9 +311,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         disabled={saving}
       >
         <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={styles.logoutText}>
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </Text>
+        <Text style={styles.logoutText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
       </TouchableOpacity>
 
       <View style={{ height: 20 }} />
