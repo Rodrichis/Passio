@@ -163,6 +163,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     correos: contadores?.correosMes ?? 0,
   };
 
+  const limiteUsuarios = planInfo.limiteUsuarios;
+  const atUserLimit = typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
+
   return (
     <ScrollView style={{ paddingHorizontal: 10 }}>
       <Text style={styles.sectionTitle}>Ajustes de Empresa</Text>
@@ -201,6 +204,26 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           <Text style={{ color: "#455a64" }}>
             Usuarios: {usados.usuarios} / {planInfo.limiteUsuarios ?? "-"}
           </Text>
+          {atUserLimit && (
+            <View
+              style={{
+                marginTop: 6,
+                padding: 8,
+                borderRadius: 8,
+                backgroundColor: "#fff4f4",
+                borderWidth: 1,
+                borderColor: "#ffcdd2",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ionicons name="warning-outline" size={16} color="#c62828" />
+              <Text style={{ color: "#c62828", flex: 1 }}>
+                Alcanzaste tu límite de usuarios registrados. Mejora tu plan.
+              </Text>
+            </View>
+          )}
           <Text style={{ color: "#455a64" }}>
             Notificaciones (mes): {usados.notificaciones} / {planInfo.limiteNotificacion ?? "-"}
           </Text>
