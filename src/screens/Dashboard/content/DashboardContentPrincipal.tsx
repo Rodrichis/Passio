@@ -7,6 +7,7 @@ import {
   Platform,
   Linking,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { auth, db } from "../../../services/firebaseConfig";
 import { APP_BASE_URL } from "@env";
@@ -14,11 +15,13 @@ import {
   collection,
   getCountFromServer,
   getDocs,
+  getDoc,
   limit,
   orderBy,
   query,
   where,
   Timestamp,
+  doc,
 } from "firebase/firestore";
 import { useIsFocused } from "@react-navigation/native";
 
@@ -44,6 +47,8 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const [iosCount, setIosCount] = React.useState<number | null>(null);
   const [puntosHoy, setPuntosHoy] = React.useState<number | null>(null);
   const [actividad, setActividad] = React.useState<ActivityItem[]>([]);
+  const [limiteUsuarios, setLimiteUsuarios] = React.useState<number | null>(null);
+  const [atUserLimit, setAtUserLimit] = React.useState(false);
 
   const baseURL =
     APP_BASE_URL ||
@@ -60,9 +65,54 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
 
       try {
         const col = collection(db, "Empresas", uid, "Clientes");
+        // Info de empresa/plan
+        let planName: string | null = null;
+        try {
+          const empSnap = await getDoc(doc(db, "Empresas", uid));
+          if (empSnap.exists()) {
+            planName = (empSnap.data() as any)?.plan || null;
+          }
+        } catch {}
+
+        // Límite del plan
+        let limitePlan: number | null = null;
+        if (planName) {
+          try {
+            const planSnap = await getDocs(
+              query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+            );
+            const first = planSnap.docs[0];
+            if (first) {
+              const data = first.data() as any;
+              if (typeof data.limiteUsuarios === "number") limitePlan = data.limiteUsuarios;
+            }
+          } catch {}
+        }
+        setLimiteUsuarios(limitePlan);
+
+        // Contador de usuarios desde "Contador"
+        let totalFromCont: number | null = null;
+        try {
+          const contSnap = await getDocs(collection(db, "Empresas", uid, "Contador"));
+          const first = contSnap.docs[0];
+          if (first) {
+            const data = first.data() as any;
+            if (typeof data.totalUsuarios === "number") totalFromCont = data.totalUsuarios;
+          }
+        } catch {}
 
         const totalSnap = await getCountFromServer(col);
-        setTotalClientes(totalSnap.data().count);
+        const totalCount = totalFromCont ?? totalSnap.data().count;
+        setTotalClientes(totalCount);
+
+        const limitNum =
+          typeof limitePlan === "number"
+            ? limitePlan
+            : limitePlan != null
+            ? parseInt(String(limitePlan), 10)
+            : null;
+        const hasLimit = limitNum != null && !isNaN(limitNum);
+        setAtUserLimit(hasLimit ? totalCount >= (limitNum as number) : false);
 
         const androidSnap = await getDocs(query(col, where("so", "==", "android")));
         setAndroidCount(androidSnap.size);
@@ -190,6 +240,7 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
           value={totalClientes}
           loading={loading}
           note={`Android: ${androidCount ?? 0} · iOS: ${iosCount ?? 0}`}
+          warning={atUserLimit ? "Alcanzaste el límite." : undefined}
         />
         <MetricCard label="Nuevos 7 días" value={nuevosSemana} loading={loading} />
         <MetricCard
@@ -250,11 +301,13 @@ function MetricCard({
   value,
   loading,
   note,
+  warning,
 }: {
   label: string;
   value: number | null;
   loading: boolean;
   note?: string;
+  warning?: string;
 }) {
   return (
     <View
@@ -269,7 +322,10 @@ function MetricCard({
         minWidth: 160,
       }}
     >
-      <Text style={{ fontSize: 13, color: "#555" }}>{label}</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 13, color: "#555" }}>{label}</Text>
+        {warning ? <Text style={{ fontSize: 11, color: "#c62828" }}>{warning}</Text> : null}
+      </View>
       <Text style={{ fontSize: 22, fontWeight: "700", color: "#023047" }}>
         {loading ? "…" : value ?? "0"}
       </Text>
