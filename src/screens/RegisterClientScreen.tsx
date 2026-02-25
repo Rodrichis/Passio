@@ -74,6 +74,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [testAppleMessage, setTestAppleMessage] = useState<string | null>(null);
   const [testAppleStatus, setTestAppleStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [testAppleError, setTestAppleError] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const openedWalletRef = useRef(false);
 
   // Anonymous auth to comply with security rules for public form
@@ -153,6 +154,7 @@ export default function RegisterClientScreen({ route }: Props) {
     setFormError(null);
     setWalletError(null);
     setWalletFriendlyError(null);
+    setShowLimitModal(false);
     if (!nombre.trim() || !apellido.trim() || !email.trim() || !telefono.trim()) {
       setFormError("Completa nombre, apellido, email y telefono.");
       return;
@@ -305,9 +307,7 @@ export default function RegisterClientScreen({ route }: Props) {
           });
         } catch (txErr: any) {
           if (String(txErr?.message).includes("LIMIT_REACHED")) {
-            setFormError(
-              `No puedes registrar más clientes. Límite del plan alcanzado (${limiteUsuarios ?? "sin límite cargado"}).`
-            );
+            setShowLimitModal(true);
             setWalletStep("idle");
             setSaving(false);
             return;
@@ -874,6 +874,53 @@ export default function RegisterClientScreen({ route }: Props) {
                 alignSelf: "flex-end",
                 paddingVertical: 8,
                 paddingHorizontal: 12,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: "#cfd8dc",
+                backgroundColor: "#fff",
+              }}
+            >
+              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {showLimitModal && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "rgba(0,0,0,0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              padding: 16,
+              borderRadius: 12,
+              width: "85%",
+              maxWidth: 360,
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828", textAlign: "center" }}>
+              No se pueden registrar más usuarios.
+            </Text>
+            <Text style={{ color: "#444", textAlign: "center" }}>
+              Este comercio alcanzó el límite de registros disponible.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowLimitModal(false)}
+              style={{
+                marginTop: 4,
+                alignSelf: "center",
+                paddingVertical: 10,
+                paddingHorizontal: 16,
                 borderRadius: 8,
                 borderWidth: 1,
                 borderColor: "#cfd8dc",
