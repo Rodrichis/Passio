@@ -26,6 +26,9 @@ import {
   doc,
   getDoc,
   updateDoc,
+  runTransaction,
+  serverTimestamp,
+  where,
 } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../../styles/ClientesStyles";
@@ -100,6 +103,7 @@ export default function DashboardContentClientes() {
   const [sendingPush, setSendingPush] = useState(false);
   const [pushSent, setPushSent] = useState(false);
   const [pushMode, setPushMode] = useState<"single" | "bulk">("single");
+  const [limitePush, setLimitePush] = useState<number | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const closePushModal = () => {
@@ -169,6 +173,41 @@ export default function DashboardContentClientes() {
   useEffect(() => {
     loadFirstPage();
   }, [loadFirstPage]);
+
+  // Carga límite de notificaciones desde el plan de la empresa
+  useEffect(() => {
+    const loadLimitePush = async () => {
+      if (!uid) return;
+      try {
+        const empSnap = await getDoc(doc(db, "Empresas", uid));
+        const planName = empSnap.exists() ? (empSnap.data() as any)?.plan : null;
+        if (planName) {
+          // Primero intento exacto
+          let planData: any = null;
+          let planSnap = await getDocs(
+            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+          );
+          if (planSnap.docs[0]) {
+            planData = planSnap.docs[0].data();
+          } else {
+            // Fallback insensible a mayúsculas
+            planSnap = await getDocs(collection(db, "Planes"));
+            const lower = String(planName).toLowerCase();
+            const match = planSnap.docs.find(
+              (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
+            );
+            if (match) planData = match.data();
+          }
+          if (planData && typeof planData.limiteNotificacion === "number") {
+            setLimitePush(planData.limiteNotificacion);
+          }
+        }
+      } catch (e) {
+        console.log("No se pudo cargar límite de notificaciones:", e);
+      }
+    };
+    loadLimitePush();
+  }, [uid]);
 
   const filteredItems = useMemo(
     () => filterItems(items, search, filterOS, filterPremios),
@@ -997,26 +1036,70 @@ export default function DashboardContentClientes() {
                       try {
                         setSendingPush(true);
                         setPushStatus("Enviando...");
-                        let okCount = 0;
-                        for (const tgt of targets) {
-                          const isIOS = tgt.so === "ios";
-                          const resp = isIOS
-                            ? await notifyApplePass({ idUsuario: tgt.id, notificacion: pushBody.trim() })
-                            : await notifyAndroidPass({ idUsuario: tgt.id, notificacion: pushBody.trim() });
-                          if (resp.ok) okCount += 1;
+
+                        // Límite de notificaciones y reset mensual (siempre incrementa contador)
+                        const toSend = targets.length;
+                        try {
+                          let contRef = doc(db, "Empresas", uid!, "Contador", "contador");
+                          const coll = await getDocs(collection(db, "Empresas", uid!, "Contador"));
+                          if (!coll.empty) {
+                            contRef = doc(db, "Empresas", uid!, "Contador", coll.docs[0].id);
+                          }
+                          await runTransaction(db, async (tx) => {
+                            const snap = await tx.get(contRef);
+                            const data = snap.exists() ? snap.data() || {} : {};
+                            const mesActual = new Date();
+                            const mesKey = `${mesActual.getFullYear()}-${String(
+                              mesActual.getMonth() + 1
+                            ).padStart(2, "0")}`;
+                            let current = typeof data.notificacionesMes === "number" ? data.notificacionesMes : 0;
+                            const mesConteo = data.mesConteo as string | undefined;
+                            if (mesConteo !== mesKey) {
+                              current = 0;
+                            }
+                            const nuevoTotal = current + toSend;
+                            if (limitePush != null && nuevoTotal > limitePush) {
+                              throw new Error("LIMIT_PUSH");
+                            }
+                            tx.set(
+                              contRef,
+                              {
+                                notificacionesMes: nuevoTotal,
+                                mesConteo: mesKey,
+                                actualizadoEl: serverTimestamp(),
+                              },
+                              { merge: true }
+                            );
+                          });
+                        } catch (e: any) {
+                          if (String(e?.message).includes("LIMIT_PUSH")) {
+                            setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
+                            setSendingPush(false);
+                            return;
+                          }
+                          throw e;
                         }
-                        setPushStatus(`Enviadas ${okCount}/${targets.length}`);
-                        setPushBody("");
-                        setPushSent(true);
-                      } catch (err) {
-                        setPushStatus(`Error: ${String(err)}`);
-                      } finally {
-                        setSendingPush(false);
-                      }
-                    }}
-                    style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
-                    disabled={sendingPush}
-                  >
+
+                          let okCount = 0;
+                          for (const tgt of targets) {
+                            const isIOS = tgt.so === "ios";
+                            const resp = isIOS
+                              ? await notifyApplePass({ idUsuario: tgt.id, notificacion: pushBody.trim() })
+                              : await notifyAndroidPass({ idUsuario: tgt.id, notificacion: pushBody.trim() });
+                            if (resp.ok) okCount += 1;
+                          }
+                          setPushStatus(`Enviadas ${okCount}/${targets.length}`);
+                          setPushBody("");
+                          setPushSent(true);
+                        } catch (err) {
+                          setPushStatus(`Error: ${String(err)}`);
+                        } finally {
+                          setSendingPush(false);
+                        }
+                      }}
+                      style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
+                      disabled={sendingPush}
+                    >
                     <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
                   </TouchableOpacity>
                 </View>
