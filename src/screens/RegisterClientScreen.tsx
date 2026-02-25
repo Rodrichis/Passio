@@ -15,7 +15,17 @@ import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, addDoc, collection, serverTimestamp, deleteDoc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  serverTimestamp,
+  setDoc,
+  getDocs,
+  query,
+  where,
+  runTransaction,
+} from "firebase/firestore";
 import { createAndSignWallet, createApplePass } from "../services/apiWallet";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
@@ -168,6 +178,26 @@ export default function RegisterClientScreen({ route }: Props) {
     setShowForm(true);
 
     try {
+      // Traer límites del plan
+      let limiteUsuarios: number | null = null;
+      try {
+        const planName = empresa?.plan;
+        if (planName) {
+          const planRes = await getDocs(
+            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+          );
+          const planDoc = planRes.docs[0];
+          if (planDoc) {
+            const data = planDoc.data() as any;
+            if (typeof data.limiteUsuarios === "number") {
+              limiteUsuarios = data.limiteUsuarios;
+            }
+          }
+        }
+      } catch (planErr) {
+        console.log("No se pudieron leer los límites del plan:", planErr);
+      }
+
       // Pre-generar ID sin escribir en Firestore
       const newDocRef = doc(collection(db, "Empresas", empresaId, "Clientes"));
       const clientId = newDocRef.id;
@@ -209,9 +239,9 @@ export default function RegisterClientScreen({ route }: Props) {
         }
       }
 
-      // Solo si el wallet fue OK escribimos el cliente en Firestore
+      // Solo si el wallet fue OK escribimos el cliente en Firestore (con límite)
       if (walletOk) {
-        await setDoc(newDocRef, {
+        const clientData = {
           nombre: nombre.trim(),
           apellido: apellido.trim(),
           email: email.trim().toLowerCase(),
@@ -232,7 +262,58 @@ export default function RegisterClientScreen({ route }: Props) {
           cicloVisitas: 1,
           premiosDisponibles: 0,
           premiosCanjeados: 0,
-        });
+        };
+
+        // Transacción: valida límite y crea cliente + incrementa contador
+        // Contador de usuarios: intenta colección "Contador" (singular) y luego "Contadores" (plural)
+        let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
+        try {
+          let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
+          if (!contColl.empty) {
+            const first = contColl.docs[0];
+            contRefToUse = doc(db, "Empresas", empresaId, "Contador", first.id);
+          } else {
+            contColl = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
+            if (!contColl.empty) {
+              const first = contColl.docs[0];
+              contRefToUse = doc(db, "Empresas", empresaId, "Contadores", first.id);
+            }
+          }
+        } catch (e) {
+          console.log("No se pudo leer colección Contador/Contadores, se usará 'contador':", e);
+        }
+
+        try {
+          await runTransaction(db, async (tx) => {
+            const contSnap = await tx.get(contRefToUse);
+            const current = contSnap.exists() ? (contSnap.data()?.totalUsuarios || 0) : 0;
+
+            if (limiteUsuarios != null && current >= limiteUsuarios) {
+              throw new Error("LIMIT_REACHED");
+            }
+
+            tx.set(newDocRef, clientData);
+            tx.set(
+              contRefToUse,
+              {
+                totalUsuarios: current + 1,
+                actualizadoEl: serverTimestamp(),
+                // preserva otros contadores si ya existen
+              },
+              { merge: true }
+            );
+          });
+        } catch (txErr: any) {
+          if (String(txErr?.message).includes("LIMIT_REACHED")) {
+            setFormError(
+              `No puedes registrar más clientes. Límite del plan alcanzado (${limiteUsuarios ?? "sin límite cargado"}).`
+            );
+            setWalletStep("idle");
+            setSaving(false);
+            return;
+          }
+          throw txErr;
+        }
 
         setNombre("");
         setApellido("");

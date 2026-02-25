@@ -84,11 +84,15 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             }
           }
 
-          // Traer contadores de la empresa
-          const contRef = doc(db, "Empresas", uid, "Contadores", "global");
-          const contSnap = await getDoc(contRef);
-          if (contSnap.exists()) {
-            setContadores(contSnap.data());
+          // Traer contadores de la empresa (colección "Contador")
+          try {
+            const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
+            const first = contColl.docs[0];
+            if (first) {
+              setContadores(first.data());
+            }
+          } catch (e) {
+            console.log("No se pudo leer contadores:", e);
           }
         } else {
           console.warn("No se encontró información de la empresa");
