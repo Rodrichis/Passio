@@ -174,6 +174,44 @@ export default function DashboardContentClientes() {
     loadFirstPage();
   }, [loadFirstPage]);
 
+  // Helper: actualiza contador de notificaciones con reset mensual y límite
+  const updatePushCounter = useCallback(
+    async (toSend: number) => {
+      if (!uid) throw new Error("NO_UID");
+      let contRef = doc(db, "Empresas", uid, "Contador", "contador");
+      const coll = await getDocs(collection(db, "Empresas", uid, "Contador"));
+      if (!coll.empty) {
+        contRef = doc(db, "Empresas", uid, "Contador", coll.docs[0].id);
+      }
+
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(contRef);
+        const data = snap.exists() ? snap.data() || {} : {};
+        const mesActual = new Date();
+        const mesKey = `${mesActual.getFullYear()}-${String(mesActual.getMonth() + 1).padStart(2, "0")}`;
+        let current = typeof data.notificacionesMes === "number" ? data.notificacionesMes : 0;
+        const mesConteo = data.mesConteo as string | undefined;
+        if (mesConteo !== mesKey) {
+          current = 0;
+        }
+        const nuevoTotal = current + toSend;
+        if (limitePush != null && nuevoTotal > limitePush) {
+          throw new Error("LIMIT_PUSH");
+        }
+        tx.set(
+          contRef,
+          {
+            notificacionesMes: nuevoTotal,
+            mesConteo: mesKey,
+            actualizadoEl: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+    },
+    [uid, limitePush]
+  );
+
   // Carga límite de notificaciones desde el plan de la empresa
   useEffect(() => {
     const loadLimitePush = async () => {
@@ -728,7 +766,7 @@ export default function DashboardContentClientes() {
           <View style={cStyles.modalCard}>
             <Text style={cStyles.modalTitle}>Filtros</Text>
 
-            <Text style={cStyles.optionTitle}>Sistema operativo</Text>
+            <Text style={cStyles.optionItem}>Sistema operativo</Text>
             <View
               style={[
                 cStyles.dropdownContainer,
@@ -780,7 +818,7 @@ export default function DashboardContentClientes() {
               )}
             </View>
 
-            <Text style={cStyles.optionTitle}>Premios</Text>
+            <Text style={cStyles.optionItem}>Premios</Text>
             <View
               style={[
                 cStyles.dropdownContainer,
@@ -1028,49 +1066,16 @@ export default function DashboardContentClientes() {
                       if (targets.length === 0) {
                         setPushStatus("No hay destinatarios.");
                         return;
-                      }
-                      if (!pushBody.trim()) {
-                        setPushStatus("Ingresa un mensaje.");
-                        return;
-                      }
-                      try {
-                        setSendingPush(true);
-                        setPushStatus("Enviando...");
-
-                        // Límite de notificaciones y reset mensual (siempre incrementa contador)
-                        const toSend = targets.length;
+                        }
+                        if (!pushBody.trim()) {
+                          setPushStatus("Ingresa un mensaje.");
+                          return;
+                        }
                         try {
-                          let contRef = doc(db, "Empresas", uid!, "Contador", "contador");
-                          const coll = await getDocs(collection(db, "Empresas", uid!, "Contador"));
-                          if (!coll.empty) {
-                            contRef = doc(db, "Empresas", uid!, "Contador", coll.docs[0].id);
-                          }
-                          await runTransaction(db, async (tx) => {
-                            const snap = await tx.get(contRef);
-                            const data = snap.exists() ? snap.data() || {} : {};
-                            const mesActual = new Date();
-                            const mesKey = `${mesActual.getFullYear()}-${String(
-                              mesActual.getMonth() + 1
-                            ).padStart(2, "0")}`;
-                            let current = typeof data.notificacionesMes === "number" ? data.notificacionesMes : 0;
-                            const mesConteo = data.mesConteo as string | undefined;
-                            if (mesConteo !== mesKey) {
-                              current = 0;
-                            }
-                            const nuevoTotal = current + toSend;
-                            if (limitePush != null && nuevoTotal > limitePush) {
-                              throw new Error("LIMIT_PUSH");
-                            }
-                            tx.set(
-                              contRef,
-                              {
-                                notificacionesMes: nuevoTotal,
-                                mesConteo: mesKey,
-                                actualizadoEl: serverTimestamp(),
-                              },
-                              { merge: true }
-                            );
-                          });
+                          setSendingPush(true);
+                          setPushStatus("Enviando...");
+                        try {
+                          await updatePushCounter(targets.length);
                         } catch (e: any) {
                           if (String(e?.message).includes("LIMIT_PUSH")) {
                             setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
