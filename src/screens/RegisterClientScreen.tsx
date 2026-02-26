@@ -288,7 +288,18 @@ export default function RegisterClientScreen({ route }: Props) {
         try {
           await runTransaction(db, async (tx) => {
             const contSnap = await tx.get(contRefToUse);
-            const current = contSnap.exists() ? (contSnap.data()?.totalUsuarios || 0) : 0;
+            const contData = contSnap.exists() ? contSnap.data() || {} : {};
+            const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
+            const currentNoti =
+              typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
+            const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
+
+            const now = new Date();
+            const mesKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+            const storedMes = contData.mesConteo as string | undefined;
+            const resetMonthly = storedMes !== mesKey;
+            const nextNoti = resetMonthly ? 0 : currentNoti;
+            const nextMail = resetMonthly ? 0 : currentMail;
 
             if (limiteUsuarios != null && current >= limiteUsuarios) {
               throw new Error("LIMIT_REACHED");
@@ -299,6 +310,9 @@ export default function RegisterClientScreen({ route }: Props) {
               contRefToUse,
               {
                 totalUsuarios: current + 1,
+                notificacionesMes: nextNoti,
+                correosMes: nextMail,
+                mesConteo: mesKey,
                 actualizadoEl: serverTimestamp(),
                 // preserva otros contadores si ya existen
               },
