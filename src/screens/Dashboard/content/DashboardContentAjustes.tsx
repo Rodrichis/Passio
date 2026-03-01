@@ -28,6 +28,8 @@ import {
   getCustomerInfoSafe,
   hasProEntitlement,
   presentRCPlaywall,
+  isRevenueCatAvailable,
+  hasRevenueCatApiKey,
 } from "../../../services/revenuecat";
 
 type RootStackParamList = {
@@ -143,10 +145,27 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   };
 
   const handleUpgrade = async () => {
+    console.log("handleUpgrade start", {
+      rcAvailable: isRevenueCatAvailable(),
+      rcApiKey: hasRevenueCatApiKey(),
+      uid,
+    });
+    if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) {
+      alert(
+        "RevenueCat no está disponible. Asegúrate de usar APK release y de tener REVENUECAT_API_KEY en .env antes de compilar."
+      );
+      return;
+    }
     if (!uid) return;
     setUpgrading(true);
     try {
       const offering = await fetchOfferings();
+      if (!offering) {
+        alert(
+          "No encontramos ofertas disponibles. Revisa tu clave de RevenueCat o los productos en el dashboard."
+        );
+        return;
+      }
       await presentRCPlaywall(offering || undefined);
       const info = await getCustomerInfoSafe();
       const hasPro = hasProEntitlement(info);

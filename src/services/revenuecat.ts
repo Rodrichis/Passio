@@ -7,7 +7,7 @@ import type {
   CustomerInfo,
 } from "react-native-purchases";
 
-const API_KEY = REVENUECAT_API_KEY || "test_iUYfcFTfNLYQbYSgYbyDhhjoyXQ";
+const API_KEY = REVENUECAT_API_KEY || "";
 export const ENTITLEMENT_PRO = "Pro";
 
 // Safe, platform-aware loading to avoid breaking web bundle
@@ -30,8 +30,12 @@ export function isRevenueCatAvailable() {
   return !!Purchases && typeof Purchases.configure === "function";
 }
 
+export function hasRevenueCatApiKey() {
+  return !!API_KEY;
+}
+
 export async function configureRevenueCat(appUserId?: string | null) {
-  if (!isRevenueCatAvailable()) return; // skip on web / Expo Go
+  if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) return; // skip on web / Expo Go / sin clave
   try {
     await Purchases.configure({
       apiKey: API_KEY,
