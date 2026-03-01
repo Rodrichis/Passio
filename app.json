@@ -21,17 +21,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": false,
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.CAMERA"
-      ],
+      "permissions": ["android.permission.CAMERA"],
       "package": "com.anonymous.passio"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-barcode-scanner"
-    ]
+    "plugins": []
   }
 }
