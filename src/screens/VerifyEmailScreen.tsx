@@ -49,7 +49,15 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     try {
       await auth.signOut();
     } finally {
-      navigation.replace("Login");
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.reset({
+          index: 0,
+          routes: [{ name: "Login" as any }],
+        });
+      } else {
+        navigation.navigate("Login" as any);
+      }
     }
   };
 

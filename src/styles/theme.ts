@@ -45,6 +45,7 @@ export const globalStyles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 8,
     backgroundColor: "#fff",
+    color: COLORS.textDark,
   },
   primaryButton: {
     backgroundColor: COLORS.primary,

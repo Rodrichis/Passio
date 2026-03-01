@@ -80,6 +80,7 @@ export const dashboardStyles = StyleSheet.create({
     padding: 10,
     fontSize: 15,
     backgroundColor: "#fff",
+    color: "#023047",
   },
   saveButton: {
     flexDirection: "row",

@@ -138,7 +138,15 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const handleLogout = async () => {
     try {
       await auth.signOut();
-      navigation.replace("Login");
+      const parent = navigation.getParent();
+      if (parent) {
+        parent.reset({
+          index: 0,
+          routes: [{ name: "Login" as any }],
+        });
+      } else {
+        navigation.navigate("Login" as any);
+      }
     } catch (err) {
       console.log("Error al cerrar sesión:", err);
     }
@@ -370,6 +378,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             value={empresa?.telefono || ""}
             onChangeText={(t) => setEmpresa({ ...empresa, telefono: t })}
             placeholder="+56 9 ..."
+            placeholderTextColor="#607d8b"
           />
         </View>
       </View>
@@ -383,6 +392,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         value={empresa?.Descripcion || ""}
         onChangeText={(t) => setEmpresa({ ...empresa, Descripcion: t })}
         placeholder="Describe brevemente tu empresa..."
+        placeholderTextColor="#607d8b"
       />
 
       {/* Botón guardar */}

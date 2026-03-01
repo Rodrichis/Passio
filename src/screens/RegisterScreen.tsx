@@ -145,6 +145,7 @@ export default function RegisterScreen({ navigation }: Props) {
             style={globalStyles.input}
             placeholder="Nombre de la empresa"
             value={empresa}
+            placeholderTextColor="#607d8b"
             onChangeText={setEmpresa}
             returnKeyType="done"
             autoCapitalize="none"
@@ -155,6 +156,7 @@ export default function RegisterScreen({ navigation }: Props) {
             style={globalStyles.input}
             placeholder="Correo electrónico"
             value={email}
+            placeholderTextColor="#607d8b"
             onChangeText={setEmail}
             keyboardType="email-address"
             returnKeyType="done"
@@ -167,6 +169,7 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="Contraseña"
             secureTextEntry
             value={password}
+            placeholderTextColor="#607d8b"
             onChangeText={(v) => {
               setPassword(v);
               const hasLetter = /[A-Za-z]/.test(v);
