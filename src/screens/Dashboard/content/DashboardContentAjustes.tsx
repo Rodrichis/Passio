@@ -23,6 +23,12 @@ import {
 } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { APP_BASE_URL } from "@env";
+import {
+  fetchOfferings,
+  getCustomerInfoSafe,
+  hasProEntitlement,
+  presentRCPlaywall,
+} from "../../../services/revenuecat";
 
 type RootStackParamList = {
   Login: undefined;
@@ -48,6 +54,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [contadores, setContadores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   const uid = auth.currentUser?.uid;
   const baseURL = APP_BASE_URL || "http://localhost:8081";
@@ -63,18 +70,13 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           const data = snap.data();
           setEmpresa(data);
 
-          // Traer límites del plan (colección Planes) para mostrarlos
           if (data?.plan) {
-            const q = query(
-              collection(db, "Planes"),
-              where("nombrePlan", "==", data.plan)
-            );
+            const q = query(collection(db, "Planes"), where("nombrePlan", "==", data.plan));
             const res = await getDocs(q);
             const first = res.docs[0];
             if (first) {
               setPlanData(first.data() as PlanInfo);
             } else {
-              // Fallback: buscar insensible a mayúsculas si el nombre no matchea exacto
               const all = await getDocs(collection(db, "Planes"));
               const lower = String(data.plan || "").toLowerCase();
               const match = all.docs.find(
@@ -84,7 +86,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             }
           }
 
-          // Traer contadores de la empresa (colección "Contador")
+          // Contadores (colección "Contador")
           try {
             const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
             const first = contColl.docs[0];
@@ -137,6 +139,36 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       navigation.replace("Login");
     } catch (err) {
       console.log("Error al cerrar sesión:", err);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (!uid) return;
+    setUpgrading(true);
+    try {
+      const offering = await fetchOfferings();
+      await presentRCPlaywall(offering || undefined);
+      const info = await getCustomerInfoSafe();
+      const hasPro = hasProEntitlement(info);
+      if (hasPro) {
+        await setDoc(
+          doc(db, "Empresas", uid),
+          { plan: "Pro", estadoSuscripcion: "activa" },
+          { merge: true }
+        );
+        setEmpresa((prev: any) => ({ ...prev, plan: "Pro", estadoSuscripcion: "activa" }));
+        const qPlan = query(collection(db, "Planes"), where("nombrePlan", "==", "Pro"));
+        const resPlan = await getDocs(qPlan);
+        const firstPlan = resPlan.docs[0];
+        if (firstPlan) setPlanData(firstPlan.data() as PlanInfo);
+        const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
+        const first = contColl.docs[0];
+        if (first) setContadores(first.data());
+      }
+    } catch (e) {
+      console.log("Paywall error:", e);
+    } finally {
+      setUpgrading(false);
     }
   };
 
@@ -194,9 +226,12 @@ export default function DashboardContentAjustes({ navigation }: Props) {
               borderRadius: 8,
               backgroundColor: "#2196F3",
             }}
-            onPress={() => alert("Próximamente podrás mejorar tu plan")}
+            onPress={handleUpgrade}
+            disabled={upgrading}
           >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>Mejorar plan</Text>
+            <Text style={{ color: "#fff", fontWeight: "700" }}>
+              {upgrading ? "Abriendo..." : "Mejorar plan"}
+            </Text>
           </TouchableOpacity>
         </View>
 

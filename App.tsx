@@ -12,6 +12,8 @@ import RegisterClientScreen from "./src/screens/RegisterClientScreen";
 import VerifyEmailScreen from "./src/screens/VerifyEmailScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import { RootStackParamList } from "./src/types/navigation";
+import { configureRevenueCat, syncRevenueCatUser, isRevenueCatAvailable } from "./src/services/revenuecat";
+import { Platform } from "react-native";
 
 // Linking para probar en web (Expo Web)
 const linking = {
@@ -41,6 +43,14 @@ export default function App() {
     });
     return unsub;
   }, []);
+
+  // Configura RevenueCat al iniciar y cuando cambia el usuario
+  React.useEffect(() => {
+    if (Platform.OS !== "web" && isRevenueCatAvailable()) {
+      configureRevenueCat(user?.uid || null);
+      syncRevenueCatUser(user?.uid || null);
+    }
+  }, [user]);
 
   if (loading) {
     return (
