@@ -13,6 +13,7 @@ export const clientesStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     backgroundColor: "#fff",
+    color: "#000",
   },
   filterButton: {
     paddingHorizontal: 12,
@@ -43,7 +44,7 @@ export const clientesStyles = StyleSheet.create({
   chipGreen: {
     backgroundColor: "#e8f5e9",
   },
-  chipText: { color: "#023047", fontSize: 12 },
+  chipText: { color: "#000", fontSize: 12 },
   chipGreenText: { color: "#2e7d32", fontSize: 12 },
 
   sendButton: {
@@ -71,7 +72,7 @@ export const clientesStyles = StyleSheet.create({
     gap: 10,
   },
   metaText: {
-    color: "#607d8b",
+    color: "#000",
     fontSize: 12,
     flex: 1,
   },
@@ -102,6 +103,7 @@ export const clientesStyles = StyleSheet.create({
     gap: 8,
   },
   headerText: { fontWeight: "bold", color: "#023047" },
+  optionLabel: { color: "#000", fontWeight: "700", marginBottom: 4 },
 
   row: {
     flexDirection: "row",
@@ -126,7 +128,7 @@ export const clientesStyles = StyleSheet.create({
   },
   nameText: {
     fontWeight: "600",
-    color: "#023047",
+    color: "#000",
   },
   card: {
     backgroundColor: "#fff",
@@ -149,7 +151,7 @@ export const clientesStyles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  cardFooterText: { color: "#666", flex: 1 },
+  cardFooterText: { color: "#000", flex: 1 },
 
   checkbox: {
     width: 20,
@@ -179,7 +181,7 @@ export const clientesStyles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     width: "100%",
-    maxWidth: 320,
+    maxWidth: 360,
     gap: 10,
   },
   modalTitle: { fontWeight: "700", fontSize: 16, color: "#023047" },
@@ -195,8 +197,8 @@ export const clientesStyles = StyleSheet.create({
     borderColor: "#2196F3",
     backgroundColor: "#E3F2FD",
   },
-  optionText: { color: "#023047", fontWeight: "600" },
-  optionTextActive: { color: "#023047" },
+  optionText: { color: "#000", fontWeight: "600" },
+  optionTextActive: { color: "#000" },
   dropdown: {
     borderWidth: 1,
     borderColor: "#cfd8dc",
@@ -208,7 +210,7 @@ export const clientesStyles = StyleSheet.create({
     justifyContent: "space-between",
   },
   dropdownText: {
-    color: "#023047",
+    color: "#000",
     fontSize: 14,
   },
   dropdownList: {
@@ -261,6 +263,7 @@ export const clientesStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     backgroundColor: "#fff",
+    color: "#023047",
   },
 
   rowActions: {

@@ -574,7 +574,7 @@ export default function DashboardContentClientes() {
             size={18}
             color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
           />
-          <Text style={{ fontWeight: "bold", flex: 1 }} numberOfLines={1}>
+          <Text style={{ fontWeight: "bold", flex: 1, color: "#000" }} numberOfLines={1}>
             {item.nombreCompleto || "--"}
           </Text>
         </View>
@@ -658,12 +658,13 @@ export default function DashboardContentClientes() {
       <Text style={styles.sectionTitle}>Clientes</Text>
 
       <View style={cStyles.searchRow}>
-        <TextInput
-          placeholder="Buscar por nombre, email o ID"
-          value={search}
-          onChangeText={setSearch}
-          style={cStyles.searchInput}
-        />
+           <TextInput
+             placeholder="Buscar por nombre, email o ID"
+             placeholderTextColor="#607d8b"
+             value={search}
+             onChangeText={setSearch}
+             style={cStyles.searchInput}
+           />
 
         <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
           <Text style={cStyles.filterButtonText}>Filtro</Text>
@@ -763,10 +764,10 @@ export default function DashboardContentClientes() {
               style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
             />
           )}
-          <View style={cStyles.modalCard}>
+          <View style={[cStyles.modalCard, { minWidth: 320 }]}>
             <Text style={cStyles.modalTitle}>Filtros</Text>
 
-            <Text style={cStyles.optionItem}>Sistema operativo</Text>
+            <Text style={cStyles.optionLabel}>Sistema operativo</Text>
             <View
               style={[
                 cStyles.dropdownContainer,
@@ -818,7 +819,7 @@ export default function DashboardContentClientes() {
               )}
             </View>
 
-            <Text style={cStyles.optionItem}>Premios</Text>
+            <Text style={cStyles.optionLabel}>Premios</Text>
             <View
               style={[
                 cStyles.dropdownContainer,
@@ -887,9 +888,9 @@ export default function DashboardContentClientes() {
       {/* Modal: Detalle cliente */}
       <Modal visible={showDetail} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
-          <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
+          <View style={[cStyles.modalCard, { maxWidth: 480 }]}>
             <Text style={cStyles.modalTitle}>Detalle del cliente</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
+            <ScrollView style={{ maxHeight: 480 }}>
               <Text style={cStyles.detailTitle}>
                 {detailClient?.nombreCompleto || "--"}
               </Text>
@@ -1033,14 +1034,15 @@ export default function DashboardContentClientes() {
               </>
             ) : (
               <>
-                <TextInput
-                  placeholder="Mensaje de la notificacion"
-                  value={pushBody}
-                  onChangeText={setPushBody}
-                  multiline
-                  numberOfLines={3}
-                  style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
-                />
+          <TextInput
+            placeholder="Mensaje de la notificacion"
+            placeholderTextColor="#607d8b"
+            value={pushBody}
+            onChangeText={setPushBody}
+            multiline
+            numberOfLines={3}
+            style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
+          />
                 {pushStatus ? <Text style={{ color: "#023047", marginTop: 4 }}>{pushStatus}</Text> : null}
                 <View style={cStyles.modalActions}>
                   <TouchableOpacity
@@ -1130,12 +1132,14 @@ export default function DashboardContentClientes() {
             ) : null}
             <TextInput
               placeholder="Asunto"
+              placeholderTextColor="#607d8b"
               value={emailSubject}
               onChangeText={setEmailSubject}
               style={cStyles.input}
             />
             <TextInput
               placeholder="Cuerpo del correo"
+              placeholderTextColor="#607d8b"
               value={emailBody}
               onChangeText={setEmailBody}
               multiline
