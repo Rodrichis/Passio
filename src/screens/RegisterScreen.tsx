@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from "react";
 import { View, TextInput, Text, ScrollView, TouchableOpacity, Modal, ScrollView as RNScrollView } from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { globalStyles } from "../styles/theme";
@@ -94,6 +94,10 @@ export default function RegisterScreen({ navigation }: Props) {
         console.warn("No se pudo enviar verificación de correo:", e);
       }
 
+      const now = new Date();
+      const expira = new Date(now.getTime());
+      expira.setFullYear(expira.getFullYear() + 1);
+
       await setDoc(doc(db, "Empresas", user.uid), {
         uid: user.uid,
         nombre: empresaTrim,
@@ -106,7 +110,9 @@ export default function RegisterScreen({ navigation }: Props) {
         ColorPrincipal: "#A99985",
         LinkRegistro: `https://passio.cl/register/${user.uid}`,
         Activo: true,
-        FechaRegistro: new Date(),
+        FechaRegistro: now,
+        plan: "Free",
+        expiraEl: Timestamp.fromDate(expira),
       });
 
       // La navegacion depende de onAuthStateChanged en App.tsx
@@ -172,14 +178,14 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholderTextColor="#607d8b"
             onChangeText={(v) => {
               setPassword(v);
-              const hasLetter = /[A-Za-z]/.test(v);
-              const hasNumber = /\d/.test(v);
+              const hasLetterPwd = /[A-Za-z]/.test(v);
+              const hasNumberPwd = /\d/.test(v);
               if (v.length === 0) {
                 setPasswordHint("");
-              } else if (v.length < 8 || !hasLetter || !hasNumber) {
+              } else if (v.length < 8 || !hasLetterPwd || !hasNumberPwd) {
                 setPasswordHint("Usa al menos 8 caracteres con letras y números.");
               } else {
-                setPasswordHint("ContraseÃ±a fuerte.");
+                setPasswordHint("Contraseña fuerte.");
               }
             }}
             returnKeyType="done"
@@ -208,7 +214,8 @@ export default function RegisterScreen({ navigation }: Props) {
                 <Text style={{ color: "#555", marginRight: 6 }}>+56</Text>
                 <TextInput
                   style={{ flex: 1, paddingVertical: 0, paddingHorizontal: 0, outlineStyle: "none" as any }}
-                  placeholder=""
+                  placeholder="Teléfono"
+                  placeholderTextColor="#607d8b"
                   value={telefono}
                   onChangeText={(v) => {
                     const digits = v.replace(/\D/g, "");
@@ -243,6 +250,7 @@ export default function RegisterScreen({ navigation }: Props) {
                 style={globalStyles.input}
                 placeholder="Comuna"
                 value={ciudad}
+                placeholderTextColor="#607d8b"
                 onChangeText={setCiudad}
                 returnKeyType="done"
                 autoCapitalize="words"
@@ -254,6 +262,7 @@ export default function RegisterScreen({ navigation }: Props) {
                 style={globalStyles.input}
                 placeholder="Dirección"
                 value={Dirección}
+                placeholderTextColor="#607d8b"
                 onChangeText={setDirección}
                 returnKeyType="done"
                 autoCapitalize="sentences"
@@ -345,6 +354,3 @@ export default function RegisterScreen({ navigation }: Props) {
     </ScrollView>
   );
 }
-
-
-
