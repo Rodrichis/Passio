@@ -1,9 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "./src/services/firebaseConfig";
 import { View, Text, ActivityIndicator } from "react-native";
+import { StatusBar } from "expo-status-bar";
 
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -68,6 +69,7 @@ export default function App() {
 
   return (
     <NavigationContainer linking={linking}>
+      <StatusBar style="dark" backgroundColor="#ffffff" translucent={false} />
       {!effectiveUser ? (
         <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -90,3 +92,8 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+
+
+
+

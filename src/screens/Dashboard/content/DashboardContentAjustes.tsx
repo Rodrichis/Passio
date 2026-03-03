@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -358,12 +358,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       {/* Nombre + Teléfono en una fila */}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <View style={{ flex: 0.6, marginRight: 8 }}>
-          <Text style={styles.label}>
-            Nombre empresa{" "}
-            <Text style={{ color: "#607d8b", fontSize: 12 }}>
-              (aparecerá en el formulario de registro de clientes)
-            </Text>
-          </Text>
+          <Text style={styles.label}>Nombre empresa</Text>
           <TextInput
             style={styles.input}
             value={empresa?.nombre || ""}
@@ -415,3 +410,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
+
+
+
+
