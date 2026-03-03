@@ -1,4 +1,4 @@
-// RevenueCat integration helpers
+﻿// RevenueCat integration helpers
 import { Platform } from "react-native";
 import { REVENUECAT_API_KEY } from "@env";
 import type {
@@ -7,7 +7,7 @@ import type {
   CustomerInfo,
 } from "react-native-purchases";
 
-const API_KEY = REVENUECAT_API_KEY || "";
+const API_KEY = (REVENUECAT_API_KEY || "").trim();
 export const ENTITLEMENT_PRO = "Pro";
 
 // Safe, platform-aware loading to avoid breaking web bundle
@@ -17,10 +17,18 @@ let presentPaywall: any = null;
 
 if (Platform.OS !== "web") {
   try {
-    const lib = require("react-native-purchases");
-    Purchases = lib.Purchases;
-    LOG_LEVEL = lib.LOG_LEVEL;
-    presentPaywall = require("react-native-purchases-ui").presentPaywall;
+    const purchasesLib = require("react-native-purchases");
+    const purchasesUiLib = require("react-native-purchases-ui");
+
+    // RN Purchases v9 exposes default export for the SDK object.
+    Purchases = purchasesLib?.default ?? purchasesLib?.Purchases ?? purchasesLib;
+    LOG_LEVEL = purchasesLib?.LOG_LEVEL ?? purchasesLib?.default?.LOG_LEVEL ?? LOG_LEVEL;
+
+    // RN Purchases UI exposes default export with static methods.
+    const uiModule = purchasesUiLib?.default ?? purchasesUiLib;
+    if (uiModule?.presentPaywall) {
+      presentPaywall = (params: any) => uiModule.presentPaywall(params);
+    }
   } catch (e) {
     console.log("RevenueCat native modules not available:", e);
   }
@@ -31,11 +39,11 @@ export function isRevenueCatAvailable() {
 }
 
 export function hasRevenueCatApiKey() {
-  return !!API_KEY;
+  return API_KEY.length > 0;
 }
 
 export async function configureRevenueCat(appUserId?: string | null) {
-  if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) return; // skip on web / Expo Go / sin clave
+  if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) return;
   try {
     await Purchases.configure({
       apiKey: API_KEY,
@@ -118,6 +126,7 @@ export async function presentRCPlaywall(offering?: PurchasesOffering | null) {
 }
 
 export async function getCustomerInfoSafe() {
+  if (!isRevenueCatAvailable()) return null;
   try {
     return await Purchases.getCustomerInfo();
   } catch (e) {

@@ -158,9 +158,16 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       rcApiKey: hasRevenueCatApiKey(),
       uid,
     });
-    if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) {
+    const rcAvailable = isRevenueCatAvailable();
+    const rcApiKey = hasRevenueCatApiKey();
+
+    if (!rcAvailable || !rcApiKey) {
+      const reason = !rcAvailable
+        ? "El modulo nativo de RevenueCat no esta disponible en esta build."
+        : "REVENUECAT_API_KEY no se cargo en runtime.";
+
       alert(
-        "RevenueCat no está disponible. Asegúrate de usar APK release y de tener REVENUECAT_API_KEY en .env antes de compilar."
+        `${reason}\n\nChecks:\n1) Recompila APK release despues de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android (prefijo goog_) en RevenueCat`
       );
       return;
     }
@@ -410,6 +417,8 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
 
 
 
