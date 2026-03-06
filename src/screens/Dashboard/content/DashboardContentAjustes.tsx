@@ -28,10 +28,11 @@ import {
   getCustomerInfoSafe,
   hasProEntitlement,
   presentRCPlaywall,
+  openRevenueCatCustomerCenter,
   isRevenueCatAvailable,
   hasRevenueCatApiKey,
+  isRevenueCatCustomerCenterAvailable,
 } from "../../../services/revenuecat";
-
 type RootStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -111,6 +112,46 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     fetchEmpresa();
   }, [uid]);
 
+  const loadPlanDataByName = async (planName?: string) => {
+    if (!planName) return;
+
+    const q = query(collection(db, "Planes"), where("nombrePlan", "==", planName));
+    const res = await getDocs(q);
+    const first = res.docs[0];
+    if (first) {
+      setPlanData(first.data() as PlanInfo);
+      return;
+    }
+
+    const all = await getDocs(collection(db, "Planes"));
+    const lower = String(planName || "").toLowerCase();
+    const match = all.docs.find(
+      (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
+    );
+    if (match) setPlanData(match.data() as PlanInfo);
+  };
+
+  const applyPlanState = async (hasPro: boolean) => {
+    if (!uid) return;
+
+    const nextPlan = hasPro ? "Pro" : "Free";
+    const nextState = hasPro ? "activa" : "inactiva";
+
+    await setDoc(
+      doc(db, "Empresas", uid),
+      { plan: nextPlan, estadoSuscripcion: nextState },
+      { merge: true }
+    );
+
+    setEmpresa((prev: any) => ({
+      ...prev,
+      plan: nextPlan,
+      estadoSuscripcion: nextState,
+    }));
+
+    await loadPlanDataByName(nextPlan);
+  };
+
   const handleSave = async () => {
     if (!uid || !empresa) return;
     setSaving(true);
@@ -158,8 +199,10 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       rcApiKey: hasRevenueCatApiKey(),
       uid,
     });
+
     const rcAvailable = isRevenueCatAvailable();
     const rcApiKey = hasRevenueCatApiKey();
+    const isAlreadyPro = String(empresa?.plan || "").toLowerCase() === "pro";
 
     if (!rcAvailable || !rcApiKey) {
       const reason = !rcAvailable
@@ -171,41 +214,77 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       );
       return;
     }
+
+    if (isAlreadyPro) {
+      alert("Tu cuenta ya tiene plan Pro. Usa 'Gestionar suscripcion' para administrarla.");
+      return;
+    }
+
     if (!uid) return;
+
     setUpgrading(true);
     try {
       const offering = await fetchOfferings();
       if (!offering) {
-        alert(
-          "No encontramos ofertas disponibles. Revisa tu clave de RevenueCat o los productos en el dashboard."
-        );
+        alert("No encontramos ofertas disponibles. Revisa Offerings/Packages en RevenueCat.");
         return;
       }
-      await presentRCPlaywall(offering || undefined);
+
+      const paywallResult = await presentRCPlaywall(offering || undefined);
       const info = await getCustomerInfoSafe();
       const hasPro = hasProEntitlement(info);
+
       if (hasPro) {
-        await setDoc(
-          doc(db, "Empresas", uid),
-          { plan: "Pro", estadoSuscripcion: "activa" },
-          { merge: true }
-        );
-        setEmpresa((prev: any) => ({ ...prev, plan: "Pro", estadoSuscripcion: "activa" }));
-        const qPlan = query(collection(db, "Planes"), where("nombrePlan", "==", "Pro"));
-        const resPlan = await getDocs(qPlan);
-        const firstPlan = resPlan.docs[0];
-        if (firstPlan) setPlanData(firstPlan.data() as PlanInfo);
-        const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
-        const first = contColl.docs[0];
-        if (first) setContadores(first.data());
+        await applyPlanState(true);
+        alert("Suscripcion Pro activada correctamente.");
+      } else {
+        console.log("Paywall result:", paywallResult);
+        alert("No se completo la compra. Si cancelaste el pago, tu plan sigue igual.");
       }
     } catch (e) {
       console.log("Paywall error:", e);
+      alert("No se pudo completar el flujo de pago. Intenta de nuevo.");
     } finally {
       setUpgrading(false);
     }
   };
 
+  const handleManageSubscription = async () => {
+    const rcAvailable = isRevenueCatAvailable();
+    const rcApiKey = hasRevenueCatApiKey();
+
+    if (!rcAvailable || !rcApiKey) {
+      alert("RevenueCat no esta disponible para gestionar la suscripcion en esta build.");
+      return;
+    }
+
+    setUpgrading(true);
+    try {
+      if (isRevenueCatCustomerCenterAvailable()) {
+        await openRevenueCatCustomerCenter();
+      } else if (Platform.OS === "android") {
+        await Linking.openURL("https://play.google.com/store/account/subscriptions");
+      }
+
+      const info = await getCustomerInfoSafe();
+      if (info) {
+        await applyPlanState(hasProEntitlement(info));
+      }
+    } catch (e) {
+      console.log("Customer center error:", e);
+      if (Platform.OS === "android") {
+        try {
+          await Linking.openURL("https://play.google.com/store/account/subscriptions");
+          return;
+        } catch {
+          // no-op
+        }
+      }
+      alert("No se pudo abrir la gestion de suscripcion.");
+    } finally {
+      setUpgrading(false);
+    }
+  };
   if (loading) {
     return (
       <View style={{ marginTop: 20, alignItems: "center" }}>
@@ -231,6 +310,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
 
   const limiteUsuarios = planInfo.limiteUsuarios;
   const atUserLimit = typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
+  const isProPlan = String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() === "pro";
 
   return (
     <ScrollView style={{ paddingHorizontal: 10 }}>
@@ -253,25 +333,45 @@ export default function DashboardContentAjustes({ navigation }: Props) {
               Plan actual: {planInfo?.nombrePlan || "No definido"}
             </Text>
           </View>
-          <TouchableOpacity
-            style={{
-              paddingVertical: 8,
-              paddingHorizontal: 12,
-              borderRadius: 8,
-              backgroundColor: "#2196F3",
-            }}
-            onPress={handleUpgrade}
-            disabled={upgrading}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700" }}>
-              {upgrading ? "Abriendo..." : "Mejorar plan"}
-            </Text>
-          </TouchableOpacity>
+          {isProPlan ? (
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                backgroundColor: "#2e7d32",
+              }}
+              onPress={handleManageSubscription}
+              disabled={upgrading}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                {upgrading ? "Abriendo..." : "Gestionar suscripcion"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                backgroundColor: "#2196F3",
+              }}
+              onPress={handleUpgrade}
+              disabled={upgrading}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                {upgrading ? "Abriendo..." : "Mejorar plan"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={{ marginTop: 10, gap: 6 }}>
           <Text style={{ color: "#455a64" }}>
             Usuarios: {usados.usuarios} / {planInfo.limiteUsuarios ?? "-"}
+          </Text>
+          <Text style={{ color: "#455a64" }}>
+            Estado suscripcion: {empresa?.estadoSuscripcion || (isProPlan ? "activa" : "inactiva")}
           </Text>
           {atUserLimit && (
             <View
@@ -417,6 +517,26 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

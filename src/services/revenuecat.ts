@@ -14,6 +14,7 @@ export const ENTITLEMENT_PRO = "Pro";
 let Purchases: any = null;
 let LOG_LEVEL: any = { INFO: "INFO" };
 let presentPaywall: any = null;
+let presentCustomerCenter: any = null;
 let didConfigure = false;
 
 if (Platform.OS !== "web") {
@@ -30,6 +31,9 @@ if (Platform.OS !== "web") {
     if (uiModule?.presentPaywall) {
       presentPaywall = (params: any) => uiModule.presentPaywall(params);
     }
+    if (uiModule?.presentCustomerCenter) {
+      presentCustomerCenter = (params?: any) => uiModule.presentCustomerCenter(params);
+    }
   } catch (e) {
     console.log("RevenueCat native modules not available:", e);
   }
@@ -37,6 +41,10 @@ if (Platform.OS !== "web") {
 
 export function isRevenueCatAvailable() {
   return !!Purchases && typeof Purchases.configure === "function";
+}
+
+export function isRevenueCatCustomerCenterAvailable() {
+  return typeof presentCustomerCenter === "function";
 }
 
 export function hasRevenueCatApiKey() {
@@ -132,6 +140,13 @@ export async function presentRCPlaywall(offering?: PurchasesOffering | null) {
     console.log("Paywall failed:", e);
     throw e;
   }
+}
+
+export async function openRevenueCatCustomerCenter() {
+  if (!presentCustomerCenter) {
+    throw new Error("RevenueCat customer center no disponible en este entorno");
+  }
+  return presentCustomerCenter();
 }
 
 export async function getCustomerInfoSafe() {
