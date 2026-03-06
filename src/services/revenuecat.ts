@@ -14,6 +14,7 @@ export const ENTITLEMENT_PRO = "Pro";
 let Purchases: any = null;
 let LOG_LEVEL: any = { INFO: "INFO" };
 let presentPaywall: any = null;
+let didConfigure = false;
 
 if (Platform.OS !== "web") {
   try {
@@ -43,17 +44,15 @@ export function hasRevenueCatApiKey() {
 }
 
 export async function configureRevenueCat(appUserId?: string | null) {
-  if (!isRevenueCatAvailable() || !hasRevenueCatApiKey()) return;
+  if (!isRevenueCatAvailable() || !hasRevenueCatApiKey() || didConfigure) return;
   try {
     await Purchases.configure({
       apiKey: API_KEY,
       appUserID: appUserId || undefined,
       useAmazon: false,
     });
+    didConfigure = true;
     Purchases.setLogLevel(LOG_LEVEL.INFO);
-    if (appUserId) {
-      await Purchases.setEmail(appUserId);
-    }
   } catch (e) {
     console.log("RevenueCat configure failed:", e);
   }
@@ -61,12 +60,22 @@ export async function configureRevenueCat(appUserId?: string | null) {
 
 export async function syncRevenueCatUser(appUserId?: string | null) {
   if (!isRevenueCatAvailable()) return;
+
+  if (!didConfigure) {
+    await configureRevenueCat(null);
+    if (!didConfigure) return;
+  }
+
   try {
     if (!appUserId) {
+      const info = await Purchases.getCustomerInfo();
+      const currentUserId = String(info?.originalAppUserId || "");
+      if (!currentUserId || currentUserId.startsWith("$RCAnonymousID:")) return;
       await Purchases.logOut();
-    } else {
-      await Purchases.logIn(appUserId);
+      return;
     }
+
+    await Purchases.logIn(appUserId);
   } catch (e) {
     console.log("RevenueCat sync user failed:", e);
   }
