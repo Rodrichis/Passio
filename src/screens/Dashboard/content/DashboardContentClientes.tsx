@@ -104,6 +104,7 @@ export default function DashboardContentClientes() {
   const [pushSent, setPushSent] = useState(false);
   const [pushMode, setPushMode] = useState<"single" | "bulk">("single");
   const [limitePush, setLimitePush] = useState<number | null>(null);
+  const [empresaNombre, setEmpresaNombre] = useState("");
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const closePushModal = () => {
@@ -174,7 +175,7 @@ export default function DashboardContentClientes() {
     loadFirstPage();
   }, [loadFirstPage]);
 
-  // Helper: actualiza contador de notificaciones con reset mensual y límite
+  // Helper: actualiza contador de notificaciones con reset mensual y lÃƒÆ’Ã‚Â­mite
   const updatePushCounter = useCallback(
     async (toSend: number) => {
       if (!uid) throw new Error("NO_UID");
@@ -212,13 +213,16 @@ export default function DashboardContentClientes() {
     [uid, limitePush]
   );
 
-  // Carga límite de notificaciones desde el plan de la empresa
+  // Carga lÃƒÆ’Ã‚Â­mite de notificaciones desde el plan de la empresa
   useEffect(() => {
     const loadLimitePush = async () => {
       if (!uid) return;
       try {
         const empSnap = await getDoc(doc(db, "Empresas", uid));
-        const planName = empSnap.exists() ? (empSnap.data() as any)?.plan : null;
+        const empresaData = empSnap.exists() ? (empSnap.data() as any) : null;
+        const planName = empresaData?.plan ?? null;
+        const nombreEmpresa = String(empresaData?.nombre || "").trim();
+        setEmpresaNombre(nombreEmpresa);
         if (planName) {
           // Primero intento exacto
           let planData: any = null;
@@ -228,7 +232,7 @@ export default function DashboardContentClientes() {
           if (planSnap.docs[0]) {
             planData = planSnap.docs[0].data();
           } else {
-            // Fallback insensible a mayúsculas
+            // Fallback insensible a mayÃƒÆ’Ã‚Âºsculas
             planSnap = await getDocs(collection(db, "Planes"));
             const lower = String(planName).toLowerCase();
             const match = planSnap.docs.find(
@@ -241,7 +245,7 @@ export default function DashboardContentClientes() {
           }
         }
       } catch (e) {
-        console.log("No se pudo cargar límite de notificaciones:", e);
+        console.log("No se pudo cargar lÃƒÆ’Ã‚Â­mite de notificaciones:", e);
       }
     };
     loadLimitePush();
@@ -251,6 +255,11 @@ export default function DashboardContentClientes() {
     () => filterItems(items, search, filterOS, filterPremios),
     [items, search, filterOS, filterPremios]
   );
+
+  const androidNotificationHeader = useMemo(() => {
+    const nombre = empresaNombre.trim();
+    return nombre ? `${nombre} (Passio)` : "Passio";
+  }, [empresaNombre]);
 
   const sortedItems = useMemo(
     () => sortItems(filteredItems, sortOrder),
@@ -1080,7 +1089,7 @@ export default function DashboardContentClientes() {
                           await updatePushCounter(targets.length);
                         } catch (e: any) {
                           if (String(e?.message).includes("LIMIT_PUSH")) {
-                            setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
+                            setPushStatus("Alcanzaste el lÃƒÆ’Ã‚Â­mite de notificaciones de tu plan.");
                             setSendingPush(false);
                             return;
                           }
@@ -1092,7 +1101,11 @@ export default function DashboardContentClientes() {
                             const isIOS = tgt.so === "ios";
                             const resp = isIOS
                               ? await notifyApplePass({ idUsuario: tgt.id, notificacion: pushBody.trim() })
-                              : await notifyAndroidPass({ idUsuario: tgt.id, notificacion: pushBody.trim() });
+                              : await notifyAndroidPass({
+                                  idUsuario: tgt.id,
+                                  notificacion: pushBody.trim(),
+                                  cabecera: androidNotificationHeader,
+                                });
                             if (resp.ok) okCount += 1;
                           }
                           setPushStatus(`Enviadas ${okCount}/${targets.length}`);

@@ -240,7 +240,9 @@ export async function notifyApplePass(params: {
 export async function notifyAndroidPass(params: {
   idUsuario: string;
   notificacion: string;
+  cabecera?: string;
 }): Promise<WalletApiResponse> {
+  const { idUsuario, notificacion, cabecera = "Passio" } = params;
   if (!ANDROID_PREFIX) {
     return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
   }
@@ -248,7 +250,11 @@ export async function notifyAndroidPass(params: {
     const res = await fetch(`${ANDROID_PREFIX}/notificacion`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        idUsuario,
+        mensaje: notificacion,
+        cabecera,
+      }),
     });
     const rawText = await res.text();
     let data: any = null;
