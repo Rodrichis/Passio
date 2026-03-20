@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -333,22 +333,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
               Plan actual: {planInfo?.nombrePlan || "No definido"}
             </Text>
           </View>
-          {isProPlan ? (
-            <TouchableOpacity
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                backgroundColor: "#2e7d32",
-              }}
-              onPress={handleManageSubscription}
-              disabled={upgrading}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>
-                {upgrading ? "Abriendo..." : "Gestionar suscripcion"}
-              </Text>
-            </TouchableOpacity>
-          ) : (
+          {isProPlan ? null : (
             <TouchableOpacity
               style={{
                 paddingVertical: 8,
