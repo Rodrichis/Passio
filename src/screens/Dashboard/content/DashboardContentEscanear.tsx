@@ -1,17 +1,16 @@
-import React, { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import {
-  updateWalletPoints,
+  updateAndroidWalletState,
   updateApplePass,
   type WalletApiResponse,
 } from "../../../services/apiWallet";
 import { auth, db } from "../../../services/firebaseConfig";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 
 type ParsedPayload = {
   idUsuario?: string;
-  cantidadPuntos?: number;
   empresaId?: string;
 };
 
@@ -20,12 +19,13 @@ type Feedback = { type: "success" | "error"; message: string; action?: "visita" 
 export default function DashboardContentEscanear() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
-  const [status, setStatus] = useState<string>("Apunta al código QR");
+  const [status, setStatus] = useState<string>("Apunta al codigo QR");
   const [result, setResult] = useState<WalletApiResponse | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanMode, setScanMode] = useState<"visita" | "premio">("visita");
   const [permission, requestPermission] = useCameraPermissions();
+  const processingRef = useRef(false);
 
   useEffect(() => {
     if (!permission) {
@@ -38,7 +38,7 @@ export default function DashboardContentEscanear() {
     if (current !== undefined) {
       setHasPermission(current);
       if (!current) {
-        setStatus("Permiso de cámara denegado. Actívalo para escanear.");
+        setStatus("Permiso de camara denegado. Activalo para escanear.");
       }
     }
   }, [permission]);
@@ -48,42 +48,48 @@ export default function DashboardContentEscanear() {
       const parsed = JSON.parse(raw);
       return {
         idUsuario: parsed.idUsuario || parsed.userId,
-        cantidadPuntos: parsed.cantidadPuntos ?? parsed.puntos ?? parsed.points,
         empresaId: parsed.empresaId || parsed.empresaUid,
       };
     } catch {
-      return { idUsuario: raw, cantidadPuntos: 1 };
+      return { idUsuario: raw };
     }
   };
 
   const handleBarCodeScanned = useCallback(
     async ({ data }: { data: string }) => {
-      if (scanned) return;
+      if (scanned || processingRef.current) return;
+
+      processingRef.current = true;
       setScanned(true);
       setLoading(true);
       setFeedback(null);
       setStatus(scanMode === "premio" ? "Procesando (premio)..." : "Procesando (visita)...");
 
+      const releaseScan = () => {
+        processingRef.current = false;
+        setLoading(false);
+      };
+
       const empresaId = auth.currentUser?.uid;
       if (!empresaId) {
-        setStatus("Debes iniciar sesión para escanear.");
+        setStatus("Debes iniciar sesion para escanear.");
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-        setLoading(false);
+        releaseScan();
         return;
       }
 
       const payload = parseData(data);
       if (!payload.idUsuario) {
-        setStatus("No se encontró idUsuario en el QR.");
+        setStatus("No se encontro idUsuario en el QR.");
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-        setLoading(false);
+        releaseScan();
         return;
       }
 
       if (payload.empresaId && payload.empresaId !== empresaId) {
         setStatus("Esta tarjeta no pertenece a tu empresa.");
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-        setLoading(false);
+        releaseScan();
         return;
       }
 
@@ -94,22 +100,23 @@ export default function DashboardContentEscanear() {
         if (!snap.exists()) {
           setStatus("Esta tarjeta no pertenece a tu empresa.");
           setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-          setLoading(false);
+          releaseScan();
           return;
         }
+
         clienteDoc = snap.data() as any;
         const activo = clienteDoc.activo ?? true;
         if (!activo) {
-          setStatus("Este usuario está desactivado. No se puede registrar la visita.");
+          setStatus("Este usuario esta desactivado. No se puede registrar la visita.");
           setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-          setLoading(false);
+          releaseScan();
           return;
         }
-      } catch (e) {
-        console.error("Error validando tarjeta:", e);
+      } catch (error) {
+        console.error("Error validando tarjeta:", error);
         setStatus("No se pudo validar la tarjeta. Intenta nuevamente.");
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
-        setLoading(false);
+        releaseScan();
         return;
       }
 
@@ -123,7 +130,7 @@ export default function DashboardContentEscanear() {
       if (scanMode === "premio" && premiosDispPrev <= 0) {
         setStatus("No tiene premios disponibles.");
         setFeedback({ type: "error", message: "El usuario no tiene premios disponibles." });
-        setLoading(false);
+        releaseScan();
         return;
       }
 
@@ -144,27 +151,23 @@ export default function DashboardContentEscanear() {
         premiosCanjeados = premiosCanjPrev + 1;
       }
 
-      const puntos = Number(payload.cantidadPuntos ?? 1);
-      const basePoints = Number.isFinite(puntos) ? puntos : 1;
-      const finalPoints = scanMode === "premio" ? -Math.abs(basePoints) : basePoints;
-
       try {
         const walletResp =
           soCliente === "ios"
             ? await updateApplePass({
                 idUsuario: payload.idUsuario,
-                cantidad: cicloVisitas || 0,
+                cantidad: cicloVisitas,
                 premiosDisponibles,
               })
-            : await updateWalletPoints({
+            : await updateAndroidWalletState({
                 idUsuario: payload.idUsuario,
-                cantidadPuntos: finalPoints,
+                cantidad: cicloVisitas,
+                premiosDisponibles,
               });
 
         if (!walletResp.ok) {
           setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
           setStatus("No pudimos leer el pase. Escanea nuevamente.");
-          setLoading(false);
           return;
         }
 
@@ -196,29 +199,30 @@ export default function DashboardContentEscanear() {
               }
         );
         setStatus(scanMode === "premio" ? "Premio canjeado" : "Visita registrada");
-      } catch (err) {
-        console.error("Error al actualizar pase:", err);
+      } catch (error) {
+        console.error("Error al actualizar pase:", error);
         setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
         setStatus("No pudimos leer el pase. Escanea nuevamente.");
       } finally {
-        setLoading(false);
+        releaseScan();
       }
     },
     [scanned, scanMode]
   );
 
   const resetScan = () => {
+    processingRef.current = false;
     setScanned(false);
     setResult(null);
     setFeedback(null);
-    setStatus("Apunta al código QR");
+    setStatus("Apunta al codigo QR");
   };
 
   if (hasPermission === null) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#023047" />
-        <Text style={{ marginTop: 8 }}>Solicitando permiso de cámara...</Text>
+        <Text style={{ marginTop: 8 }}>Solicitando permiso de camara...</Text>
       </View>
     );
   }
@@ -227,7 +231,7 @@ export default function DashboardContentEscanear() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Escanear</Text>
-        <Text style={styles.text}>Permiso de cámara denegado.</Text>
+        <Text style={styles.text}>Permiso de camara denegado.</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Otorgar permiso</Text>
         </TouchableOpacity>
@@ -258,34 +262,22 @@ export default function DashboardContentEscanear() {
       <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
         <TouchableOpacity
           onPress={() => setScanMode("visita")}
-          style={[
-            styles.actionButton,
-            scanMode === "visita" && styles.actionButtonActive,
-          ]}
+          style={[styles.actionButton, scanMode === "visita" && styles.actionButtonActive]}
           disabled={loading}
         >
           <Text
-            style={[
-              styles.actionButtonText,
-              scanMode === "visita" && styles.actionButtonTextActive,
-            ]}
+            style={[styles.actionButtonText, scanMode === "visita" && styles.actionButtonTextActive]}
           >
             Contar visita
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setScanMode("premio")}
-          style={[
-            styles.actionButton,
-            scanMode === "premio" && styles.actionButtonActive,
-          ]}
+          style={[styles.actionButton, scanMode === "premio" && styles.actionButtonActive]}
           disabled={loading}
         >
           <Text
-            style={[
-              styles.actionButtonText,
-              scanMode === "premio" && styles.actionButtonTextActive,
-            ]}
+            style={[styles.actionButtonText, scanMode === "premio" && styles.actionButtonTextActive]}
           >
             Reclamar premio
           </Text>
@@ -305,8 +297,8 @@ export default function DashboardContentEscanear() {
                 ? "Premio canjeado"
                 : "Visita registrada"
               : feedback.message === "El usuario no tiene premios disponibles."
-              ? "Sin premios disponibles"
-              : "No pudimos leer el pase"}
+                ? "Sin premios disponibles"
+                : "No pudimos leer el pase"}
           </Text>
           <Text style={styles.resultText}>{feedback.message}</Text>
         </View>

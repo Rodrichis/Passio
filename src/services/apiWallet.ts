@@ -13,7 +13,7 @@ export interface WalletApiResponse {
 }
 
 async function callWalletApi(
-  path: "/createObject" | "/firma" | "/actualizar",
+  path: "/createObject" | "/firma" | "/actualizar" | "/actualizarEstado",
   body: any
 ): Promise<WalletApiResponse> {
   if (!ANDROID_PREFIX) {
@@ -44,9 +44,14 @@ async function callWalletApi(
       rawText,
     };
 
-    if (!res.ok) {
-      result.errorText = rawText;
-      console.warn(`[WalletAPI] Error en ${path} (status ${res.status}):`, rawText);
+    if (result.ok && parsed && typeof parsed === "object" && parsed.success === false) {
+      result.ok = false;
+      result.errorText = String(parsed.message || rawText || "Operacion rechazada por backend");
+    }
+
+    if (!result.ok) {
+      result.errorText = result.errorText || rawText;
+      console.warn(`[WalletAPI] Error en ${path} (status ${res.status}):`, parsed);
     } else {
       console.log(`[WalletAPI] OK ${path} (status ${res.status})`, parsed);
     }
@@ -109,6 +114,14 @@ export async function updateWalletPoints(params: {
 }): Promise<WalletApiResponse> {
   const { idUsuario, cantidadPuntos } = params;
   return callWalletApi("/actualizar", { idUsuario, cantidadPuntos });
+}
+
+export async function updateAndroidWalletState(params: {
+  idUsuario: string;
+  cantidad: number;
+  premiosDisponibles: number;
+}): Promise<WalletApiResponse> {
+  return callWalletApi("/actualizarEstado", params);
 }
 
 export async function createAndSignWallet(params: {
