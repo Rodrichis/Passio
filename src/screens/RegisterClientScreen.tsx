@@ -621,7 +621,10 @@ export default function RegisterClientScreen({ route }: Props) {
                 </Text>
               </TouchableOpacity>
 
-              {/* Botones de prueba con payload de ejemplo */}
+              {/*
+              Botones de prueba ocultos para la beta.
+
+              Botones de prueba con payload de ejemplo
               <TouchableOpacity
                 onPress={async () => {
                   try {
@@ -736,6 +739,7 @@ export default function RegisterClientScreen({ route }: Props) {
               >
                 <Text style={{ color: "#fff", fontWeight: "700" }}>Test Android (payload ejemplo)</Text>
               </TouchableOpacity>
+              */}
 
               {formError ? (
                 <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
