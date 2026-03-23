@@ -175,7 +175,7 @@ export default function DashboardContentClientes() {
     loadFirstPage();
   }, [loadFirstPage]);
 
-  // Helper: actualiza contador de notificaciones con reset mensual y lÃƒÆ’Ã‚Â­mite
+  // Helper: actualiza contador de notificaciones con reset mensual y limite
   const updatePushCounter = useCallback(
     async (toSend: number) => {
       if (!uid) throw new Error("NO_UID");
@@ -213,7 +213,7 @@ export default function DashboardContentClientes() {
     [uid, limitePush]
   );
 
-  // Carga lÃƒÆ’Ã‚Â­mite de notificaciones desde el plan de la empresa
+  // Carga limite de notificaciones desde el plan de la empresa
   useEffect(() => {
     const loadLimitePush = async () => {
       if (!uid) return;
@@ -232,7 +232,7 @@ export default function DashboardContentClientes() {
           if (planSnap.docs[0]) {
             planData = planSnap.docs[0].data();
           } else {
-            // Fallback insensible a mayÃƒÆ’Ã‚Âºsculas
+            // Fallback insensible a mayusculas
             planSnap = await getDocs(collection(db, "Planes"));
             const lower = String(planName).toLowerCase();
             const match = planSnap.docs.find(
@@ -245,7 +245,7 @@ export default function DashboardContentClientes() {
           }
         }
       } catch (e) {
-        console.log("No se pudo cargar lÃƒÆ’Ã‚Â­mite de notificaciones:", e);
+        console.log("No se pudo cargar limite de notificaciones:", e);
       }
     };
     loadLimitePush();
@@ -1089,7 +1089,7 @@ export default function DashboardContentClientes() {
                           await updatePushCounter(targets.length);
                         } catch (e: any) {
                           if (String(e?.message).includes("LIMIT_PUSH")) {
-                            setPushStatus("Alcanzaste el lÃƒÆ’Ã‚Â­mite de notificaciones de tu plan.");
+                            setPushStatus("Alcanzaste el limite de notificaciones de tu plan.");
                             setSendingPush(false);
                             return;
                           }
