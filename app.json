@@ -30,7 +30,7 @@
       "package": "com.anonymous.passio"
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [],
     "experiments": {
