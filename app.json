@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "passio",
     "slug": "passio",
@@ -30,8 +30,11 @@
       "package": "com.anonymous.passio"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     },
-    "plugins": []
+    "plugins": [],
+    "experiments": {
+      "baseUrl": "/app"
+    }
   }
 }

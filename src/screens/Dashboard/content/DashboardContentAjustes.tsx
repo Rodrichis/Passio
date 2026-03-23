@@ -22,7 +22,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
-import { APP_BASE_URL } from "@env";
+import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
   fetchOfferings,
   getCustomerInfoSafe,
@@ -60,8 +60,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [upgrading, setUpgrading] = useState(false);
 
   const uid = auth.currentUser?.uid;
-  const baseURL = APP_BASE_URL || "http://localhost:8081";
-  const registroURL = `${baseURL}/register/${uid}`;
+  const registroURL = buildRegistrationUrl(uid);
 
   useEffect(() => {
     const fetchEmpresa = async () => {
@@ -89,7 +88,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             }
           }
 
-          // Contadores (colección "Contador")
+          // Contadores (coleccion "Contador")
           try {
             const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
             const first = contColl.docs[0];
@@ -100,7 +99,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             console.log("No se pudo leer contadores:", e);
           }
         } else {
-          console.warn("No se encontró información de la empresa");
+          console.warn("No se encontro informacion de la empresa");
         }
       } catch (err) {
         console.error("Error al cargar empresa:", err);
@@ -163,6 +162,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           nombre: empresa.nombre || "",
           Descripcion: empresa.Descripcion || "",
           telefono: empresa.telefono || "",
+          LinkRegistro: buildRegistrationUrl(uid),
         },
         { merge: true }
       );
@@ -189,7 +189,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         navigation.navigate("Login" as any);
       }
     } catch (err) {
-      console.log("Error al cerrar sesión:", err);
+      console.log("Error al cerrar sesion:", err);
     }
   };
 
@@ -289,7 +289,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     return (
       <View style={{ marginTop: 20, alignItems: "center" }}>
         <ActivityIndicator size="large" color="#8ecae6" />
-        <Text>Cargando información...</Text>
+        <Text>Cargando informacion...</Text>
       </View>
     );
   }
@@ -374,7 +374,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             >
               <Ionicons name="warning-outline" size={16} color="#c62828" />
               <Text style={{ color: "#c62828", flex: 1 }}>
-                Alcanzaste tu límite de usuarios registrados. Mejora tu plan.
+                Alcanzaste tu limite de usuarios registrados. Mejora tu plan.
               </Text>
             </View>
           )}
@@ -386,7 +386,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           </Text>
           {!planData && (
             <Text style={{ color: "#b71c1c", fontSize: 12 }}>
-              No pudimos leer los límites del plan. Revisa la colección "Planes" y los permisos de lectura.
+              No pudimos leer los limites del plan. Revisa la coleccion "Planes" y los permisos de lectura.
             </Text>
           )}
         </View>
@@ -447,7 +447,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Nombre + Teléfono en una fila */}
+      {/* Nombre + Telefono en una fila */}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         <View style={{ flex: 0.6, marginRight: 8 }}>
           <Text style={styles.label}>Nombre empresa</Text>
@@ -470,7 +470,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Descripción con textarea */}
+      {/* Descripcion con textarea */}
       <Text style={styles.label}>Descripción</Text>
       <TextInput
         style={[styles.input, { height: 100, textAlignVertical: "top" }]}
@@ -482,7 +482,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         placeholderTextColor="#607d8b"
       />
 
-      {/* Botón guardar */}
+      {/* Boton guardar */}
       <TouchableOpacity
         style={[styles.saveButton, saving && { opacity: 0.6 }]}
         onPress={handleSave}

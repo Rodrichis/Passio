@@ -5,6 +5,7 @@ import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { globalStyles } from "../styles/theme";
+import { buildRegistrationUrl } from "../utils/publicUrls";
 
 type RootStackParamList = {
   Login: undefined;
@@ -108,7 +109,7 @@ export default function RegisterScreen({ navigation }: Props) {
         Dirección: DirecciónTrim,
         Descripcion: "",
         ColorPrincipal: "#A99985",
-        LinkRegistro: `https://passio.cl/register/${user.uid}`,
+        LinkRegistro: buildRegistrationUrl(user.uid),
         Activo: true,
         FechaRegistro: now,
         plan: "Free",

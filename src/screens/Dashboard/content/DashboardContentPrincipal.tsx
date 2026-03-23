@@ -10,7 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { auth, db } from "../../../services/firebaseConfig";
-import { APP_BASE_URL } from "@env";
+import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
   collection,
   getCountFromServer,
@@ -50,11 +50,7 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const [limiteUsuarios, setLimiteUsuarios] = React.useState<number | null>(null);
   const [atUserLimit, setAtUserLimit] = React.useState(false);
 
-  const baseURL =
-    APP_BASE_URL ||
-    "http://localhost:8081";
-
-  const registroURL = uid ? `${baseURL}/register/${uid}` : "";
+  const registroURL = buildRegistrationUrl(uid);
 
   React.useEffect(() => {
     const fetchStats = async () => {
