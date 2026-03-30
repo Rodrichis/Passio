@@ -124,6 +124,23 @@ export async function updateAndroidWalletState(params: {
   return callWalletApi("/actualizarEstado", params);
 }
 
+function isExistingWalletResponse(response: WalletApiResponse | null | undefined) {
+  if (!response) return false;
+
+  const message = [
+    response.errorText,
+    typeof response.data === "object" && response.data
+      ? String((response.data as any).message || "")
+      : "",
+    response.rawText,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return message.includes("ya existe") || message.includes("already exists");
+}
+
 export async function createAndSignWallet(params: {
   classId?: string;
   idUsuario: string;
@@ -138,7 +155,7 @@ export async function createAndSignWallet(params: {
   sign: WalletApiResponse | null;
 }> {
   const create = await createWalletObject(params);
-  if (!create.ok) {
+  if (!create.ok && !isExistingWalletResponse(create)) {
     return { create, sign: null };
   }
 
@@ -287,3 +304,4 @@ export async function notifyAndroidPass(params: {
     return { ok: false, status: 0, data: null, errorText: String(e) };
   }
 }
+

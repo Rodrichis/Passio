@@ -19,14 +19,15 @@ import {
   doc,
   getDoc,
   collection,
+  DocumentReference,
   serverTimestamp,
-  setDoc,
   getDocs,
   query,
   where,
   runTransaction,
+  updateDoc,
 } from "firebase/firestore";
-import { createAndSignWallet, createApplePass } from "../services/apiWallet";
+import { createAndSignWallet } from "../services/apiWallet";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
 type SO = "ios" | "android";
@@ -66,6 +67,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [walletLink, setWalletLink] = useState<string | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [walletFriendlyError, setWalletFriendlyError] = useState<string | null>(null);
+  const [walletSuccessMessage, setWalletSuccessMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
@@ -177,32 +179,53 @@ export default function RegisterClientScreen({ route }: Props) {
     setWalletStep("idle");
     setWalletLink(null);
     setWalletError(null);
+    setWalletSuccessMessage(null);
     setShowForm(true);
 
     try {
-      // Traer límites del plan
+      // Traer limites del plan solo si vamos a crear un cliente nuevo
+      const normalizedEmail = email.trim().toLowerCase();
+      const clientesRef = collection(db, "Empresas", empresaId, "Clientes");
+      const existingClientRes = await getDocs(
+        query(clientesRef, where("email", "==", normalizedEmail))
+      );
+      const existingClientDoc = existingClientRes.docs[0] || null;
+      const existingClientData = (existingClientDoc?.data() as any) || null;
+      const isExistingClient = !!existingClientDoc;
+
       let limiteUsuarios: number | null = null;
-      try {
-        const planName = empresa?.plan;
-        if (planName) {
-          const planRes = await getDocs(
-            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-          );
-          const planDoc = planRes.docs[0];
-          if (planDoc) {
-            const data = planDoc.data() as any;
-            if (typeof data.limiteUsuarios === "number") {
-              limiteUsuarios = data.limiteUsuarios;
+      if (!isExistingClient) {
+        try {
+          const planName = empresa?.plan;
+          if (planName) {
+            const planRes = await getDocs(
+              query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+            );
+            const planDoc = planRes.docs[0];
+            if (planDoc) {
+              const data = planDoc.data() as any;
+              if (typeof data.limiteUsuarios === "number") {
+                limiteUsuarios = data.limiteUsuarios;
+              }
             }
           }
+        } catch (planErr) {
+          console.log("No se pudieron leer los limites del plan:", planErr);
         }
-      } catch (planErr) {
-        console.log("No se pudieron leer los límites del plan:", planErr);
       }
 
-      // Pre-generar ID sin escribir en Firestore
-      const newDocRef = doc(collection(db, "Empresas", empresaId, "Clientes"));
-      const clientId = newDocRef.id;
+      const clientRef =
+        existingClientDoc?.ref || (doc(clientesRef) as DocumentReference);
+      const clientId = clientRef.id;
+      const walletCantidad = isExistingClient
+        ? Math.max(1, Number(existingClientData?.cicloVisitas ?? 1))
+        : 1;
+      const walletPremios = isExistingClient
+        ? Math.max(0, Number(existingClientData?.premiosDisponibles ?? 0))
+        : 0;
+      const walletNombre = String(existingClientData?.nombre ?? nombre).trim();
+      const walletApellido = String(existingClientData?.apellido ?? apellido).trim();
+      const walletNombreUsuario = [walletNombre, walletApellido].filter(Boolean).join(" ");
 
       // Generar y firmar wallet
       setWalletStep("creating");
@@ -210,30 +233,29 @@ export default function RegisterClientScreen({ route }: Props) {
       let walletLinkLocal: string | null = null;
 
       if (so === "ios") {
-        // Nuevo flujo: Apple expone GET directo con los parámetros
-        const query = new URLSearchParams({
+        const walletQuery = new URLSearchParams({
           idUsuario: clientId,
-          cantidad: "1", // servicio no permite 0
-          premiosDisponibles: "0",
-          nombre,
-          apellido,
+          cantidad: String(walletCantidad),
+          premiosDisponibles: String(walletPremios),
+          nombre: walletNombre,
+          apellido: walletApellido,
           codigoQR: clientId,
         }).toString();
-        const directUrl = `${EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL}/v1/crearPasses?${query}`;
+        const directUrl = EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL + "/v1/crearPasses?" + walletQuery;
         walletOk = true;
         walletLinkLocal = directUrl;
       } else {
         const { create, sign } = await createAndSignWallet({
           idUsuario: clientId,
-          nombreUsuario: `${nombre.trim()} ${apellido.trim()}`,
-          nombre: nombre.trim(),
-          apellido: apellido.trim(),
+          nombreUsuario: walletNombreUsuario,
+          nombre: walletNombre,
+          apellido: walletApellido,
           codigoQR: clientId,
-          cantidad: 1,
-          premios: 0,
+          cantidad: walletCantidad,
+          premios: walletPremios,
         });
         const signUrl = typeof sign?.data?.url === "string" ? sign.data.url : null;
-        if (create.ok && sign?.ok) {
+        if ((create.ok || isExistingClient) && sign?.ok) {
           walletOk = true;
           walletLinkLocal = extractLink(sign.data) || extractLink(create.data) || signUrl;
         } else {
@@ -241,12 +263,12 @@ export default function RegisterClientScreen({ route }: Props) {
         }
       }
 
-      // Solo si el wallet fue OK escribimos el cliente en Firestore (con límite)
+      // Solo si el wallet fue OK escribimos el cliente en Firestore
       if (walletOk) {
         const clientData = {
-          nombre: nombre.trim(),
-          apellido: apellido.trim(),
-          email: email.trim().toLowerCase(),
+          nombre: walletNombre,
+          apellido: walletApellido,
+          email: normalizedEmail,
           telefono: telefono.trim(),
           applePassUrl: walletLinkLocal || null,
           empresaUid: empresaId,
@@ -266,69 +288,84 @@ export default function RegisterClientScreen({ route }: Props) {
           premiosCanjeados: 0,
         };
 
-        // Transacción: valida límite y crea cliente + incrementa contador
-        // Contador de usuarios: intenta colección "Contador" (singular) y luego "Contadores" (plural)
-        let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
-        try {
-          let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
-          if (!contColl.empty) {
-            const first = contColl.docs[0];
-            contRefToUse = doc(db, "Empresas", empresaId, "Contador", first.id);
-          } else {
-            contColl = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
+        if (isExistingClient) {
+          await updateDoc(clientRef, {
+            applePassUrl: walletLinkLocal || null,
+            so,
+            navegador:
+              Platform.select({
+                web: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+                default: "app",
+              }) || "unknown",
+          });
+          setWalletSuccessMessage(
+            "Este correo ya estaba registrado en esta empresa. Recuperamos tu tarjeta actual."
+          );
+        } else {
+          // Transaccion: valida limite y crea cliente + incrementa contador
+          // Contador de usuarios: intenta coleccion "Contador" (singular) y luego "Contadores" (plural)
+          let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
+          try {
+            let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
             if (!contColl.empty) {
               const first = contColl.docs[0];
-              contRefToUse = doc(db, "Empresas", empresaId, "Contadores", first.id);
+              contRefToUse = doc(db, "Empresas", empresaId, "Contador", first.id);
+            } else {
+              contColl = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
+              if (!contColl.empty) {
+                const first = contColl.docs[0];
+                contRefToUse = doc(db, "Empresas", empresaId, "Contadores", first.id);
+              }
             }
+          } catch (e) {
+            console.log("No se pudo leer coleccion Contador/Contadores, se usara \"contador\":", e);
           }
-        } catch (e) {
-          console.log("No se pudo leer colección Contador/Contadores, se usará 'contador':", e);
-        }
 
-        try {
-          await runTransaction(db, async (tx) => {
-            const contSnap = await tx.get(contRefToUse);
-            const contData = contSnap.exists() ? contSnap.data() || {} : {};
-            const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
-            const currentNoti =
-              typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
-            const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
+          try {
+            await runTransaction(db, async (tx) => {
+              const contSnap = await tx.get(contRefToUse);
+              const contData = contSnap.exists() ? contSnap.data() || {} : {};
+              const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
+              const currentNoti =
+                typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
+              const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
 
-            const now = new Date();
-            const mesKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-            const storedMes = contData.mesConteo as string | undefined;
-            const resetMonthly = storedMes !== mesKey;
-            const nextNoti = resetMonthly ? 0 : currentNoti;
-            const nextMail = resetMonthly ? 0 : currentMail;
+              const now = new Date();
+              const mesKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+              const storedMes = contData.mesConteo as string | undefined;
+              const resetMonthly = storedMes !== mesKey;
+              const nextNoti = resetMonthly ? 0 : currentNoti;
+              const nextMail = resetMonthly ? 0 : currentMail;
 
-            if (limiteUsuarios != null && current >= limiteUsuarios) {
-              throw new Error("LIMIT_REACHED");
+              if (limiteUsuarios != null && current >= limiteUsuarios) {
+                throw new Error("LIMIT_REACHED");
+              }
+
+              tx.set(clientRef, clientData);
+              tx.set(
+                contRefToUse,
+                {
+                  totalUsuarios: current + 1,
+                  notificacionesMes: nextNoti,
+                  correosMes: nextMail,
+                  mesConteo: mesKey,
+                  actualizadoEl: serverTimestamp(),
+                },
+                { merge: true }
+              );
+            });
+          } catch (txErr: any) {
+            if (String(txErr?.message).includes("LIMIT_REACHED")) {
+              setShowLimitModal(true);
+              setWalletStep("idle");
+              setSaving(false);
+              return;
             }
-
-            tx.set(newDocRef, clientData);
-            tx.set(
-              contRefToUse,
-              {
-                totalUsuarios: current + 1,
-                notificacionesMes: nextNoti,
-                correosMes: nextMail,
-                mesConteo: mesKey,
-                actualizadoEl: serverTimestamp(),
-                // preserva otros contadores si ya existen
-              },
-              { merge: true }
-            );
-          });
-        } catch (txErr: any) {
-          if (String(txErr?.message).includes("LIMIT_REACHED")) {
-            setShowLimitModal(true);
-            setWalletStep("idle");
-            setSaving(false);
-            return;
+            throw txErr;
           }
-          throw txErr;
-        }
 
+          setWalletSuccessMessage("Tarjeta creada correctamente.");
+        }
         setNombre("");
         setApellido("");
         setEmail("");
@@ -754,7 +791,7 @@ export default function RegisterClientScreen({ route }: Props) {
             <>
               {walletStep === "success" && (
                 <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#e8f5e9" }}>
-                  <Text style={{ color: "#2e7d32", fontWeight: "700" }}>Tarjeta creada correctamente.</Text>
+                  <Text style={{ color: "#2e7d32", fontWeight: "700" }}>{walletSuccessMessage || "Tarjeta creada correctamente."}</Text>
                   {walletLink ? (
                     <TouchableOpacity
                       onPress={() => {
