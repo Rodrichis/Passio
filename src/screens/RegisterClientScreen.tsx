@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,6 @@ import {
   query,
   where,
   runTransaction,
-  updateDoc,
 } from "firebase/firestore";
 import { createAndSignWallet } from "../services/apiWallet";
 
@@ -186,45 +185,32 @@ export default function RegisterClientScreen({ route }: Props) {
       // Traer limites del plan solo si vamos a crear un cliente nuevo
       const normalizedEmail = email.trim().toLowerCase();
       const clientesRef = collection(db, "Empresas", empresaId, "Clientes");
-      const existingClientRes = await getDocs(
-        query(clientesRef, where("email", "==", normalizedEmail))
-      );
-      const existingClientDoc = existingClientRes.docs[0] || null;
-      const existingClientData = (existingClientDoc?.data() as any) || null;
-      const isExistingClient = !!existingClientDoc;
 
       let limiteUsuarios: number | null = null;
-      if (!isExistingClient) {
-        try {
-          const planName = empresa?.plan;
-          if (planName) {
-            const planRes = await getDocs(
-              query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-            );
-            const planDoc = planRes.docs[0];
-            if (planDoc) {
-              const data = planDoc.data() as any;
-              if (typeof data.limiteUsuarios === "number") {
-                limiteUsuarios = data.limiteUsuarios;
-              }
+      try {
+        const planName = empresa?.plan;
+        if (planName) {
+          const planRes = await getDocs(
+            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+          );
+          const planDoc = planRes.docs[0];
+          if (planDoc) {
+            const data = planDoc.data() as any;
+            if (typeof data.limiteUsuarios === "number") {
+              limiteUsuarios = data.limiteUsuarios;
             }
           }
-        } catch (planErr) {
-          console.log("No se pudieron leer los limites del plan:", planErr);
         }
+      } catch (planErr) {
+        console.log("No se pudieron leer los limites del plan:", planErr);
       }
 
-      const clientRef =
-        existingClientDoc?.ref || (doc(clientesRef) as DocumentReference);
+      const clientRef = doc(clientesRef) as DocumentReference;
       const clientId = clientRef.id;
-      const walletCantidad = isExistingClient
-        ? Math.max(1, Number(existingClientData?.cicloVisitas ?? 1))
-        : 1;
-      const walletPremios = isExistingClient
-        ? Math.max(0, Number(existingClientData?.premiosDisponibles ?? 0))
-        : 0;
-      const walletNombre = String(existingClientData?.nombre ?? nombre).trim();
-      const walletApellido = String(existingClientData?.apellido ?? apellido).trim();
+      const walletCantidad = 1;
+      const walletPremios = 0;
+      const walletNombre = nombre.trim();
+      const walletApellido = apellido.trim();
       const walletNombreUsuario = [walletNombre, walletApellido].filter(Boolean).join(" ");
 
       // Generar y firmar wallet
@@ -255,7 +241,7 @@ export default function RegisterClientScreen({ route }: Props) {
           premios: walletPremios,
         });
         const signUrl = typeof sign?.data?.url === "string" ? sign.data.url : null;
-        if ((create.ok || isExistingClient) && sign?.ok) {
+        if (create.ok && sign?.ok) {
           walletOk = true;
           walletLinkLocal = extractLink(sign.data) || extractLink(create.data) || signUrl;
         } else {
@@ -288,85 +274,70 @@ export default function RegisterClientScreen({ route }: Props) {
           premiosCanjeados: 0,
         };
 
-        if (isExistingClient) {
-          await updateDoc(clientRef, {
-            applePassUrl: walletLinkLocal || null,
-            so,
-            navegador:
-              Platform.select({
-                web: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-                default: "app",
-              }) || "unknown",
-          });
-          setWalletSuccessMessage(
-            "Este correo ya estaba registrado en esta empresa. Recuperamos tu tarjeta actual."
-          );
-        } else {
-          // Transaccion: valida limite y crea cliente + incrementa contador
-          // Contador de usuarios: intenta coleccion "Contador" (singular) y luego "Contadores" (plural)
-          let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
-          try {
-            let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
+        // Transaccion: valida limite y crea cliente + incrementa contador
+        // Contador de usuarios: intenta coleccion "Contador" (singular) y luego "Contadores" (plural)
+        let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
+        try {
+          let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
+          if (!contColl.empty) {
+            const first = contColl.docs[0];
+            contRefToUse = doc(db, "Empresas", empresaId, "Contador", first.id);
+          } else {
+            contColl = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
             if (!contColl.empty) {
               const first = contColl.docs[0];
-              contRefToUse = doc(db, "Empresas", empresaId, "Contador", first.id);
-            } else {
-              contColl = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
-              if (!contColl.empty) {
-                const first = contColl.docs[0];
-                contRefToUse = doc(db, "Empresas", empresaId, "Contadores", first.id);
-              }
+              contRefToUse = doc(db, "Empresas", empresaId, "Contadores", first.id);
             }
-          } catch (e) {
-            console.log("No se pudo leer coleccion Contador/Contadores, se usara \"contador\":", e);
           }
-
-          try {
-            await runTransaction(db, async (tx) => {
-              const contSnap = await tx.get(contRefToUse);
-              const contData = contSnap.exists() ? contSnap.data() || {} : {};
-              const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
-              const currentNoti =
-                typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
-              const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
-
-              const now = new Date();
-              const mesKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-              const storedMes = contData.mesConteo as string | undefined;
-              const resetMonthly = storedMes !== mesKey;
-              const nextNoti = resetMonthly ? 0 : currentNoti;
-              const nextMail = resetMonthly ? 0 : currentMail;
-
-              if (limiteUsuarios != null && current >= limiteUsuarios) {
-                throw new Error("LIMIT_REACHED");
-              }
-
-              tx.set(clientRef, clientData);
-              tx.set(
-                contRefToUse,
-                {
-                  totalUsuarios: current + 1,
-                  notificacionesMes: nextNoti,
-                  correosMes: nextMail,
-                  mesConteo: mesKey,
-                  actualizadoEl: serverTimestamp(),
-                },
-                { merge: true }
-              );
-            });
-          } catch (txErr: any) {
-            if (String(txErr?.message).includes("LIMIT_REACHED")) {
-              setShowLimitModal(true);
-              setWalletStep("idle");
-              setSaving(false);
-              return;
-            }
-            throw txErr;
-          }
-
-          setWalletSuccessMessage("Tarjeta creada correctamente.");
+        } catch (e) {
+          console.log("No se pudo leer coleccion Contador/Contadores, se usara contador:", e);
         }
-        setNombre("");
+
+        try {
+          await runTransaction(db, async (tx) => {
+            const contSnap = await tx.get(contRefToUse);
+            const contData = contSnap.exists() ? contSnap.data() || {} : {};
+            const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
+            const currentNoti =
+              typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
+            const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
+
+            const now = new Date();
+            const mesKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+            const storedMes = contData.mesConteo as string | undefined;
+            const resetMonthly = storedMes !== mesKey;
+            const nextNoti = resetMonthly ? 0 : currentNoti;
+            const nextMail = resetMonthly ? 0 : currentMail;
+
+            if (limiteUsuarios != null && current >= limiteUsuarios) {
+              throw new Error("LIMIT_REACHED");
+            }
+
+            tx.set(clientRef, clientData);
+            tx.set(
+              contRefToUse,
+              {
+                totalUsuarios: current + 1,
+                notificacionesMes: nextNoti,
+                correosMes: nextMail,
+                mesConteo: mesKey,
+                actualizadoEl: serverTimestamp(),
+              },
+              { merge: true }
+            );
+          });
+        } catch (txErr: any) {
+          if (String(txErr?.message).includes("LIMIT_REACHED")) {
+            setShowLimitModal(true);
+            setWalletStep("idle");
+            setSaving(false);
+            return;
+          }
+          throw txErr;
+        }
+
+        setWalletSuccessMessage("Tarjeta creada correctamente.");
+        setNombre("");        setNombre("");
         setApellido("");
         setEmail("");
         setTelefono("");
@@ -381,7 +352,7 @@ export default function RegisterClientScreen({ route }: Props) {
     } catch (e: any) {
       console.error("Error registrando cliente:", e);
       setWalletStep("error");
-      setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
+      setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contÃ¡ctanos.");
       setWalletError(String(e?.message || e));
       setShowForm(true);
     } finally {
@@ -917,7 +888,7 @@ export default function RegisterClientScreen({ route }: Props) {
               No se pudo crear tu wallet
             </Text>
             <Text style={{ color: "#444" }}>
-              {walletFriendlyError || "Ocurrió un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
+              {walletFriendlyError || "OcurriÃ³ un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
             </Text>
             <TouchableOpacity
               onPress={() => {
@@ -964,10 +935,10 @@ export default function RegisterClientScreen({ route }: Props) {
             }}
           >
             <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828", textAlign: "center" }}>
-              No se pueden registrar más usuarios.
+              No se pueden registrar mÃ¡s usuarios.
             </Text>
             <Text style={{ color: "#444", textAlign: "center" }}>
-              Este comercio alcanzó el límite de registros disponible.
+              Este comercio alcanzÃ³ el lÃ­mite de registros disponible.
             </Text>
             <TouchableOpacity
               onPress={() => setShowLimitModal(false)}
@@ -990,3 +961,4 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
+
