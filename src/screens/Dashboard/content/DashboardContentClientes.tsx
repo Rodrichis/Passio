@@ -11,6 +11,7 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
@@ -62,6 +63,8 @@ function formatDate(d?: Date | null) {
 
 export default function DashboardContentClientes() {
   const uid = auth.currentUser?.uid;
+  const { width } = useWindowDimensions();
+  const useDesktopWebLayout = IS_WEB && width >= 900;
 
   const [items, setItems] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -473,7 +476,7 @@ export default function DashboardContentClientes() {
         />
       </TouchableOpacity>
 
-      {IS_WEB ? (
+      {useDesktopWebLayout ? (
         <View style={{ width: 160, alignItems: "center", paddingRight: 8 }}>
           <Text style={[cStyles.headerText, { textAlign: "center" }]}>Estadisticas</Text>
         </View>
@@ -524,7 +527,7 @@ export default function DashboardContentClientes() {
 
         <Text style={{ flex: 1.4, textAlign: "center" }}>{formatDate(fecha)}</Text>
 
-        {IS_WEB ? (
+        {useDesktopWebLayout ? (
           <View style={{ width: 160, alignItems: "center", paddingRight: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
@@ -634,7 +637,7 @@ export default function DashboardContentClientes() {
   const renderItem = useCallback(
     ({ item, index }: { item: Cliente; index: number }) => {
       const selected = selectedIds.has(item.id);
-      return IS_WEB ? (
+      return useDesktopWebLayout ? (
         <RowWeb item={item} index={index} selected={selected} />
       ) : (
         <CardMobile item={item} selected={selected} />
@@ -1188,7 +1191,7 @@ export default function DashboardContentClientes() {
         <FlatList
           data={sortedItems}
           keyExtractor={(it) => it.id}
-          ListHeaderComponent={IS_WEB ? <HeaderWeb /> : null}
+          ListHeaderComponent={useDesktopWebLayout ? <HeaderWeb /> : null}
           renderItem={renderItem as any}
           extraData={selectedIds}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

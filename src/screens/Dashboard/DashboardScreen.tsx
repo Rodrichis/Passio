@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { View, ScrollView, Platform } from "react-native";
+import { View, ScrollView, Platform, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import DashboardMenu from "./DashboardMenu";
@@ -23,7 +23,10 @@ type RootStackParamList = {
 // relajamos tipos de navegación para evitar conflictos en web
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
-  const isMobile = Platform.OS === "android" || Platform.OS === "ios";
+  const { width } = useWindowDimensions();
+  const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
+  const isCompactWeb = Platform.OS === "web" && width < 900;
+  const isMobileLayout = isNativeMobile || isCompactWeb;
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -51,8 +54,8 @@ export default function Dashboard({ navigation }: any) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
-      <View style={{ flex: 1, flexDirection: isMobile ? "column" : "row" }}>
-        {!isMobile && (
+      <View style={{ flex: 1, flexDirection: isMobileLayout ? "column" : "row" }}>
+        {!isMobileLayout && (
           <DashboardMenu selected={selected} setSelected={setSelected} />
         )}
 
@@ -63,7 +66,7 @@ export default function Dashboard({ navigation }: any) {
           </View>
         ) : (
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1, paddingBottom: isMobile ? 60 : 0 }}
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: isMobileLayout ? 60 : 0 }}
             style={{ flex: 1, backgroundColor: "#f5f5f5" }}
           >
             <View style={styles.contentContainer}>{renderContent()}</View>
@@ -71,7 +74,7 @@ export default function Dashboard({ navigation }: any) {
         )}
       </View>
 
-      {isMobile && (
+      {isMobileLayout && (
         <DashboardMenu selected={selected} setSelected={setSelected} isMobile />
       )}
     </SafeAreaView>
