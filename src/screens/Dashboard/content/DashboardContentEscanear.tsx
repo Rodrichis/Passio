@@ -16,6 +16,8 @@ type ParsedPayload = {
 
 type Feedback = { type: "success" | "error"; message: string; action?: "visita" | "premio" };
 
+const VISITAS_POR_PREMIO = 6;
+
 export default function DashboardContentEscanear() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -141,9 +143,8 @@ export default function DashboardContentEscanear() {
 
       if (scanMode === "visita") {
         visitasTotales = visitasTotalesPrev + 1;
-        cicloVisitas = cicloPrev + 1;
-        if (cicloVisitas > 10) {
-          cicloVisitas = 1;
+        cicloVisitas = cicloPrev >= VISITAS_POR_PREMIO ? 1 : cicloPrev + 1;
+        if (cicloVisitas === VISITAS_POR_PREMIO) {
           premiosDisponibles += 1;
         }
       } else {
