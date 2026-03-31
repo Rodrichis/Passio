@@ -248,6 +248,8 @@ export default function DashboardContentEscanear() {
       <View style={styles.scannerBox}>
         <CameraView
           style={StyleSheet.absoluteFillObject}
+          facing="back"
+          autofocus="off"
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
           barcodeScannerSettings={{
             barcodeTypes: ["qr"],
