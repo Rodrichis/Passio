@@ -18,6 +18,18 @@ type Feedback = { type: "success" | "error"; message: string; action?: "visita" 
 
 const VISITAS_POR_PREMIO = 6;
 
+const normalizeCycleValue = (value: unknown) => {
+  const parsed = Math.trunc(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, VISITAS_POR_PREMIO);
+};
+
+const normalizeNonNegativeInt = (value: unknown) => {
+  const parsed = Math.trunc(Number(value));
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
+};
+
 export default function DashboardContentEscanear() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -124,10 +136,10 @@ export default function DashboardContentEscanear() {
 
       const nombreCliente = clienteDoc?.nombreCompleto || clienteDoc?.nombre || "--";
       const soCliente = (clienteDoc?.so || "").toLowerCase();
-      const visitasTotalesPrev = Number(clienteDoc?.visitasTotales ?? 0);
-      const cicloPrev = Number(clienteDoc?.cicloVisitas ?? 0);
-      const premiosDispPrev = Number(clienteDoc?.premiosDisponibles ?? 0);
-      const premiosCanjPrev = Number(clienteDoc?.premiosCanjeados ?? 0);
+      const visitasTotalesPrev = normalizeNonNegativeInt(clienteDoc?.visitasTotales);
+      const cicloPrev = normalizeCycleValue(clienteDoc?.cicloVisitas);
+      const premiosDispPrev = normalizeNonNegativeInt(clienteDoc?.premiosDisponibles);
+      const premiosCanjPrev = normalizeNonNegativeInt(clienteDoc?.premiosCanjeados);
 
       if (scanMode === "premio" && premiosDispPrev <= 0) {
         setStatus("No tiene premios disponibles.");
@@ -143,14 +155,23 @@ export default function DashboardContentEscanear() {
 
       if (scanMode === "visita") {
         visitasTotales = visitasTotalesPrev + 1;
-        cicloVisitas = cicloPrev >= VISITAS_POR_PREMIO ? 1 : cicloPrev + 1;
-        if (cicloVisitas === VISITAS_POR_PREMIO) {
-          premiosDisponibles += 1;
+
+        if (cicloPrev >= VISITAS_POR_PREMIO) {
+          cicloVisitas = 1;
+        } else {
+          cicloVisitas = cicloPrev + 1;
+          if (cicloVisitas === VISITAS_POR_PREMIO) {
+            premiosDisponibles += 1;
+          }
         }
       } else {
         premiosDisponibles = Math.max(0, premiosDispPrev - 1);
         premiosCanjeados = premiosCanjPrev + 1;
       }
+
+      cicloVisitas = normalizeCycleValue(cicloVisitas);
+      premiosDisponibles = normalizeNonNegativeInt(premiosDisponibles);
+      premiosCanjeados = normalizeNonNegativeInt(premiosCanjeados);
 
       try {
         const walletResp =
