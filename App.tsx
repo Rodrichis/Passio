@@ -1,4 +1,4 @@
-import { NavigationContainer } from "@react-navigation/native";
+﻿import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { onAuthStateChanged } from "firebase/auth";
 import React from "react";
@@ -12,6 +12,10 @@ import DashboardScreen from "./src/screens/Dashboard/DashboardScreen";
 import RegisterClientScreen from "./src/screens/RegisterClientScreen";
 import VerifyEmailScreen from "./src/screens/VerifyEmailScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
+import CompanyGateScreen from "./src/screens/CompanyGateScreen";
+import WalletOnboardingIntroScreen from "./src/screens/WalletOnboarding/WalletOnboardingIntroScreen";
+import WalletOnboardingSetupScreen from "./src/screens/WalletOnboarding/WalletOnboardingSetupScreen";
+import WalletOnboardingDoneScreen from "./src/screens/WalletOnboarding/WalletOnboardingDoneScreen";
 import { configureRevenueCat, isRevenueCatAvailable, syncRevenueCatUser } from "./src/services/revenuecat";
 import { RootStackParamList } from "./src/types/navigation";
 
@@ -27,9 +31,13 @@ const linking = {
     screens: {
       Login: "login",
       Register: "register-company",
+      CompanyGate: "company-gate",
       Dashboard: "dashboard",
       VerifyEmail: "verify-email",
       ForgotPassword: "forgot-password",
+      WalletOnboardingIntro: "wallet-onboarding",
+      WalletOnboardingSetup: "wallet-onboarding/setup",
+      WalletOnboardingDone: "wallet-onboarding/done",
       RegisterClient: "register/:empresaId",
     },
   },
@@ -83,18 +91,20 @@ export default function App() {
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
         </Stack.Navigator>
-      ) : !isVerified ? (
-        <Stack.Navigator initialRouteName="VerifyEmail" screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-          <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
-        </Stack.Navigator>
       ) : (
-        <Stack.Navigator initialRouteName="Dashboard" screenOptions={{ headerShown: false }}>
+        <Stack.Navigator initialRouteName={isVerified ? "CompanyGate" : "VerifyEmail"} screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+          <Stack.Screen name="CompanyGate" component={CompanyGateScreen} />
+          <Stack.Screen name="WalletOnboardingIntro" component={WalletOnboardingIntroScreen} />
+          <Stack.Screen name="WalletOnboardingSetup" component={WalletOnboardingSetupScreen} />
+          <Stack.Screen name="WalletOnboardingDone" component={WalletOnboardingDoneScreen} />
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="RegisterClient" component={RegisterClientScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         </Stack.Navigator>
       )}
     </NavigationContainer>
   );
 }
+
+

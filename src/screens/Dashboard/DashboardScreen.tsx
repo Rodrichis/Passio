@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { View, ScrollView, Platform, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -10,6 +10,7 @@ import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 import { auth } from "../../services/firebaseConfig";
+import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
 
 type RootStackParamList = {
   Login: undefined;
@@ -20,7 +21,7 @@ type RootStackParamList = {
   VerifyEmail: { email?: string };
 };
 
-// relajamos tipos de navegación para evitar conflictos en web
+// relajamos tipos de navegaciÃ³n para evitar conflictos en web
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
   const { width } = useWindowDimensions();
@@ -29,10 +30,35 @@ export default function Dashboard({ navigation }: any) {
   const isMobileLayout = isNativeMobile || isCompactWeb;
 
   useEffect(() => {
+    let active = true;
     const user = auth.currentUser;
+
     if (user && !user.emailVerified) {
       navigation.replace("VerifyEmail", { email: user.email || "" });
+      return () => {
+        active = false;
+      };
     }
+
+    const ensureWalletConfigured = async () => {
+      if (!user || !user.emailVerified) return;
+
+      try {
+        const walletConfig = await getWalletConfig(user.uid);
+        if (!active) return;
+
+        if (!walletConfig.walletConfigurado) {
+          navigation.replace("WalletOnboardingIntro");
+        }
+      } catch (walletError) {
+        console.error("Error verificando onboarding de wallet:", walletError);
+      }
+    };
+
+    ensureWalletConfigured();
+    return () => {
+      active = false;
+    };
   }, [navigation]);
 
   const renderContent = () => {
@@ -40,7 +66,7 @@ export default function Dashboard({ navigation }: any) {
       case "Principal":
         return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
       case "Clientes":
-        return <DashboardContentClientes />; // <- FlatList manejará el scroll
+        return <DashboardContentClientes />; // <- FlatList manejarÃ¡ el scroll
       case "Escanear":
         return <DashboardContentEscanear />;
       case "Ajustes":
@@ -59,7 +85,7 @@ export default function Dashboard({ navigation }: any) {
           <DashboardMenu selected={selected} setSelected={setSelected} />
         )}
 
-        {/* 👉 Para Clientes NO usamos ScrollView */}
+        {/* ðŸ‘‰ Para Clientes NO usamos ScrollView */}
         {isClientes ? (
           <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
             <View style={styles.contentContainer}>{renderContent()}</View>
@@ -80,4 +106,6 @@ export default function Dashboard({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+
 

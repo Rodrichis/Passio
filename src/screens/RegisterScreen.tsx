@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { View, TextInput, Text, ScrollView, TouchableOpacity, Modal, ScrollView as RNScrollView } from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
@@ -6,13 +6,8 @@ import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { globalStyles } from "../styles/theme";
 import { buildRegistrationUrl } from "../utils/publicUrls";
-
-type RootStackParamList = {
-  Login: undefined;
-  Register: undefined;
-  Dashboard: undefined;
-  VerifyEmail: { email?: string };
-};
+import { RootStackParamList } from "../types/navigation";
+import { resolveWalletClassIdFromName } from "../utils/walletOnboarding/walletClassId";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 
@@ -88,6 +83,7 @@ export default function RegisterScreen({ navigation }: Props) {
       auth.languageCode = "es";
       const userCredential = await createUserWithEmailAndPassword(auth, emailTrim, passwordTrim);
       const user = userCredential.user;
+      const walletClassId = resolveWalletClassIdFromName(empresaTrim, user.uid);
 
       try {
         await sendEmailVerification(user);
@@ -114,6 +110,13 @@ export default function RegisterScreen({ navigation }: Props) {
         FechaRegistro: now,
         plan: "Free",
         expiraEl: Timestamp.fromDate(expira),
+        walletConfigurado: false,
+        estadoWallet: "pendiente",
+        colorWallet: "#A99985",
+        visitasPorPremio: 6,
+        urlIconoWallet: "",
+        paqueteSellosWallet: "generico1",
+        "wallet-class-id": walletClassId,
       });
 
       // La navegacion depende de onAuthStateChanged en App.tsx
@@ -355,3 +358,6 @@ export default function RegisterScreen({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
+

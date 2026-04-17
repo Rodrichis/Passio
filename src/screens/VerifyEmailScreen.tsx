@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { sendEmailVerification } from "firebase/auth";
@@ -26,7 +26,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     try {
       setStatus("Enviando correo...");
       await sendEmailVerification(user);
-      setStatus("Correo de verificación enviado.");
+      setStatus("Correo de verificaciÃ³n enviado.");
       setCooldown(60);
     } catch (e) {
       setStatus("No se pudo enviar el correo. Intenta nuevamente.");
@@ -39,9 +39,9 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     if (!user) return;
     await user.reload();
     if (user.emailVerified) {
-      navigation.replace("Dashboard");
+      navigation.replace("CompanyGate");
     } else {
-      setStatus("Aún no está verificado. Revisa tu correo.");
+      setStatus("AÃºn no estÃ¡ verificado. Revisa tu correo.");
     }
   };
 
@@ -68,7 +68,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
         <View style={globalStyles.card}>
           <Text style={globalStyles.title}>Confirma tu cuenta</Text>
           <Text style={{ marginBottom: 12, color: "#333", textAlign: "center" }}>
-            Enviamos un correo de verificación a:
+            Enviamos un correo de verificaciÃ³n a:
           </Text>
           <Text style={{ fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
             {email || "tu correo"}
@@ -90,7 +90,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <TouchableOpacity style={globalStyles.secondaryButton} onPress={handleCheck}>
-            <Text style={globalStyles.buttonTextSecondary}>Ya verifiqué</Text>
+            <Text style={globalStyles.buttonTextSecondary}>Ya verifiquÃ©</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[globalStyles.secondaryButton, { backgroundColor: "#ccc" }]} onPress={handleLogout}>
@@ -101,3 +101,5 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     </ScrollView>
   );
 }
+
+

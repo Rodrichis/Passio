@@ -15,5 +15,6 @@ declare module "@env" {
   export const EXPO_PUBLIC_WALLET_ANDROID_API_BASE_URL: string;
   export const EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL: string;
   export const EXPO_PUBLIC_WALLET_CLASS_ID: string;
+  export const EXPO_PUBLIC_WALLET_CONFIG_API_BASE_URL: string;
 
 }

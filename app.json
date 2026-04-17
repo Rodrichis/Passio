@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "passio",
     "slug": "passio",
@@ -32,9 +32,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [],
+    "plugins": [["expo-image-picker", { "photosPermission": "Passio necesita acceder a tus fotos para seleccionar el icono del wallet." }]],
     "experiments": {
       "baseUrl": "/app"
     }
   }
 }
+

@@ -32,3 +32,5 @@ export const auth =
         persistence: require("firebase/auth").getReactNativePersistence(AsyncStorage),
       });
 export const db = getFirestore(app);
+
+
