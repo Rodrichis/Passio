@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -212,7 +212,18 @@ export default function RegisterClientScreen({ route }: Props) {
       const walletNombre = nombre.trim();
       const walletApellido = apellido.trim();
       const walletNombreUsuario = [walletNombre, walletApellido].filter(Boolean).join(" ");
-
+      const walletClassId =
+        typeof empresa?.["wallet-class-id"] === "string" && empresa["wallet-class-id"].trim().length > 0
+          ? empresa["wallet-class-id"].trim()
+          : "";
+      const paqueteSellosWallet =
+        typeof empresa?.paqueteSellosWallet === "string" && empresa.paqueteSellosWallet.trim().length > 0
+          ? empresa.paqueteSellosWallet.trim()
+          : "generico1";
+      const visitasPorPremio =
+        typeof empresa?.visitasPorPremio === "number" && Number.isFinite(empresa.visitasPorPremio)
+          ? Math.min(10, Math.max(6, Math.trunc(empresa.visitasPorPremio)))
+          : 6;
       // Generar y firmar wallet
       setWalletStep("creating");
       let walletOk = false;
@@ -231,7 +242,14 @@ export default function RegisterClientScreen({ route }: Props) {
         walletOk = true;
         walletLinkLocal = directUrl;
       } else {
+        if (!walletClassId) {
+          throw new Error("La empresa no tiene wallet-class-id configurado.");
+        }
+
         const { create, sign } = await createAndSignWallet({
+          walletClassId,
+          paqueteSellosWallet,
+          visitasPorPremio,
           idUsuario: clientId,
           nombreUsuario: walletNombreUsuario,
           nombre: walletNombre,
@@ -352,7 +370,7 @@ export default function RegisterClientScreen({ route }: Props) {
     } catch (e: any) {
       console.error("Error registrando cliente:", e);
       setWalletStep("error");
-      setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contÃ¡ctanos.");
+      setWalletFriendlyError("No pudimos generar tu tarjeta en este momento. Intenta nuevamente o contáctanos.");
       setWalletError(String(e?.message || e));
       setShowForm(true);
     } finally {
@@ -961,4 +979,3 @@ export default function RegisterClientScreen({ route }: Props) {
     </View>
   );
 }
-

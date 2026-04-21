@@ -5,20 +5,35 @@ const APPLE_BASE_URL = process.env.EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL;
 export const DEFAULT_CLASS_ID = process.env.EXPO_PUBLIC_WALLET_CLASS_ID!;
 
 export interface WalletApiResponse {
-  ok: boolean;      // true si status 2xx
-  status: number;   // status HTTP (0 si fallo de red)
-  data: any | null; // cuerpo parseado (JSON si se pudo, si no string)
-  rawText?: string; // texto crudo de la respuesta
+  ok: boolean;
+  status: number;
+  data: any | null;
+  rawText?: string;
   errorText?: string;
 }
 
+export interface AndroidWalletVisualConfig {
+  walletClassId: string;
+  nombreEmpresa?: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
+  colorWallet?: string;
+}
+
+export interface AndroidWalletStateConfig {
+  walletClassId: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
+}
+
 async function callWalletApi(
-  path: "/createObject" | "/firma" | "/actualizar" | "/actualizarEstado",
+  path: "/syncClass" | "/createObject" | "/firma" | "/actualizar" | "/actualizarEstado",
   body: any
 ): Promise<WalletApiResponse> {
   if (!ANDROID_PREFIX) {
     return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
   }
+
   try {
     const res = await fetch(`${ANDROID_PREFIX}${path}`, {
       method: "POST",
@@ -34,7 +49,7 @@ async function callWalletApi(
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      parsed = rawText; // no era JSON, lo dejamos como string
+      parsed = rawText;
     }
 
     const result: WalletApiResponse = {
@@ -68,10 +83,25 @@ async function callWalletApi(
   }
 }
 
+export async function syncAndroidWalletClass(config: AndroidWalletVisualConfig): Promise<WalletApiResponse> {
+  const { walletClassId, nombreEmpresa, paqueteSellosWallet, visitasPorPremio, colorWallet } = config;
+
+  return callWalletApi("/syncClass", {
+    walletClassId,
+    nombreEmpresa,
+    paqueteSellosWallet,
+    visitasPorPremio,
+    colorWallet,
+  });
+}
+
 export async function createWalletObject(params: {
   classId?: string;
+  walletClassId?: string;
   idUsuario: string;
   nombreUsuario: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
   nombre?: string;
   apellido?: string;
   codigoQR?: string;
@@ -79,9 +109,12 @@ export async function createWalletObject(params: {
   premios?: number;
 }): Promise<WalletApiResponse> {
   const {
-    classId = DEFAULT_CLASS_ID,
+    classId,
+    walletClassId,
     idUsuario,
     nombreUsuario,
+    paqueteSellosWallet,
+    visitasPorPremio,
     nombre,
     apellido,
     codigoQR,
@@ -89,10 +122,15 @@ export async function createWalletObject(params: {
     premios,
   } = params;
 
+  const resolvedWalletClassId = walletClassId || classId || DEFAULT_CLASS_ID;
+
   return callWalletApi("/createObject", {
-    classId,
+    classId: resolvedWalletClassId,
+    walletClassId: resolvedWalletClassId,
     idUsuario,
     nombreUsuario,
+    paqueteSellosWallet,
+    visitasPorPremio,
     ...(nombre ? { nombre } : {}),
     ...(apellido ? { apellido } : {}),
     ...(codigoQR ? { codigoQR } : {}),
@@ -101,9 +139,7 @@ export async function createWalletObject(params: {
   });
 }
 
-export async function signWalletObject(params: {
-  idUsuario: string;
-}): Promise<WalletApiResponse> {
+export async function signWalletObject(params: { idUsuario: string }): Promise<WalletApiResponse> {
   const { idUsuario } = params;
   return callWalletApi("/firma", { idUsuario });
 }
@@ -111,15 +147,27 @@ export async function signWalletObject(params: {
 export async function updateWalletPoints(params: {
   idUsuario: string;
   cantidadPuntos: number;
+  walletClassId: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
 }): Promise<WalletApiResponse> {
-  const { idUsuario, cantidadPuntos } = params;
-  return callWalletApi("/actualizar", { idUsuario, cantidadPuntos });
+  const { idUsuario, cantidadPuntos, walletClassId, paqueteSellosWallet, visitasPorPremio } = params;
+  return callWalletApi("/actualizar", {
+    idUsuario,
+    cantidadPuntos,
+    walletClassId,
+    paqueteSellosWallet,
+    visitasPorPremio,
+  });
 }
 
 export async function updateAndroidWalletState(params: {
   idUsuario: string;
   cantidad: number;
   premiosDisponibles: number;
+  walletClassId: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
 }): Promise<WalletApiResponse> {
   return callWalletApi("/actualizarEstado", params);
 }
@@ -129,9 +177,7 @@ function isExistingWalletResponse(response: WalletApiResponse | null | undefined
 
   const message = [
     response.errorText,
-    typeof response.data === "object" && response.data
-      ? String((response.data as any).message || "")
-      : "",
+    typeof response.data === "object" && response.data ? String((response.data as any).message || "") : "",
     response.rawText,
   ]
     .filter(Boolean)
@@ -143,8 +189,11 @@ function isExistingWalletResponse(response: WalletApiResponse | null | undefined
 
 export async function createAndSignWallet(params: {
   classId?: string;
+  walletClassId?: string;
   idUsuario: string;
   nombreUsuario: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
   nombre?: string;
   apellido?: string;
   codigoQR?: string;
@@ -163,7 +212,6 @@ export async function createAndSignWallet(params: {
   return { create, sign };
 }
 
-// --------- Apple Wallet services (separados) ---------
 type ApplePassResponse = WalletApiResponse & {
   contentType?: string;
 };
@@ -172,6 +220,7 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
   if (!APPLE_BASE_URL) {
     return { ok: false, status: 0, data: null, errorText: "APPLE_BASE_URL no configurada" };
   }
+
   try {
     const res = await fetch(`${APPLE_BASE_URL}${path}`, {
       method: "POST",
@@ -186,7 +235,6 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
     let data: any = null;
     let rawText: string | undefined;
 
-    // Si no es OK, intentamos leer texto para mostrar detalle
     if (!res.ok) {
       rawText = await res.text();
       try {
@@ -204,7 +252,6 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
       };
     }
 
-    // Apple puede responder bytes (.pkpass) o JSON de ok
     if (contentType.includes("application/json")) {
       rawText = await res.text();
       try {
@@ -213,7 +260,6 @@ async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v
         data = rawText;
       }
     } else {
-      // bytes
       data = await res.blob();
     }
 
@@ -276,6 +322,7 @@ export async function notifyAndroidPass(params: {
   if (!ANDROID_PREFIX) {
     return { ok: false, status: 0, data: null, errorText: "ANDROID_BASE_URL no configurada" };
   }
+
   try {
     const res = await fetch(`${ANDROID_PREFIX}/notificacion`, {
       method: "POST",
@@ -304,4 +351,3 @@ export async function notifyAndroidPass(params: {
     return { ok: false, status: 0, data: null, errorText: String(e) };
   }
 }
-

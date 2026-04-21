@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import WalletColorField from "../../components/wallet-onboarding/WalletColorField";
@@ -8,6 +8,7 @@ import WalletVisitsField from "../../components/wallet-onboarding/WalletVisitsFi
 import WalletPreviewCard from "../../components/wallet-onboarding/WalletPreviewCard";
 import { auth } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
+import { syncAndroidWalletClass } from "../../services/apiWallet";
 import { saveWalletConfig } from "../../services/walletOnboarding/saveWalletConfig";
 import { uploadWalletIcon } from "../../services/walletOnboarding/uploadWalletIcon";
 import { COLORS } from "../../styles/theme";
@@ -106,6 +107,18 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       let nextIconUrl = urlIconoWallet;
       if (iconAsset) {
         nextIconUrl = await uploadWalletIcon(safeWalletClassId, iconAsset);
+      }
+
+      const syncClassResponse = await syncAndroidWalletClass({
+        walletClassId: safeWalletClassId,
+        nombreEmpresa: companyName || safeWalletClassId,
+        paqueteSellosWallet,
+        visitasPorPremio: safeVisitas,
+        colorWallet: normalizedColor,
+      });
+
+      if (!syncClassResponse.ok) {
+        throw new Error(syncClassResponse.errorText || "No pudimos sincronizar la clase del wallet Android.");
       }
 
       await saveWalletConfig(user.uid, {
@@ -257,4 +270,3 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     </ScrollView>
   );
 }
-

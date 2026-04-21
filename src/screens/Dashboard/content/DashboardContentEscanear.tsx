@@ -8,6 +8,7 @@ import {
 } from "../../../services/apiWallet";
 import { auth, db } from "../../../services/firebaseConfig";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { getWalletConfig } from "../../../services/walletOnboarding/getWalletConfig";
 
 type ParsedPayload = {
   idUsuario?: string;
@@ -16,12 +17,10 @@ type ParsedPayload = {
 
 type Feedback = { type: "success" | "error"; message: string; action?: "visita" | "premio" };
 
-const VISITAS_POR_PREMIO = 6;
-
-const normalizeCycleValue = (value: unknown) => {
+const normalizeCycleValue = (value: unknown, maxCycle: number) => {
   const parsed = Math.trunc(Number(value));
   if (!Number.isFinite(parsed) || parsed < 1) return 1;
-  return Math.min(parsed, VISITAS_POR_PREMIO);
+  return Math.min(parsed, maxCycle);
 };
 
 const normalizeNonNegativeInt = (value: unknown) => {
@@ -38,6 +37,7 @@ export default function DashboardContentEscanear() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [loading, setLoading] = useState(false);
   const [scanMode, setScanMode] = useState<"visita" | "premio">("visita");
+  const [walletConfig, setWalletConfig] = useState<Awaited<ReturnType<typeof getWalletConfig>> | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const processingRef = useRef(false);
 
@@ -56,6 +56,29 @@ export default function DashboardContentEscanear() {
       }
     }
   }, [permission]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadWalletConfig = async () => {
+      const empresaId = auth.currentUser?.uid;
+      if (!empresaId) return;
+
+      try {
+        const config = await getWalletConfig(empresaId);
+        if (active) {
+          setWalletConfig(config);
+        }
+      } catch (error) {
+        console.error("Error cargando configuracion de wallet para escaner:", error);
+      }
+    };
+
+    loadWalletConfig();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const parseData = (raw: string): ParsedPayload => {
     try {
@@ -92,6 +115,14 @@ export default function DashboardContentEscanear() {
         return;
       }
 
+      if (!walletConfig) {
+        setStatus("No se pudo cargar la configuracion de tu wallet.");
+        setFeedback({ type: "error", message: "No pudimos leer el pase. Escanea nuevamente." });
+        releaseScan();
+        return;
+      }
+
+      const visitasPorPremio = walletConfig.visitasPorPremio;
       const payload = parseData(data);
       if (!payload.idUsuario) {
         setStatus("No se encontro idUsuario en el QR.");
@@ -137,7 +168,7 @@ export default function DashboardContentEscanear() {
       const nombreCliente = clienteDoc?.nombreCompleto || clienteDoc?.nombre || "--";
       const soCliente = (clienteDoc?.so || "").toLowerCase();
       const visitasTotalesPrev = normalizeNonNegativeInt(clienteDoc?.visitasTotales);
-      const cicloPrev = normalizeCycleValue(clienteDoc?.cicloVisitas);
+      const cicloPrev = normalizeCycleValue(clienteDoc?.cicloVisitas, visitasPorPremio);
       const premiosDispPrev = normalizeNonNegativeInt(clienteDoc?.premiosDisponibles);
       const premiosCanjPrev = normalizeNonNegativeInt(clienteDoc?.premiosCanjeados);
 
@@ -156,11 +187,11 @@ export default function DashboardContentEscanear() {
       if (scanMode === "visita") {
         visitasTotales = visitasTotalesPrev + 1;
 
-        if (cicloPrev >= VISITAS_POR_PREMIO) {
+        if (cicloPrev >= visitasPorPremio) {
           cicloVisitas = 1;
         } else {
           cicloVisitas = cicloPrev + 1;
-          if (cicloVisitas === VISITAS_POR_PREMIO) {
+          if (cicloVisitas === visitasPorPremio) {
             premiosDisponibles += 1;
           }
         }
@@ -169,7 +200,7 @@ export default function DashboardContentEscanear() {
         premiosCanjeados = premiosCanjPrev + 1;
       }
 
-      cicloVisitas = normalizeCycleValue(cicloVisitas);
+      cicloVisitas = normalizeCycleValue(cicloVisitas, visitasPorPremio);
       premiosDisponibles = normalizeNonNegativeInt(premiosDisponibles);
       premiosCanjeados = normalizeNonNegativeInt(premiosCanjeados);
 
@@ -185,6 +216,9 @@ export default function DashboardContentEscanear() {
                 idUsuario: payload.idUsuario,
                 cantidad: cicloVisitas,
                 premiosDisponibles,
+                walletClassId: walletConfig.walletClassId,
+                paqueteSellosWallet: walletConfig.paqueteSellosWallet,
+                visitasPorPremio,
               });
 
         if (!walletResp.ok) {
@@ -229,7 +263,7 @@ export default function DashboardContentEscanear() {
         releaseScan();
       }
     },
-    [scanned, scanMode]
+    [scanned, scanMode, walletConfig]
   );
 
   const resetScan = () => {
@@ -289,9 +323,7 @@ export default function DashboardContentEscanear() {
           style={[styles.actionButton, scanMode === "visita" && styles.actionButtonActive]}
           disabled={loading}
         >
-          <Text
-            style={[styles.actionButtonText, scanMode === "visita" && styles.actionButtonTextActive]}
-          >
+          <Text style={[styles.actionButtonText, scanMode === "visita" && styles.actionButtonTextActive]}>
             Contar visita
           </Text>
         </TouchableOpacity>
@@ -300,9 +332,7 @@ export default function DashboardContentEscanear() {
           style={[styles.actionButton, scanMode === "premio" && styles.actionButtonActive]}
           disabled={loading}
         >
-          <Text
-            style={[styles.actionButtonText, scanMode === "premio" && styles.actionButtonTextActive]}
-          >
+          <Text style={[styles.actionButtonText, scanMode === "premio" && styles.actionButtonTextActive]}>
             Reclamar premio
           </Text>
         </TouchableOpacity>
