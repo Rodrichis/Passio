@@ -1,7 +1,7 @@
-﻿import React from "react";
+import React from "react";
 import { Text, TextInput, View } from "react-native";
 import { COLORS } from "../../styles/theme";
-import { normalizeHexColor } from "../../utils/walletOnboarding/validators";
+import { isValidHexColor, normalizeHexColor } from "../../utils/walletOnboarding/validators";
 
 type Props = {
   value: string;
@@ -9,6 +9,8 @@ type Props = {
 };
 
 export default function WalletColorField({ value, onChange }: Props) {
+  const isValid = isValidHexColor(value);
+
   return (
     <View style={{ marginBottom: 24 }}>
       <Text style={{ fontSize: 16, fontWeight: "700", color: COLORS.textDark, marginBottom: 8 }}>
@@ -31,14 +33,21 @@ export default function WalletColorField({ value, onChange }: Props) {
         />
         <TextInput
           value={value}
-          onChangeText={onChange}
+          onChangeText={(nextValue) => {
+            const cleaned = nextValue.toUpperCase().replace(/[^#A-F0-9]/g, "");
+            const withoutHashes = cleaned.replace(/#/g, "");
+            const withHash = cleaned.startsWith("#") ? cleaned : "#" + withoutHashes;
+            onChange(withHash.slice(0, 7));
+          }}
           autoCapitalize="characters"
+          autoCorrect={false}
           placeholder="#A99985"
           placeholderTextColor="#7A8A98"
+          maxLength={7}
           style={{
             flex: 1,
             borderWidth: 1,
-            borderColor: "#D5E2E8",
+            borderColor: isValid ? "#D5E2E8" : "#C62828",
             backgroundColor: "#fff",
             borderRadius: 12,
             paddingHorizontal: 14,
@@ -47,6 +56,9 @@ export default function WalletColorField({ value, onChange }: Props) {
           }}
         />
       </View>
+      {!isValid ? (
+        <Text style={{ marginTop: 8, color: "#C62828" }}>Usa un color HEX valido con formato #RRGGBB.</Text>
+      ) : null}
     </View>
   );
 }

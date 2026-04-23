@@ -14,7 +14,7 @@ import { uploadWalletIcon } from "../../services/walletOnboarding/uploadWalletIc
 import { COLORS } from "../../styles/theme";
 import { RootStackParamList } from "../../types/navigation";
 import type { PaqueteSellosWallet, WalletIconAsset } from "../../types/walletOnboarding";
-import { clampVisitasPorPremio, isPngAsset, normalizeHexColor } from "../../utils/walletOnboarding/validators";
+import { clampVisitasPorPremio, isPngAsset, isValidHexColor, normalizeHexColor } from "../../utils/walletOnboarding/validators";
 import OnboardingNextButton from "../../components/wallet-onboarding/OnboardingNextButton";
 
 type Props = NativeStackScreenProps<RootStackParamList, "WalletOnboardingSetup">;
@@ -83,6 +83,11 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
     if (!safeWalletClassId) {
       setError("Falta el identificador wallet-class-id de la empresa.");
+      return;
+    }
+
+    if (!isValidHexColor(colorWallet)) {
+      setError("El color del wallet debe tener formato #RRGGBB.");
       return;
     }
 
