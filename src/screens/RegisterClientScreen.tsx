@@ -224,6 +224,20 @@ export default function RegisterClientScreen({ route }: Props) {
         typeof empresa?.visitasPorPremio === "number" && Number.isFinite(empresa.visitasPorPremio)
           ? Math.min(10, Math.max(6, Math.trunc(empresa.visitasPorPremio)))
           : 6;
+      const nombreEmpresa =
+        typeof empresa?.nombre === "string" && empresa.nombre.trim().length > 0 ? empresa.nombre.trim() : "Passio";
+      const colorWallet =
+        typeof empresa?.colorWallet === "string" && empresa.colorWallet.trim().length > 0
+          ? empresa.colorWallet.trim()
+          : typeof empresa?.ColorPrincipal === "string" && empresa.ColorPrincipal.trim().length > 0
+            ? empresa.ColorPrincipal.trim()
+            : "#A99985";
+      const urlIconoWallet =
+        typeof empresa?.urlIconoWallet === "string" && empresa.urlIconoWallet.trim().length > 0
+          ? empresa.urlIconoWallet.trim()
+          : walletClassId
+            ? `https://storage.googleapis.com/passio-wallet-bucket/${walletClassId}/icon.png`
+            : "";
       // Generar y firmar wallet
       setWalletStep("creating");
       let walletOk = false;
@@ -237,6 +251,13 @@ export default function RegisterClientScreen({ route }: Props) {
           nombre: walletNombre,
           apellido: walletApellido,
           codigoQR: clientId,
+          empresaUid: empresaId,
+          walletClassId,
+          nombreEmpresa,
+          paqueteSellosWallet,
+          visitasPorPremio: String(visitasPorPremio),
+          colorWallet,
+          urlIconoWallet,
         }).toString();
         const directUrl = EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL + "/v1/crearPasses?" + walletQuery;
         walletOk = true;

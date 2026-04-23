@@ -18,6 +18,7 @@ export interface AndroidWalletVisualConfig {
   paqueteSellosWallet?: string;
   visitasPorPremio?: number;
   colorWallet?: string;
+  urlIconoWallet?: string;
 }
 
 export interface AndroidWalletStateConfig {
@@ -84,7 +85,7 @@ async function callWalletApi(
 }
 
 export async function syncAndroidWalletClass(config: AndroidWalletVisualConfig): Promise<WalletApiResponse> {
-  const { walletClassId, nombreEmpresa, paqueteSellosWallet, visitasPorPremio, colorWallet } = config;
+  const { walletClassId, nombreEmpresa, paqueteSellosWallet, visitasPorPremio, colorWallet, urlIconoWallet } = config;
 
   return callWalletApi("/syncClass", {
     walletClassId,
@@ -92,6 +93,7 @@ export async function syncAndroidWalletClass(config: AndroidWalletVisualConfig):
     paqueteSellosWallet,
     visitasPorPremio,
     colorWallet,
+    urlIconoWallet,
   });
 }
 
@@ -286,8 +288,28 @@ export async function createApplePass(params: {
   nombre: string;
   apellido: string;
   codigoQR: string;
+  empresaUid?: string;
+  walletClassId?: string;
+  nombreEmpresa?: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
+  colorWallet?: string;
+  urlIconoWallet?: string;
 }): Promise<ApplePassResponse> {
-  const { idUsuario, nombre, apellido, codigoQR } = params;
+  const {
+    idUsuario,
+    nombre,
+    apellido,
+    codigoQR,
+    empresaUid,
+    walletClassId,
+    nombreEmpresa,
+    paqueteSellosWallet,
+    visitasPorPremio,
+    colorWallet,
+    urlIconoWallet,
+  } = params;
+
   return callAppleApi("/v1/crearPasses", {
     idUsuario,
     cantidad: 1,
@@ -295,6 +317,13 @@ export async function createApplePass(params: {
     nombre,
     apellido,
     codigoQR,
+    empresaUid,
+    walletClassId,
+    nombreEmpresa,
+    paqueteSellosWallet,
+    visitasPorPremio,
+    colorWallet,
+    urlIconoWallet,
   });
 }
 
@@ -302,6 +331,13 @@ export async function updateApplePass(params: {
   idUsuario: number | string;
   cantidad: number;
   premiosDisponibles: number;
+  empresaUid?: string;
+  walletClassId?: string;
+  nombreEmpresa?: string;
+  paqueteSellosWallet?: string;
+  visitasPorPremio?: number;
+  colorWallet?: string;
+  urlIconoWallet?: string;
 }): Promise<ApplePassResponse> {
   return callAppleApi("/v1/actualizarPase", params);
 }

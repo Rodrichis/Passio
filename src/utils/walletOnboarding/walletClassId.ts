@@ -11,6 +11,23 @@ export function normalizeWalletClassId(value: string) {
   return normalized;
 }
 
+function buildWalletClassIdSuffix(value: string) {
+  const compact = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 5);
+
+  return compact || "passio";
+}
+
 export function resolveWalletClassIdFromName(name: string, fallback: string) {
-  return normalizeWalletClassId(name) || normalizeWalletClassId(fallback) || fallback;
+  const normalizedName = normalizeWalletClassId(name);
+  const normalizedFallback = normalizeWalletClassId(fallback);
+  const suffix = buildWalletClassIdSuffix(fallback);
+
+  if (normalizedName) {
+    return `${normalizedName}-${suffix}`;
+  }
+
+  return normalizedFallback || fallback;
 }

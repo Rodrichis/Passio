@@ -1,5 +1,5 @@
 ﻿import * as ImagePicker from "expo-image-picker";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Text, TouchableOpacity, View } from "react-native";
 import { COLORS } from "../../styles/theme";
 import type { WalletIconAsset } from "../../types/walletOnboarding";
@@ -48,8 +48,17 @@ function buildNativeAsset(uri: string): WalletIconAsset {
 export default function WalletIconUploadField({ currentUrl, asset, onSelectAsset, helperText }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [pickerError, setPickerError] = useState("");
-  const previewUri = useMemo(() => asset?.previewUrl || currentUrl || "", [asset, currentUrl]);
+  const [currentUrlUnavailable, setCurrentUrlUnavailable] = useState(false);
+  const previewUri = useMemo(() => {
+    if (asset?.previewUrl) return asset.previewUrl;
+    if (currentUrlUnavailable) return "";
+    return currentUrl || "";
+  }, [asset, currentUrl, currentUrlUnavailable]);
   const resolvedHelperText = pickerError || helperText || "";
+
+  useEffect(() => {
+    setCurrentUrlUnavailable(false);
+  }, [currentUrl, asset?.previewUrl]);
 
   const handlePick = async () => {
     if (Platform.OS === "web") {
@@ -153,7 +162,16 @@ export default function WalletIconUploadField({ currentUrl, asset, onSelectAsset
                   padding: 12,
                 }}
               >
-                <Image source={{ uri: previewUri }} style={{ width: 88, height: 88 }} resizeMode="contain" />
+                <Image
+                  source={{ uri: previewUri }}
+                  style={{ width: 88, height: 88 }}
+                  resizeMode="contain"
+                  onError={() => {
+                    if (!asset?.previewUrl) {
+                      setCurrentUrlUnavailable(true);
+                    }
+                  }}
+                />
               </View>
             ) : null}
             <Text style={{ fontSize: 15, fontWeight: "700", color: COLORS.textDark, marginBottom: 4 }}>

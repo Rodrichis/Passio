@@ -69,7 +69,8 @@ export default function WalletPreviewCard({
   const safeColor = normalizeHexColor(colorWallet);
   const textColor = resolveTextColor(safeColor);
   const safeVisits = clampVisitasPorPremio(visitasPorPremio);
-  const iconUri = iconAsset?.previewUrl || urlIconoWallet || "";
+  const [iconUnavailable, setIconUnavailable] = useState(false);
+  const iconUri = iconAsset?.previewUrl || (iconUnavailable ? "" : urlIconoWallet || "");
   const packPreviewUrl = useMemo(
     () => buildStampPreviewUrl(paqueteSellosWallet, safeVisits, safeVisits),
     [paqueteSellosWallet, safeVisits]
@@ -80,6 +81,10 @@ export default function WalletPreviewCard({
   useEffect(() => {
     setPackPreviewUnavailable(false);
   }, [packPreviewUrl]);
+
+  useEffect(() => {
+    setIconUnavailable(false);
+  }, [iconAsset?.previewUrl, urlIconoWallet]);
 
   return (
     <View
@@ -108,24 +113,20 @@ export default function WalletPreviewCard({
         }}
       >
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 10 }}>
-          {iconUri ? (
-            <Image source={{ uri: iconUri }} style={{ width: 48, height: 48 }} resizeMode="contain" />
-          ) : (
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: "rgba(255,255,255,0.18)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: textColor, fontSize: 20, fontWeight: "800" }}>
-                {(displayName.trim().charAt(0) || "P").toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <View style={{ width: 48, height: 48 }}>
+            {iconUri ? (
+              <Image
+                source={{ uri: iconUri }}
+                style={{ width: 48, height: 48 }}
+                resizeMode="contain"
+                onError={() => {
+                  if (!iconAsset?.previewUrl) {
+                    setIconUnavailable(true);
+                  }
+                }}
+              />
+            ) : null}
+          </View>
 
           <View style={{ flex: 1, alignItems: "flex-end", paddingTop: 2 }}>
             <Text style={{ color: textColor, fontSize: 11, fontWeight: "700", opacity: 0.9, textTransform: "uppercase" }}>

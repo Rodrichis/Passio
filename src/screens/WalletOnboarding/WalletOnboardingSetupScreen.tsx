@@ -106,7 +106,9 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
       let nextIconUrl = urlIconoWallet;
       if (iconAsset) {
-        nextIconUrl = await uploadWalletIcon(safeWalletClassId, iconAsset);
+        const uploadedIconUrl = await uploadWalletIcon(safeWalletClassId, iconAsset);
+        const cacheBust = `v=${Date.now()}`;
+        nextIconUrl = `${uploadedIconUrl}${uploadedIconUrl.includes("?") ? "&" : "?"}${cacheBust}`;
       }
 
       const syncClassResponse = await syncAndroidWalletClass({
@@ -115,6 +117,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         paqueteSellosWallet,
         visitasPorPremio: safeVisitas,
         colorWallet: normalizedColor,
+        urlIconoWallet: nextIconUrl,
       });
 
       if (!syncClassResponse.ok) {

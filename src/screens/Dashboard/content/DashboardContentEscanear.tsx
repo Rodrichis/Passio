@@ -211,6 +211,13 @@ export default function DashboardContentEscanear() {
                 idUsuario: payload.idUsuario,
                 cantidad: cicloVisitas,
                 premiosDisponibles,
+                empresaUid: auth.currentUser?.uid,
+                walletClassId: walletConfig.walletClassId,
+                nombreEmpresa: walletConfig.companyName,
+                paqueteSellosWallet: walletConfig.paqueteSellosWallet,
+                visitasPorPremio,
+                colorWallet: walletConfig.colorWallet,
+                urlIconoWallet: walletConfig.urlIconoWallet,
               })
             : await updateAndroidWalletState({
                 idUsuario: payload.idUsuario,
