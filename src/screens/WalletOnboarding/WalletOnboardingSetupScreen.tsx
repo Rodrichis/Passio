@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Modal, Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import WalletColorField from "../../components/wallet-onboarding/WalletColorField";
 import WalletIconUploadField from "../../components/wallet-onboarding/WalletIconUploadField";
@@ -22,6 +22,8 @@ type Props = NativeStackScreenProps<RootStackParamList, "WalletOnboardingSetup">
 export default function WalletOnboardingSetupScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveCompleted, setSaveCompleted] = useState(false);
+  const [saveStep, setSaveStep] = useState("");
   const [error, setError] = useState("");
   const [colorWallet, setColorWallet] = useState("#A99985");
   const [visitasPorPremio, setVisitasPorPremio] = useState(6);
@@ -107,15 +109,19 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
     try {
       setSaving(true);
+      setSaveCompleted(false);
+      setSaveStep("Preparando configuracion del wallet...");
       setError("");
 
       let nextIconUrl = urlIconoWallet;
       if (iconAsset) {
+        setSaveStep("Subiendo logo de tu empresa...");
         const uploadedIconUrl = await uploadWalletIcon(safeWalletClassId, iconAsset);
         const cacheBust = `v=${Date.now()}`;
         nextIconUrl = `${uploadedIconUrl}${uploadedIconUrl.includes("?") ? "&" : "?"}${cacheBust}`;
       }
 
+      setSaveStep("Aplicando configuracion del wallet...");
       const syncClassResponse = await syncAndroidWalletClass({
         walletClassId: safeWalletClassId,
         nombreEmpresa: companyName || safeWalletClassId,
@@ -129,6 +135,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         throw new Error(syncClassResponse.errorText || "No pudimos sincronizar la clase del wallet Android.");
       }
 
+      setSaveStep("Guardando configuracion final...");
       await saveWalletConfig(user.uid, {
         walletConfigurado: true,
         estadoWallet: "pendiente",
@@ -139,9 +146,12 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         walletClassId: safeWalletClassId,
       });
 
-      navigation.replace("WalletOnboardingDone");
+      setSaveCompleted(true);
+      setSaveStep("Se guardo correctamente la configuracion del wallet.");
     } catch (saveError) {
       console.error("Error guardando configuracion de wallet:", saveError);
+      setSaveCompleted(false);
+      setSaveStep("");
       setError(saveError instanceof Error ? saveError.message : "No pudimos guardar tu configuracion. Intenta nuevamente.");
     } finally {
       setSaving(false);
@@ -166,65 +176,122 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-      <View style={{ flex: 1, backgroundColor: "#F5F8FA", paddingHorizontal: isNarrow ? 14 : 20, paddingVertical: 28 }}>
+    <>
+      <Modal visible={saving || saveCompleted} transparent animationType="fade" onRequestClose={() => undefined}>
         <View
           style={{
-            width: "100%",
-            maxWidth: 760,
-            alignSelf: "center",
-            backgroundColor: "#FFFFFF",
-            borderRadius: 28,
-            paddingHorizontal: isNarrow ? 16 : 24,
-            paddingVertical: 28,
-            borderWidth: 1,
-            borderColor: "#E2ECF1",
+            flex: 1,
+            backgroundColor: "rgba(14, 25, 34, 0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
           }}
         >
-          <Text
+          <View
             style={{
-              color: COLORS.textDark,
-              fontSize: isNarrow ? 28 : 30,
-              fontWeight: "800",
-              marginBottom: 10,
+              width: "100%",
+              maxWidth: 420,
+              backgroundColor: "#FFFFFF",
+              borderRadius: 24,
+              paddingHorizontal: 24,
+              paddingVertical: 28,
+              borderWidth: 1,
+              borderColor: "#E2ECF1",
+              alignItems: "center",
             }}
           >
-            Configura tu wallet
-          </Text>
+            {!saveCompleted ? <ActivityIndicator size="large" color={COLORS.primary} /> : null}
 
-          <Text style={{ color: "#51616F", fontSize: 16, lineHeight: 24, marginBottom: 24 }}>
-            Define el color principal, el pack de sellos, las visitas por premio y sube el icono PNG de tu empresa.
-            Esta configuracion sera la base de tu programa de fidelizacion.
-          </Text>
+            <Text
+              style={{
+                marginTop: saveCompleted ? 0 : 18,
+                color: COLORS.textDark,
+                fontSize: 22,
+                fontWeight: "800",
+                textAlign: "center",
+              }}
+            >
+              {saveCompleted ? "Configuracion guardada" : "Guardando wallet"}
+            </Text>
 
-          <View style={{ flexDirection: isNarrow ? "column" : "row", alignItems: "flex-start", gap: 18 }}>
-            {!isNarrow ? (
-              <View style={{ width: 300 }}>
-                <WalletPreviewCard
-                  companyName={companyName}
-                  walletClassId={walletClassId}
-                  colorWallet={colorWallet}
-                  urlIconoWallet={urlIconoWallet}
-                  iconAsset={iconAsset}
-                  paqueteSellosWallet={paqueteSellosWallet}
-                  visitasPorPremio={visitasPorPremio}
-                />
-              </View>
+            <Text
+              style={{
+                marginTop: 10,
+                color: "#51616F",
+                fontSize: 16,
+                lineHeight: 24,
+                textAlign: "center",
+              }}
+            >
+              {saveCompleted ? "Se guardo correctamente la configuracion de tu wallet." : saveStep}
+            </Text>
+
+            {saveCompleted ? (
+              <TouchableOpacity
+                onPress={() => {
+                  setSaveCompleted(false);
+                  setSaveStep("");
+                  navigation.replace("WalletOnboardingDone");
+                }}
+                style={{
+                  marginTop: 22,
+                  minWidth: 180,
+                  backgroundColor: COLORS.primary,
+                  borderRadius: 14,
+                  paddingHorizontal: 20,
+                  paddingVertical: 14,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    fontSize: 16,
+                    fontWeight: "800",
+                    textAlign: "center",
+                  }}
+                >
+                  Aceptar
+                </Text>
+              </TouchableOpacity>
             ) : null}
+          </View>
+        </View>
+      </Modal>
 
-            <View style={{ flex: 1, width: "100%" }}>
-              <WalletColorField value={colorWallet} onChange={setColorWallet} />
-              <WalletVisitsField value={visitasPorPremio} onChange={setVisitasPorPremio} />
-              <WalletStampPackSelector value={paqueteSellosWallet} visitasPorPremio={visitasPorPremio} onChange={setPaqueteSellosWallet} />
-              <WalletIconUploadField
-                currentUrl={urlIconoWallet}
-                asset={iconAsset}
-                onSelectAsset={setIconAsset}
-                helperText={error && error.toLowerCase().includes("icono") ? error : null}
-              />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "#F5F8FA", paddingHorizontal: isNarrow ? 14 : 20, paddingVertical: 28 }}>
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 760,
+              alignSelf: "center",
+              backgroundColor: "#FFFFFF",
+              borderRadius: 28,
+              paddingHorizontal: isNarrow ? 16 : 24,
+              paddingVertical: 28,
+              borderWidth: 1,
+              borderColor: "#E2ECF1",
+            }}
+          >
+            <Text
+              style={{
+                color: COLORS.textDark,
+                fontSize: isNarrow ? 28 : 30,
+                fontWeight: "800",
+                marginBottom: 10,
+              }}
+            >
+              Configura tu wallet
+            </Text>
 
-              {isNarrow ? (
-                <View style={{ marginBottom: 18 }}>
+            <Text style={{ color: "#51616F", fontSize: 16, lineHeight: 24, marginBottom: 24 }}>
+              Define el color principal, el pack de sellos, las visitas por premio y sube el icono PNG de tu empresa.
+              Esta configuracion sera la base de tu programa de fidelizacion.
+            </Text>
+
+            <View style={{ flexDirection: isNarrow ? "column" : "row", alignItems: "flex-start", gap: 18 }}>
+              {!isNarrow ? (
+                <View style={{ width: 300 }}>
                   <WalletPreviewCard
                     companyName={companyName}
                     walletClassId={walletClassId}
@@ -237,44 +304,70 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
                 </View>
               ) : null}
 
-              {walletClassId ? (
-                <Text style={{ color: "#51616F", marginTop: -12, marginBottom: 18 }}>
-                  Clase wallet: {walletClassId}
-                </Text>
-              ) : null}
-
-              {error && !error.toLowerCase().includes("icono") ? (
-                <Text style={{ color: "#C62828", marginBottom: 16 }}>{error}</Text>
-              ) : null}
-
-              <View
-                style={{
-                  flexDirection: isNarrow ? "column-reverse" : "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                }}
-              >
-                <OnboardingNextButton
-                  label="Atras"
-                  onPress={() => navigation.goBack()}
-                  iconName="arrow-back"
-                  iconPosition="left"
-                  variant="secondary"
-                  style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? 0 : 132 }}
+              <View style={{ flex: 1, width: "100%" }}>
+                <WalletColorField value={colorWallet} onChange={setColorWallet} />
+                <WalletVisitsField value={visitasPorPremio} onChange={setVisitasPorPremio} />
+                <WalletStampPackSelector value={paqueteSellosWallet} visitasPorPremio={visitasPorPremio} onChange={setPaqueteSellosWallet} />
+                <WalletIconUploadField
+                  currentUrl={urlIconoWallet}
+                  asset={iconAsset}
+                  onSelectAsset={setIconAsset}
+                  helperText={error && error.toLowerCase().includes("icono") ? error : null}
                 />
 
-                <OnboardingNextButton
-                  label={saving ? "Guardando..." : "Guardar configuracion"}
-                  onPress={handleSave}
-                  disabled={saving}
-                  style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? 0 : 220 }}
-                />
+                {isNarrow ? (
+                  <View style={{ marginBottom: 18 }}>
+                    <WalletPreviewCard
+                      companyName={companyName}
+                      walletClassId={walletClassId}
+                      colorWallet={colorWallet}
+                      urlIconoWallet={urlIconoWallet}
+                      iconAsset={iconAsset}
+                      paqueteSellosWallet={paqueteSellosWallet}
+                      visitasPorPremio={visitasPorPremio}
+                    />
+                  </View>
+                ) : null}
+
+                {walletClassId ? (
+                  <Text style={{ color: "#51616F", marginTop: -12, marginBottom: 18 }}>
+                    Clase wallet: {walletClassId}
+                  </Text>
+                ) : null}
+
+                {error && !error.toLowerCase().includes("icono") ? (
+                  <Text style={{ color: "#C62828", marginBottom: 16 }}>{error}</Text>
+                ) : null}
+
+                <View
+                  style={{
+                    flexDirection: isNarrow ? "column-reverse" : "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <OnboardingNextButton
+                    label="Atras"
+                    onPress={() => navigation.goBack()}
+                    iconName="arrow-back"
+                    iconPosition="left"
+                    variant="secondary"
+                    style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? 0 : 132 }}
+                  />
+
+                  <OnboardingNextButton
+                    label={saving ? "Guardando..." : "Guardar configuracion"}
+                    onPress={handleSave}
+                    disabled={saving || saveCompleted}
+                    style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? 0 : 220 }}
+                  />
+                </View>
               </View>
             </View>
           </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
