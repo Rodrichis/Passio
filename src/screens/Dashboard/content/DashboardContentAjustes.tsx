@@ -159,7 +159,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       await setDoc(
         ref,
         {
-          nombre: empresa.nombre || "",
           Descripcion: empresa.Descripcion || "",
           telefono: empresa.telefono || "",
           LinkRegistro: buildRegistrationUrl(uid),
@@ -452,9 +451,10 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         <View style={{ flex: 0.6, marginRight: 8 }}>
           <Text style={styles.label}>Nombre empresa</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: "#EEF3F6", color: "#607D8B" }]}
             value={empresa?.nombre || ""}
-            onChangeText={(t) => setEmpresa({ ...empresa, nombre: t })}
+            editable={false}
+            selectTextOnFocus={false}
           />
         </View>
 
