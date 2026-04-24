@@ -15,13 +15,14 @@ type Props = {
 export default function WalletStampPackSelector({ value, visitasPorPremio, tipoSellosWallet, onChange }: Props) {
   const [previewPackId, setPreviewPackId] = useState<PaqueteSellosWallet | null>(null);
   const safeVisits = clampVisitasPorPremio(visitasPorPremio);
+  const previewVersion = useMemo(() => String(Date.now()), [previewPackId, safeVisits]);
   const previewUrls = useMemo(() => {
     if (!previewPackId) return null;
     return {
-      before: buildStampPreviewUrl(previewPackId, safeVisits, safeVisits - 1),
-      after: buildStampPreviewUrl(previewPackId, safeVisits, safeVisits),
+      before: buildStampPreviewUrl(previewPackId, safeVisits, safeVisits - 1, previewVersion),
+      after: buildStampPreviewUrl(previewPackId, safeVisits, safeVisits, previewVersion),
     };
-  }, [previewPackId, safeVisits]);
+  }, [previewPackId, safeVisits, previewVersion]);
   const [beforeUnavailable, setBeforeUnavailable] = useState(false);
   const [afterUnavailable, setAfterUnavailable] = useState(false);
 

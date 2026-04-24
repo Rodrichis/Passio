@@ -51,9 +51,11 @@ export function resolveStampPackLabel(paqueteSellosWallet: PaqueteSellosWallet, 
 export function buildStampPreviewUrl(
   paqueteSellosWallet: PaqueteSellosWallet,
   visitasPorPremio: number,
-  numero: number
+  numero: number,
+  cacheVersion?: string | number
 ) {
   const safeVisits = clampVisitasPorPremio(visitasPorPremio);
   const safeNumero = Math.min(Math.max(1, Math.trunc(numero || 1)), safeVisits);
-  return `${STAMP_PREVIEW_BUCKET_BASE_URL}/${paqueteSellosWallet}/${safeVisits}/${safeNumero}.png`;
+  const baseUrl = `${STAMP_PREVIEW_BUCKET_BASE_URL}/${paqueteSellosWallet}/${safeVisits}/${safeNumero}.png`;
+  return cacheVersion == null ? baseUrl : `${baseUrl}?v=${encodeURIComponent(String(cacheVersion))}`;
 }

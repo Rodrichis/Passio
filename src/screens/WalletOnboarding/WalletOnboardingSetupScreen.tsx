@@ -25,6 +25,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
   const [saveCompleted, setSaveCompleted] = useState(false);
   const [saveStep, setSaveStep] = useState("");
   const [error, setError] = useState("");
+  const [walletConfigurado, setWalletConfigurado] = useState(false);
   const [colorWallet, setColorWallet] = useState("#A99985");
   const [visitasPorPremio, setVisitasPorPremio] = useState(6);
   const [initialVisitasPorPremio, setInitialVisitasPorPremio] = useState(6);
@@ -53,6 +54,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         const config = await getWalletConfig(user.uid);
         if (!active) return;
 
+        setWalletConfigurado(config.walletConfigurado);
         setColorWallet(config.colorWallet);
         setVisitasPorPremio(config.visitasPorPremio);
         setInitialVisitasPorPremio(config.visitasPorPremio);
@@ -130,6 +132,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       });
 
       setInitialVisitasPorPremio(safeVisitas);
+      setWalletConfigurado(true);
       setSaveCompleted(true);
       setSaveStep("Se guardo correctamente la configuracion del wallet.");
     } catch (saveError) {
@@ -169,7 +172,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       return;
     }
 
-    if (!visitsWereChanged) {
+    if (!walletConfigurado || !visitsWereChanged) {
       void executeSave();
       return;
     }
@@ -352,7 +355,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
                       : null
                   }
                 />
-                {!visitsLockedByCustomStamps && visitsWereChanged ? (
+                {!visitsLockedByCustomStamps && walletConfigurado && visitsWereChanged ? (
                   <View
                     style={{
                       marginTop: -8,

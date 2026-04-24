@@ -69,11 +69,12 @@ export default function WalletPreviewCard({
   const safeColor = normalizeHexColor(colorWallet);
   const textColor = resolveTextColor(safeColor);
   const safeVisits = clampVisitasPorPremio(visitasPorPremio);
+  const stampPreviewVersion = useMemo(() => String(Date.now()), [paqueteSellosWallet, safeVisits]);
   const [iconUnavailable, setIconUnavailable] = useState(false);
   const iconUri = iconAsset?.previewUrl || (iconUnavailable ? "" : urlIconoWallet || "");
   const packPreviewUrl = useMemo(
-    () => buildStampPreviewUrl(paqueteSellosWallet, safeVisits, safeVisits),
-    [paqueteSellosWallet, safeVisits]
+    () => buildStampPreviewUrl(paqueteSellosWallet, safeVisits, safeVisits, stampPreviewVersion),
+    [paqueteSellosWallet, safeVisits, stampPreviewVersion]
   );
   const displayName = resolveDisplayName(companyName, walletClassId);
   const [packPreviewUnavailable, setPackPreviewUnavailable] = useState(false);
