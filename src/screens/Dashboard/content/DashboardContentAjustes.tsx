@@ -473,9 +473,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           Estado wallet: {empresa?.walletConfigurado ? empresa?.estadoWallet || "pendiente" : "sin configurar"}
         </Text>
         <Text style={{ color: "#455a64" }}>Visitas por premio: {empresa?.visitasPorPremio ?? 6}</Text>
-        <Text style={{ color: "#455a64" }}>
-          Sellos: {stampPackLabel}{tipoSellosWallet === "personalizado" ? " (personalizados)" : ""}
-        </Text>
 
         <TouchableOpacity
           onPress={() => navigation.navigate("WalletOnboardingSetup")}

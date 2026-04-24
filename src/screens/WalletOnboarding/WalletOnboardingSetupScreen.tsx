@@ -120,7 +120,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       setSaveStep("Guardando configuracion final...");
       await saveWalletConfig(user.uid, {
         walletConfigurado: true,
-        estadoWallet: "pendiente",
+        estadoWallet: "listo",
         colorWallet: normalizedColor,
         visitasPorPremio: safeVisitas,
         urlIconoWallet: nextIconUrl,
