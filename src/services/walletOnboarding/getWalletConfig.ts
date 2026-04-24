@@ -1,12 +1,13 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebaseConfig";
-import type { EstadoWallet, PaqueteSellosWallet, WalletConfigData } from "../../types/walletOnboarding";
+import type { EstadoWallet, PaqueteSellosWallet, TipoSellosWallet, WalletConfigData } from "../../types/walletOnboarding";
 import {
   clampVisitasPorPremio,
   DEFAULT_VISITAS_POR_PREMIO,
   DEFAULT_WALLET_COLOR,
 } from "../../utils/walletOnboarding/validators";
 import { resolveWalletClassIdFromName } from "../../utils/walletOnboarding/walletClassId";
+import { isGenericStampPack } from "../../utils/walletOnboarding/stampPacks";
 
 const DEFAULT_STAMP_PACK: PaqueteSellosWallet = "generico1";
 
@@ -15,9 +16,15 @@ function resolveEstadoWallet(value: unknown): EstadoWallet {
 }
 
 function resolvePaqueteSellosWallet(value: unknown): PaqueteSellosWallet {
-  return value === "generico1" || value === "generico2" || value === "generico3" || value === "generico4"
-    ? value
-    : DEFAULT_STAMP_PACK;
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : DEFAULT_STAMP_PACK;
+}
+
+function resolveTipoSellosWallet(value: unknown, paqueteSellosWallet: PaqueteSellosWallet): TipoSellosWallet {
+  if (value === "generico" || value === "personalizado") {
+    return value;
+  }
+
+  return isGenericStampPack(paqueteSellosWallet) ? "generico" : "personalizado";
 }
 
 export async function getWalletConfig(empresaId: string): Promise<WalletConfigData> {
@@ -25,6 +32,7 @@ export async function getWalletConfig(empresaId: string): Promise<WalletConfigDa
   const data = snap.exists() ? snap.data() : {};
   const rawWalletClassId = typeof data?.["wallet-class-id"] === "string" ? data["wallet-class-id"] : "";
   const companyName = typeof data?.nombre === "string" ? data.nombre : "";
+  const paqueteSellosWallet = resolvePaqueteSellosWallet(data?.paqueteSellosWallet);
 
   return {
     walletConfigurado: data?.walletConfigurado === true || data?.["walletConfigurado "] === true,
@@ -39,7 +47,8 @@ export async function getWalletConfig(empresaId: string): Promise<WalletConfigDa
       typeof data?.visitasPorPremio === "number" ? data.visitasPorPremio : DEFAULT_VISITAS_POR_PREMIO
     ),
     urlIconoWallet: typeof data?.urlIconoWallet === "string" ? data.urlIconoWallet : "",
-    paqueteSellosWallet: resolvePaqueteSellosWallet(data?.paqueteSellosWallet),
+    paqueteSellosWallet,
+    tipoSellosWallet: resolveTipoSellosWallet(data?.tipoSellosWallet, paqueteSellosWallet),
     walletClassId: rawWalletClassId.trim() || resolveWalletClassIdFromName(companyName, empresaId),
     companyName,
   };

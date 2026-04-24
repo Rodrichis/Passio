@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import WalletColorField from "../../components/wallet-onboarding/WalletColorField";
 import WalletIconUploadField from "../../components/wallet-onboarding/WalletIconUploadField";
@@ -13,7 +13,7 @@ import { saveWalletConfig } from "../../services/walletOnboarding/saveWalletConf
 import { uploadWalletIcon } from "../../services/walletOnboarding/uploadWalletIcon";
 import { COLORS } from "../../styles/theme";
 import { RootStackParamList } from "../../types/navigation";
-import type { PaqueteSellosWallet, WalletIconAsset } from "../../types/walletOnboarding";
+import type { PaqueteSellosWallet, TipoSellosWallet, WalletIconAsset } from "../../types/walletOnboarding";
 import { clampVisitasPorPremio, isPngAsset, isValidHexColor, normalizeHexColor } from "../../utils/walletOnboarding/validators";
 import OnboardingNextButton from "../../components/wallet-onboarding/OnboardingNextButton";
 
@@ -27,13 +27,17 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [colorWallet, setColorWallet] = useState("#A99985");
   const [visitasPorPremio, setVisitasPorPremio] = useState(6);
+  const [initialVisitasPorPremio, setInitialVisitasPorPremio] = useState(6);
   const [paqueteSellosWallet, setPaqueteSellosWallet] = useState<PaqueteSellosWallet>("generico1");
+  const [tipoSellosWallet, setTipoSellosWallet] = useState<TipoSellosWallet>("generico");
   const [urlIconoWallet, setUrlIconoWallet] = useState("");
   const [walletClassId, setWalletClassId] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [iconAsset, setIconAsset] = useState<WalletIconAsset | null>(null);
   const { width } = useWindowDimensions();
   const isNarrow = width < 620;
+  const visitsLockedByCustomStamps = tipoSellosWallet === "personalizado";
+  const visitsWereChanged = clampVisitasPorPremio(visitasPorPremio) !== clampVisitasPorPremio(initialVisitasPorPremio);
 
   useEffect(() => {
     let active = true;
@@ -51,7 +55,9 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
         setColorWallet(config.colorWallet);
         setVisitasPorPremio(config.visitasPorPremio);
+        setInitialVisitasPorPremio(config.visitasPorPremio);
         setPaqueteSellosWallet(config.paqueteSellosWallet);
+        setTipoSellosWallet(config.tipoSellosWallet);
         setUrlIconoWallet(config.urlIconoWallet);
         setWalletClassId(config.walletClassId);
         setCompanyName(config.companyName || "");
@@ -72,7 +78,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     };
   }, [navigation]);
 
-  const handleSave = async () => {
+  const executeSave = async () => {
     const user = auth.currentUser;
     if (!user) {
       navigation.reset({ index: 0, routes: [{ name: "Login" }] });
@@ -82,30 +88,6 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     const normalizedColor = normalizeHexColor(colorWallet);
     const safeVisitas = clampVisitasPorPremio(visitasPorPremio);
     const safeWalletClassId = walletClassId.trim();
-
-    if (!safeWalletClassId) {
-      setError("Falta el identificador wallet-class-id de la empresa.");
-      return;
-    }
-
-    if (!isValidHexColor(colorWallet)) {
-      setError("El color del wallet debe tener formato #RRGGBB.");
-      return;
-    }
-
-    if (!iconAsset && !urlIconoWallet) {
-      setError(
-        Platform.OS === "web"
-          ? "Debes subir el icono PNG de tu empresa para continuar."
-          : "Por ahora la carga del icono se realiza desde navegador web."
-      );
-      return;
-    }
-
-    if (iconAsset && !isPngAsset(iconAsset)) {
-      setError("El icono debe estar en formato PNG.");
-      return;
-    }
 
     try {
       setSaving(true);
@@ -143,9 +125,11 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         visitasPorPremio: safeVisitas,
         urlIconoWallet: nextIconUrl,
         paqueteSellosWallet,
+        tipoSellosWallet,
         walletClassId: safeWalletClassId,
       });
 
+      setInitialVisitasPorPremio(safeVisitas);
       setSaveCompleted(true);
       setSaveStep("Se guardo correctamente la configuracion del wallet.");
     } catch (saveError) {
@@ -156,6 +140,58 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = () => {
+    const safeWalletClassId = walletClassId.trim();
+
+    if (!safeWalletClassId) {
+      setError("Falta el identificador wallet-class-id de la empresa.");
+      return;
+    }
+
+    if (!isValidHexColor(colorWallet)) {
+      setError("El color del wallet debe tener formato #RRGGBB.");
+      return;
+    }
+
+    if (!iconAsset && !urlIconoWallet) {
+      setError(
+        Platform.OS === "web"
+          ? "Debes subir el icono PNG de tu empresa para continuar."
+          : "Por ahora la carga del icono se realiza desde navegador web."
+      );
+      return;
+    }
+
+    if (iconAsset && !isPngAsset(iconAsset)) {
+      setError("El icono debe estar en formato PNG.");
+      return;
+    }
+
+    if (!visitsWereChanged) {
+      void executeSave();
+      return;
+    }
+
+    const warningMessage = "Cambiar las visitas por premio afectara el progreso de clientes ya registrados.";
+
+    if (Platform.OS === "web") {
+      const confirmed = typeof globalThis.confirm === "function" ? globalThis.confirm(warningMessage) : true;
+      if (!confirmed) return;
+      void executeSave();
+      return;
+    }
+
+    Alert.alert("Cambiar visitas por premio", warningMessage, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Continuar",
+        onPress: () => {
+          void executeSave();
+        },
+      },
+    ]);
   };
 
   if (loading) {
@@ -306,8 +342,40 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
               <View style={{ flex: 1, width: "100%" }}>
                 <WalletColorField value={colorWallet} onChange={setColorWallet} />
-                <WalletVisitsField value={visitasPorPremio} onChange={setVisitasPorPremio} />
-                <WalletStampPackSelector value={paqueteSellosWallet} visitasPorPremio={visitasPorPremio} onChange={setPaqueteSellosWallet} />
+                <WalletVisitsField
+                  value={visitasPorPremio}
+                  onChange={setVisitasPorPremio}
+                  disabled={visitsLockedByCustomStamps}
+                  helperText={
+                    visitsLockedByCustomStamps
+                      ? "Estas usando sellos personalizados, por eso no puedes cambiar las visitas por premio desde aqui."
+                      : null
+                  }
+                />
+                {!visitsLockedByCustomStamps && visitsWereChanged ? (
+                  <View
+                    style={{
+                      marginTop: -8,
+                      marginBottom: 16,
+                      borderWidth: 1,
+                      borderColor: "#F6C56C",
+                      backgroundColor: "#FFF7E8",
+                      borderRadius: 14,
+                      paddingHorizontal: 14,
+                      paddingVertical: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#7A4A00", lineHeight: 20 }}>
+                      Cambiar las visitas por premio afectara el progreso de clientes ya registrados.
+                    </Text>
+                  </View>
+                ) : null}
+                <WalletStampPackSelector
+                  value={paqueteSellosWallet}
+                  visitasPorPremio={visitasPorPremio}
+                  tipoSellosWallet={tipoSellosWallet}
+                  onChange={setPaqueteSellosWallet}
+                />
                 <WalletIconUploadField
                   currentUrl={urlIconoWallet}
                   asset={iconAsset}

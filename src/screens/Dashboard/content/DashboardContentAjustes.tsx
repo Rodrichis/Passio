@@ -33,10 +33,12 @@ import {
   hasRevenueCatApiKey,
   isRevenueCatCustomerCenterAvailable,
 } from "../../../services/revenuecat";
+import { isGenericStampPack, resolveStampPackLabel } from "../../../utils/walletOnboarding/stampPacks";
 type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Dashboard: undefined;
+  WalletOnboardingSetup: undefined;
 };
 
 type Props = {
@@ -310,6 +312,15 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const limiteUsuarios = planInfo.limiteUsuarios;
   const atUserLimit = typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
   const isProPlan = String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() === "pro";
+  const rawStampPack = typeof empresa?.paqueteSellosWallet === "string" && empresa.paqueteSellosWallet.trim().length > 0
+    ? empresa.paqueteSellosWallet.trim()
+    : "generico1";
+  const tipoSellosWallet = empresa?.tipoSellosWallet === "generico" || empresa?.tipoSellosWallet === "personalizado"
+    ? empresa.tipoSellosWallet
+    : isGenericStampPack(rawStampPack)
+    ? "generico"
+    : "personalizado";
+  const stampPackLabel = resolveStampPackLabel(rawStampPack, tipoSellosWallet);
 
   return (
     <ScrollView style={{ paddingHorizontal: 10 }}>
@@ -444,6 +455,45 @@ export default function DashboardContentAjustes({ navigation }: Props) {
               </TouchableOpacity>
             )}
         </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>Wallet</Text>
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: "#e0e0e0",
+          borderRadius: 10,
+          padding: 12,
+          backgroundColor: "#f7f9fb",
+          marginBottom: 16,
+          gap: 8,
+        }}
+      >
+        <Text style={{ color: "#0d47a1", fontSize: 16, fontWeight: "700" }}>
+          Estado wallet: {empresa?.walletConfigurado ? empresa?.estadoWallet || "pendiente" : "sin configurar"}
+        </Text>
+        <Text style={{ color: "#455a64" }}>Visitas por premio: {empresa?.visitasPorPremio ?? 6}</Text>
+        <Text style={{ color: "#455a64" }}>
+          Sellos: {stampPackLabel}{tipoSellosWallet === "personalizado" ? " (personalizados)" : ""}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate("WalletOnboardingSetup")}
+          style={{
+            marginTop: 6,
+            alignSelf: "flex-start",
+            backgroundColor: "#2196F3",
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 8,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <Ionicons name="wallet-outline" size={18} color="#fff" />
+          <Text style={{ color: "#fff", fontWeight: "700" }}>Configurar wallet</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Nombre + Telefono en una fila */}

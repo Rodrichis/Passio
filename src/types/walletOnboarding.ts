@@ -1,6 +1,10 @@
-﻿export type EstadoWallet = "pendiente" | "listo" | "error";
+export type EstadoWallet = "pendiente" | "listo" | "error";
 
-export type PaqueteSellosWallet = "generico1" | "generico2" | "generico3" | "generico4";
+export type TipoSellosWallet = "generico" | "personalizado";
+
+export type GenericPaqueteSellosWallet = "generico1" | "generico2" | "generico3" | "generico4";
+
+export type PaqueteSellosWallet = string;
 
 export interface WalletConfigData {
   walletConfigurado: boolean;
@@ -9,6 +13,7 @@ export interface WalletConfigData {
   visitasPorPremio: number;
   urlIconoWallet: string;
   paqueteSellosWallet: PaqueteSellosWallet;
+  tipoSellosWallet: TipoSellosWallet;
   walletClassId: string;
   companyName?: string;
 }
@@ -36,7 +41,7 @@ export interface WalletOnboardingSlideData {
 }
 
 export interface StampPackOption {
-  id: PaqueteSellosWallet;
+  id: GenericPaqueteSellosWallet;
   title: string;
   description: string;
   previewColors: [string, string, string];

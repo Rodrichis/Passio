@@ -12,6 +12,7 @@ export async function saveWalletConfig(empresaId: string, config: WalletConfigDa
       visitasPorPremio: config.visitasPorPremio,
       urlIconoWallet: config.urlIconoWallet,
       paqueteSellosWallet: config.paqueteSellosWallet,
+      tipoSellosWallet: config.tipoSellosWallet,
       "wallet-class-id": config.walletClassId,
     },
     { merge: true }
