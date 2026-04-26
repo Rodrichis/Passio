@@ -12,8 +12,57 @@ type Props = {
   onChange: (value: PaqueteSellosWallet) => void;
 };
 
+function ContactStampsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(2, 48, 71, 0.55)",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            backgroundColor: "#fff",
+            borderRadius: 24,
+            padding: 22,
+            borderWidth: 1,
+            borderColor: "#DDE8EE",
+          }}
+        >
+          <Text style={{ fontSize: 22, fontWeight: "800", color: COLORS.textDark, marginBottom: 10 }}>
+            Sellos personalizados
+          </Text>
+          <Text style={{ color: "#51616F", lineHeight: 22, marginBottom: 20 }}>
+            Si necesitas sellos personalizados con tu logo, escribenos a hola@passio.cl
+          </Text>
+
+          <TouchableOpacity
+            onPress={onClose}
+            style={{
+              backgroundColor: COLORS.primary,
+              minHeight: 46,
+              borderRadius: 999,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function WalletStampPackSelector({ value, visitasPorPremio, tipoSellosWallet, onChange }: Props) {
   const [previewPackId, setPreviewPackId] = useState<PaqueteSellosWallet | null>(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const safeVisits = clampVisitasPorPremio(visitasPorPremio);
   const previewVersion = useMemo(() => String(Date.now()), [previewPackId, safeVisits]);
   const previewUrls = useMemo(() => {
@@ -38,7 +87,7 @@ export default function WalletStampPackSelector({ value, visitasPorPremio, tipoS
           Pack de sellos
         </Text>
         <Text style={{ color: "#51616F", marginBottom: 12 }}>
-          Tu wallet usa sellos personalizados. El preview seguirá mostrando tus sellos actuales.
+          Tu wallet usa sellos personalizados. El preview seguira mostrando tus sellos actuales.
         </Text>
 
         <View
@@ -73,6 +122,12 @@ export default function WalletStampPackSelector({ value, visitasPorPremio, tipoS
             <Text style={{ color: "#fff", fontWeight: "700" }}>Ver ejemplo</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity onPress={() => setContactModalOpen(true)} style={{ marginTop: 14, alignSelf: "flex-start" }}>
+          <Text style={{ color: COLORS.primary, fontWeight: "700" }}>¿Necesitas sellos personalizados?</Text>
+        </TouchableOpacity>
+
+        <ContactStampsModal visible={contactModalOpen} onClose={() => setContactModalOpen(false)} />
 
         <Modal visible={Boolean(previewPackId && previewUrls)} transparent animationType="fade" onRequestClose={() => setPreviewPackId(null)}>
           <View
@@ -234,6 +289,12 @@ export default function WalletStampPackSelector({ value, visitasPorPremio, tipoS
         })}
       </View>
 
+      <TouchableOpacity onPress={() => setContactModalOpen(true)} style={{ marginTop: 14, alignSelf: "flex-start" }}>
+        <Text style={{ color: COLORS.primary, fontWeight: "700" }}>¿Necesitas sellos personalizados?</Text>
+      </TouchableOpacity>
+
+      <ContactStampsModal visible={contactModalOpen} onClose={() => setContactModalOpen(false)} />
+
       <Modal visible={Boolean(previewPackId && previewUrls)} transparent animationType="fade" onRequestClose={() => setPreviewPackId(null)}>
         <View
           style={{
@@ -345,3 +406,4 @@ export default function WalletStampPackSelector({ value, visitasPorPremio, tipoS
     </View>
   );
 }
+
