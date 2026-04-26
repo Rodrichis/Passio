@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
   Linking,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -60,6 +61,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
 
   const uid = auth.currentUser?.uid;
   const registroURL = buildRegistrationUrl(uid);
@@ -324,7 +326,65 @@ export default function DashboardContentAjustes({ navigation }: Props) {
 
   return (
     <ScrollView style={{ paddingHorizontal: 10 }}>
-      <Text style={styles.sectionTitle}>Ajustes de Empresa</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Ajustes de Empresa</Text>
+
+        <TouchableOpacity onPress={() => setSupportModalOpen(true)}>
+          <Text style={{ color: "#2196F3", fontWeight: "700" }}>Ayuda y soporte</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={supportModalOpen} transparent animationType="fade" onRequestClose={() => setSupportModalOpen(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(13, 25, 34, 0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              backgroundColor: "#FFFFFF",
+              borderRadius: 24,
+              paddingHorizontal: 24,
+              paddingVertical: 24,
+              borderWidth: 1,
+              borderColor: "#E2ECF1",
+            }}
+          >
+            <Text style={{ color: "#123042", fontSize: 22, fontWeight: "800", marginBottom: 10 }}>Ayuda y soporte</Text>
+            <Text style={{ color: "#51616F", fontSize: 16, lineHeight: 24, marginBottom: 20 }}>
+              Si tienes errores, sugerencias o problemas, escribenos a hola@passio.cl
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setSupportModalOpen(false)}
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: "#2196F3",
+                paddingVertical: 12,
+                paddingHorizontal: 18,
+                borderRadius: 999,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Plan actual */}
       <View
@@ -549,6 +609,8 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     </ScrollView>
   );
 }
+
+
 
 
 
