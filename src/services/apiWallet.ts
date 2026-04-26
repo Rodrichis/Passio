@@ -124,7 +124,7 @@ export async function createWalletObject(params: {
     premios,
   } = params;
 
-  const resolvedWalletClassId = walletClassId || classId || DEFAULT_CLASS_ID;
+  const resolvedWalletClassId = walletClassId || classId;
 
   return callWalletApi("/createObject", {
     classId: resolvedWalletClassId,
