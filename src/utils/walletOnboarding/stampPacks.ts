@@ -13,27 +13,21 @@ export const GENERIC_STAMP_PACK_IDS: GenericPaqueteSellosWallet[] = ["generico1"
 export const STAMP_PACK_OPTIONS: StampPackOption[] = [
   {
     id: "generico1",
-    title: "Sellos clasicos",
-    description: "Sellos redondos con estilo clasico y tono artesanal.",
-    previewColors: ["#7c5535", "#a56d42", "#d4a373"],
+    title: "Sellos de granos de cafe",
+    description: "Granos de cafe sobre fondo azul.",
+    previewColors: ["#FFB81C", "#28B6D7", "#000000"],
   },
   {
     id: "generico2",
-    title: "Sellos calidos",
-    description: "Sellos suaves con look calido para marcas cercanas.",
-    previewColors: ["#6b705c", "#a5a58d", "#ddbea9"],
+    title: "Sellos Passio",
+    description: "Logo Passio sobre fondo azul.",
+    previewColors: ["#FFB81C", "#28B6D7", "#000000"],
   },
   {
     id: "generico3",
-    title: "Sellos de granos de cafe",
-    description: "Pack generico inspirado en granos de cafe y tonos naturales.",
-    previewColors: ["#1d3557", "#457b9d", "#a8dadc"],
-  },
-  {
-    id: "generico4",
-    title: "Sellos de alto contraste",
-    description: "Sellos de contraste alto para marcas con personalidad fuerte.",
-    previewColors: ["#2b2d42", "#8d99ae", "#edf2f4"],
+    title: "Sellos de tijeras",
+    description: "Tijeras sobre fondo azul.",
+    previewColors: ["#FFB81C", "#28B6D7", "#000000"],
   },
 ];
 
@@ -44,6 +38,7 @@ export function isGenericStampPack(value: unknown): value is GenericPaqueteSello
 export function resolveStampPackLabel(paqueteSellosWallet: PaqueteSellosWallet, tipoSellosWallet: TipoSellosWallet = "generico") {
   const match = STAMP_PACK_OPTIONS.find((option) => option.id === paqueteSellosWallet);
   if (match) return match.title;
+  if (paqueteSellosWallet === "generico4") return "Pack generico anterior";
   if (tipoSellosWallet === "personalizado") return "Pack personalizado";
   return paqueteSellosWallet || "Pack sin definir";
 }
