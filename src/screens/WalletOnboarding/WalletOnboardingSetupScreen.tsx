@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Platform, ScrollView, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import WalletColorField from "../../components/wallet-onboarding/WalletColorField";
@@ -137,8 +137,6 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       setSaveStep("Se guardo correctamente la configuracion del wallet.");
     } catch (saveError) {
       console.error("Error guardando configuracion de wallet:", saveError);
-      setSaveCompleted(false);
-      setSaveStep("");
       setError(saveError instanceof Error ? saveError.message : "No pudimos guardar tu configuracion. Intenta nuevamente.");
     } finally {
       setSaving(false);
@@ -442,3 +440,5 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     </>
   );
 }
+
+

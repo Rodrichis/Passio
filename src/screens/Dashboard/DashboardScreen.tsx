@@ -1,15 +1,16 @@
-﻿import React, { useState, useEffect } from "react";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { View, ScrollView, Platform, useWindowDimensions } from "react-native";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+﻿import React, { useEffect, useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, Platform, View, useWindowDimensions } from "react-native";
+import { doc, getDoc } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import DashboardMenu from "./DashboardMenu";
-
 import DashboardContentPrincipal from "./content/DashboardContentPrincipal";
 import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
-import { auth } from "../../services/firebaseConfig";
+import AdminHomeScreen from "../logs/AdminHomeScreen";
+import AdminLogsScreen from "../logs/AdminLogsScreen";
+import { auth, db } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
 
 type RootStackParamList = {
@@ -21,9 +22,9 @@ type RootStackParamList = {
   VerifyEmail: { email?: string };
 };
 
-// relajamos tipos de navegaciÃ³n para evitar conflictos en web
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
+  const [isAdmin, setIsAdmin] = useState(false);
   const { width } = useWindowDimensions();
   const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
   const isCompactWeb = Platform.OS === "web" && width < 900;
@@ -40,6 +41,20 @@ export default function Dashboard({ navigation }: any) {
       };
     }
 
+    const loadAccess = async () => {
+      if (!user || !user.emailVerified) return;
+
+      try {
+        const empresaSnap = await getDoc(doc(db, "Empresas", user.uid));
+        if (active && empresaSnap.exists()) {
+          const data = empresaSnap.data() as any;
+          setIsAdmin(data?.esAdmin === true);
+        }
+      } catch (accessError) {
+        console.error("Error verificando acceso admin:", accessError);
+      }
+    };
+
     const ensureWalletConfigured = async () => {
       if (!user || !user.emailVerified) return;
 
@@ -55,6 +70,7 @@ export default function Dashboard({ navigation }: any) {
       }
     };
 
+    loadAccess();
     ensureWalletConfigured();
     return () => {
       active = false;
@@ -66,27 +82,28 @@ export default function Dashboard({ navigation }: any) {
       case "Principal":
         return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
       case "Clientes":
-        return <DashboardContentClientes />; // <- FlatList manejarÃ¡ el scroll
+        return <DashboardContentClientes />;
       case "Escanear":
         return <DashboardContentEscanear />;
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
+      case "Admin":
+        return <AdminHomeScreen onOpenLogs={() => setSelected("Logs")} />;
+      case "Logs":
+        return <AdminLogsScreen onBack={() => setSelected("Admin")} />;
       default:
         return null;
     }
   };
 
-  const isClientes = selected === "Clientes";
+  const isListScreen = selected === "Clientes" || selected === "Logs";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
       <View style={{ flex: 1, flexDirection: isMobileLayout ? "column" : "row" }}>
-        {!isMobileLayout && (
-          <DashboardMenu selected={selected} setSelected={setSelected} />
-        )}
+        {!isMobileLayout && <DashboardMenu selected={selected} setSelected={setSelected} isAdmin={isAdmin} />}
 
-        {/* ðŸ‘‰ Para Clientes NO usamos ScrollView */}
-        {isClientes ? (
+        {isListScreen ? (
           <View style={{ flex: 1, backgroundColor: "#f5f5f5" }}>
             <View style={styles.contentContainer}>{renderContent()}</View>
           </View>
@@ -100,12 +117,7 @@ export default function Dashboard({ navigation }: any) {
         )}
       </View>
 
-      {isMobileLayout && (
-        <DashboardMenu selected={selected} setSelected={setSelected} isMobile />
-      )}
+      {isMobileLayout && <DashboardMenu selected={selected} setSelected={setSelected} isMobile isAdmin={isAdmin} />}
     </SafeAreaView>
   );
 }
-
-
-

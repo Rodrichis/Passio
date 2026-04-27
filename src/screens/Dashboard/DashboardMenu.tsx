@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
@@ -7,19 +7,20 @@ type Props = {
   selected: string;
   setSelected: (val: string) => void;
   isMobile?: boolean;
+  isAdmin?: boolean;
 };
 
-const menuItems = [
-  { name: "Principal", icon: "home-outline" },
-  { name: "Clientes", icon: "people-outline" },
-  // Promociones y Test deshabilitados temporalmente
-  // { name: "Promociones", icon: "pricetag-outline" },
-  { name: "Escanear", icon: "qr-code-outline" },
-  // { name: "Test", icon: "flask-outline" },
-  { name: "Ajustes", icon: "settings-outline" },
-];
+export default function DashboardMenu({ selected, setSelected, isMobile, isAdmin = false }: Props) {
+  const menuItems = [
+    { name: "Principal", icon: "home-outline" },
+    { name: "Clientes", icon: "people-outline" },
+    { name: "Escanear", icon: "qr-code-outline" },
+    { name: "Ajustes", icon: "settings-outline" },
+    ...(isAdmin ? [{ name: "Admin", icon: "shield-checkmark-outline" }] : []),
+  ];
 
-export default function DashboardMenu({ selected, setSelected, isMobile }: Props) {
+  const activeKey = selected === "Logs" ? "Admin" : selected;
+
   if (isMobile) {
     return (
       <View style={styles.mobileBottomMenu}>
@@ -29,7 +30,7 @@ export default function DashboardMenu({ selected, setSelected, isMobile }: Props
             onPress={() => setSelected(item.name)}
             style={[
               styles.bottomMenuButton,
-              { backgroundColor: selected === item.name ? "#8ecae6" : "#cfd8dc" },
+              { backgroundColor: activeKey === item.name ? "#8ecae6" : "#cfd8dc" },
             ]}
           >
             <Ionicons name={item.icon as any} size={22} color="#023047" />
@@ -40,7 +41,6 @@ export default function DashboardMenu({ selected, setSelected, isMobile }: Props
     );
   }
 
-  // 🔹 escritorio o tablet
   return (
     <View style={styles.sidebar}>
       <Text style={styles.sidebarTitle}>Dashboard</Text>
@@ -50,7 +50,7 @@ export default function DashboardMenu({ selected, setSelected, isMobile }: Props
           onPress={() => setSelected(item.name)}
           style={[
             styles.menuButton,
-            { backgroundColor: selected === item.name ? "#8ecae6" : "#cfd8dc" },
+            { backgroundColor: activeKey === item.name ? "#8ecae6" : "#cfd8dc" },
           ]}
         >
           <Ionicons

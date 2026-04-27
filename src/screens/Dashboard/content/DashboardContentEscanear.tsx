@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { updateAndroidWalletState, updateApplePass, type WalletApiResponse } from "../../../services/apiWallet";
@@ -269,6 +269,7 @@ export default function DashboardContentEscanear() {
     setLoading(true);
 
     try {
+
       const walletResp: WalletApiResponse =
         pendingConfirmation.soCliente === "ios"
           ? await updateApplePass({
@@ -701,3 +702,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 });
+
+
+
+
+
