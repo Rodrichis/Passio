@@ -62,8 +62,8 @@ function formatDate(value: Date | null) {
 
 function formatClientTitle(totalClientes: number) {
   return totalClientes === 1
-    ? "Notificacion a 1 cliente"
-    : `Notificacion a ${totalClientes} clientes`;
+    ? "Notificación a 1 cliente"
+    : `Notificación a ${totalClientes} clientes`;
 }
 
 function getStatusLabel(status: NotificationStatus) {
