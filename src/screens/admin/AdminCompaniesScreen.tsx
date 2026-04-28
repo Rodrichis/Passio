@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -135,6 +135,7 @@ export default function AdminCompaniesScreen({ onBack }: Props) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedItem, setSelectedItem] = useState<CompanyItem | null>(null);
+  const [showEmulationInfo, setShowEmulationInfo] = useState(false);
 
   const loadCompanies = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -287,10 +288,28 @@ export default function AdminCompaniesScreen({ onBack }: Props) {
                       {item.email || item.id}
                     </Text>
                     <Text style={{ color: "#60707D", marginTop: 2, fontSize: 12 }}>
-                      Plan: {item.plan} · Registro: {formatShortDate(item.fechaRegistro)}
+                      Plan: {item.plan} | Registro: {formatShortDate(item.fechaRegistro)}
                     </Text>
                   </View>
 
+                  <View style={{ alignItems: "flex-end", gap: 8 }}>
+                    <TouchableOpacity
+                      onPress={(event: any) => {
+                        event?.stopPropagation?.();
+                        setShowEmulationInfo(true);
+                      }}
+                      style={{
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: "#B42318",
+                        backgroundColor: "#FFF5F4",
+                      }}
+                    >
+                      <Text style={{ color: "#B42318", fontWeight: "700" }}>Emular</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
@@ -351,7 +370,7 @@ export default function AdminCompaniesScreen({ onBack }: Props) {
                   </View>
                 </ScrollView>
 
-                <View style={[cStyles.modalActions, { marginTop: 12 }]}> 
+                <View style={[cStyles.modalActions, { marginTop: 12, justifyContent: "center" }]}> 
                   <TouchableOpacity
                     onPress={() => setSelectedItem(null)}
                     style={{
@@ -369,6 +388,34 @@ export default function AdminCompaniesScreen({ onBack }: Props) {
                 </View>
               </>
             ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showEmulationInfo} transparent animationType="fade" onRequestClose={() => setShowEmulationInfo(false)}>
+        <View style={cStyles.modalBackdrop}>
+          <View style={[cStyles.modalCard, { maxWidth: 420, width: "90%" }]}> 
+            <Text style={cStyles.modalTitle}>Emular empresa</Text>
+            <Text style={{ color: "#123042", lineHeight: 22 }}>
+              Desarrollar en el futuro la función de emular.
+            </Text>
+
+            <View style={[cStyles.modalActions, { marginTop: 14, justifyContent: "center" }]}> 
+              <TouchableOpacity
+                onPress={() => setShowEmulationInfo(false)}
+                style={{
+                  alignSelf: "center",
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#023047",
+                  backgroundColor: "#fff",
+                }}
+              >
+                <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
