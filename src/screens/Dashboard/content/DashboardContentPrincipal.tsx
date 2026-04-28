@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
+import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { auth, db } from "../../../services/firebaseConfig";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
@@ -49,8 +50,10 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   const [actividad, setActividad] = React.useState<ActivityItem[]>([]);
   const [limiteUsuarios, setLimiteUsuarios] = React.useState<number | null>(null);
   const [atUserLimit, setAtUserLimit] = React.useState(false);
+  const [registrationUrl, setRegistrationUrl] = React.useState("");
+  const [showQrModal, setShowQrModal] = React.useState(false);
 
-  const registroURL = buildRegistrationUrl(uid);
+  const registroURL = registrationUrl || buildRegistrationUrl(uid);
 
   React.useEffect(() => {
     const fetchStats = async () => {
@@ -66,7 +69,13 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
         try {
           const empSnap = await getDoc(doc(db, "Empresas", uid));
           if (empSnap.exists()) {
-            planName = (empSnap.data() as any)?.plan || null;
+            const empresaData = empSnap.data() as any;
+            planName = empresaData?.plan || null;
+            const savedRegistrationUrl =
+              typeof empresaData?.LinkRegistro === "string" ? empresaData.LinkRegistro.trim() : "";
+            if (savedRegistrationUrl) {
+              setRegistrationUrl(savedRegistrationUrl);
+            }
           }
         } catch {}
 
@@ -224,8 +233,31 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
                 </Text>
               </TouchableOpacity>
             )}
+
+          <TouchableOpacity
+            onPress={() => setShowQrModal(true)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#fb8500",
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              borderRadius: 5,
+              backgroundColor: "#fb8500",
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 14 }}>
+              Ver QR
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      <RegistrationQrModal
+        visible={showQrModal}
+        value={registroURL}
+        fileName={`qr-registro-${uid || "empresa"}.png`}
+        onClose={() => setShowQrModal(false)}
+      />
 
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 

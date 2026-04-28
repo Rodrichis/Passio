@@ -23,6 +23,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
+import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
   fetchOfferings,
@@ -62,9 +63,10 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const uid = auth.currentUser?.uid;
-  const registroURL = buildRegistrationUrl(uid);
+  const registroURL = empresa?.LinkRegistro || buildRegistrationUrl(uid);
 
   useEffect(() => {
     const fetchEmpresa = async () => {
@@ -477,9 +479,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
           {registroURL}
         </Text>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
           <TouchableOpacity
-            onPress={() => Linking.openURL(registroURL)}
+            onPress={() => registroURL && Linking.openURL(registroURL)}
             style={{
               backgroundColor: "#2196F3",
               paddingVertical: 10,
@@ -514,8 +516,29 @@ export default function DashboardContentAjustes({ navigation }: Props) {
                 <Text style={{ color: "#0D47A1", fontWeight: "bold" }}>Copiar</Text>
               </TouchableOpacity>
             )}
+
+          <TouchableOpacity
+            onPress={() => setShowQrModal(true)}
+            style={{
+              borderWidth: 1,
+              borderColor: "#fb8500",
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 8,
+              backgroundColor: "#fb8500",
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Ver QR</Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      <RegistrationQrModal
+        visible={showQrModal}
+        value={registroURL}
+        fileName={`qr-registro-${uid || "empresa"}.png`}
+        onClose={() => setShowQrModal(false)}
+      />
 
       <Text style={styles.sectionTitle}>Wallet</Text>
       <View
