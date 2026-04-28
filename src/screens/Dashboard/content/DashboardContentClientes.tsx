@@ -37,6 +37,7 @@ import { clientesStyles as cStyles } from "../../../styles/ClientesStyles";
 import { mapDoc, filterItems, sortItems, Cliente } from "../../../utils/clientesHelpers";
 
 const PAGE_SIZE = 20;
+const PUSH_BATCH_SIZE = 6;
 const IS_WEB = Platform.OS === "web";
 
 function osIconName(so?: string) {
@@ -303,6 +304,38 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
       }
     },
     [uid]
+  );
+
+  const sendPushNotifications = useCallback(
+    async (targets: Cliente[], message: string) => {
+      let okCount = 0;
+
+      for (let index = 0; index < targets.length; index += PUSH_BATCH_SIZE) {
+        const batch = targets.slice(index, index + PUSH_BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (target) => {
+            const isIOS = target.so === "ios";
+            return isIOS
+              ? notifyApplePass({ idUsuario: target.id, notificacion: message })
+              : notifyAndroidPass({
+                  idUsuario: target.id,
+                  notificacion: message,
+                  cabecera: androidNotificationHeader,
+                });
+          })
+        );
+
+        okCount += batchResults.filter((response) => response.ok).length;
+
+        if (targets.length > PUSH_BATCH_SIZE) {
+          const processed = Math.min(index + batch.length, targets.length);
+          setPushStatus(`Enviando ${processed}/${targets.length}...`);
+        }
+      }
+
+      return okCount;
+    },
+    [androidNotificationHeader]
   );
 
   const sortedItems = useMemo(
@@ -1140,7 +1173,9 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
 
                       try {
                         setSendingPush(true);
-                        setPushStatus("Enviando...");
+                        setPushStatus(
+                          targets.length > PUSH_BATCH_SIZE ? `Enviando 0/${targets.length}...` : "Enviando..."
+                        );
 
                         try {
                           await updatePushCounter(targets.length);
@@ -1153,18 +1188,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
                           throw e;
                         }
 
-                        let okCount = 0;
-                        for (const tgt of targets) {
-                          const isIOS = tgt.so === "ios";
-                          const resp = isIOS
-                            ? await notifyApplePass({ idUsuario: tgt.id, notificacion: message })
-                            : await notifyAndroidPass({
-                                idUsuario: tgt.id,
-                                notificacion: message,
-                                cabecera: androidNotificationHeader,
-                              });
-                          if (resp.ok) okCount += 1;
-                        }
+                        const okCount = await sendPushNotifications(targets, message);
 
                         let historyResult:
                           | { ok: true; id: string; estado: "completada" | "parcial" | "erronea" }
