@@ -90,7 +90,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
           </TouchableOpacity>
 
           <TouchableOpacity style={globalStyles.secondaryButton} onPress={handleCheck}>
-            <Text style={globalStyles.buttonTextSecondary}>Ya verifiquÃ©</Text>
+            <Text style={globalStyles.buttonTextSecondary}>Ya verifiqué</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={[globalStyles.secondaryButton, { backgroundColor: "#ccc" }]} onPress={handleLogout}>

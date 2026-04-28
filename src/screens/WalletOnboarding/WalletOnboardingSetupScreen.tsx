@@ -64,7 +64,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         setWalletClassId(config.walletClassId);
         setCompanyName(config.companyName || "");
       } catch (loadError) {
-        console.error("Error cargando configuracion de wallet:", loadError);
+        console.error("Error cargando configuración de wallet:", loadError);
         if (!active) return;
         setError("No pudimos cargar la configuracion inicial del wallet.");
       } finally {
@@ -94,7 +94,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
     try {
       setSaving(true);
       setSaveCompleted(false);
-      setSaveStep("Preparando configuracion del wallet...");
+      setSaveStep("Preparando configuración del wallet...");
       setError("");
 
       let nextIconUrl = urlIconoWallet;
@@ -105,7 +105,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         nextIconUrl = `${uploadedIconUrl}${uploadedIconUrl.includes("?") ? "&" : "?"}${cacheBust}`;
       }
 
-      setSaveStep("Aplicando configuracion del wallet...");
+      setSaveStep("Aplicando configuración del wallet...");
       const syncClassResponse = await syncAndroidWalletClass({
         walletClassId: safeWalletClassId,
         nombreEmpresa: companyName || safeWalletClassId,
@@ -119,7 +119,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
         throw new Error(syncClassResponse.errorText || "No pudimos sincronizar la clase del wallet Android.");
       }
 
-      setSaveStep("Guardando configuracion final...");
+      setSaveStep("Guardando configuración final...");
       await saveWalletConfig(user.uid, {
         walletConfigurado: true,
         estadoWallet: "listo",
@@ -134,10 +134,10 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       setInitialVisitasPorPremio(safeVisitas);
       setWalletConfigurado(true);
       setSaveCompleted(true);
-      setSaveStep("Se guardo correctamente la configuracion del wallet.");
+      setSaveStep("Se guardo correctamente la configuración del wallet.");
     } catch (saveError) {
-      console.error("Error guardando configuracion de wallet:", saveError);
-      setError(saveError instanceof Error ? saveError.message : "No pudimos guardar tu configuracion. Intenta nuevamente.");
+      console.error("Error guardando configuración de wallet:", saveError);
+      setError(saveError instanceof Error ? saveError.message : "No pudimos guardar tu configuración. Intenta nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -260,7 +260,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
                 textAlign: "center",
               }}
             >
-              {saveCompleted ? "Se guardo correctamente la configuracion de tu wallet." : saveStep}
+              {saveCompleted ? "Se guardo correctamente la configuración de tu wallet." : saveStep}
             </Text>
 
             {saveCompleted ? (
@@ -323,7 +323,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
 
             <Text style={{ color: "#51616F", fontSize: 16, lineHeight: 24, marginBottom: 24 }}>
               Define el color principal, el pack de sellos, las visitas por premio y sube el icono PNG de tu empresa.
-              Esta configuracion sera la base de tu programa de fidelizacion.
+              Esta configuración sera la base de tu programa de fidelizacion.
             </Text>
 
             <View style={{ flexDirection: isNarrow ? "column" : "row", alignItems: "flex-start", gap: 18 }}>
@@ -426,7 +426,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
                   />
 
                   <OnboardingNextButton
-                    label={saving ? "Guardando..." : "Guardar configuracion"}
+                    label={saving ? "Guardando..." : "Guardar configuración"}
                     onPress={handleSave}
                     disabled={saving || saveCompleted}
                     style={{ width: isNarrow ? "100%" : undefined, minWidth: isNarrow ? 0 : 220 }}

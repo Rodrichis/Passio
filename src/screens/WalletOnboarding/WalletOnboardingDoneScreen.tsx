@@ -62,7 +62,7 @@ export default function WalletOnboardingDoneScreen({ navigation }: Props) {
               maxWidth: 460,
             }}
           >
-            Tu configuracion base fue guardada. Ahora ya puedes entrar al panel y continuar con el uso normal de
+            Tu configuración base fue guardada. Ahora ya puedes entrar al panel y continuar con el uso normal de
             Passio.
           </Text>
 

@@ -67,7 +67,7 @@ export default function WalletOnboardingIntroScreen({ navigation }: Props) {
               marginBottom: 10,
             }}
           >
-            Configuracion de wallet
+            Configuración de wallet
           </Text>
 
           <Text

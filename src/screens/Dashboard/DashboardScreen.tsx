@@ -10,6 +10,7 @@ import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 import AdminHomeScreen from "../logs/AdminHomeScreen";
 import AdminLogsScreen from "../logs/AdminLogsScreen";
+import NotificationHistoryScreen from "../notifications/NotificationHistoryScreen";
 import { auth, db } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
 
@@ -82,9 +83,11 @@ export default function Dashboard({ navigation }: any) {
       case "Principal":
         return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
       case "Clientes":
-        return <DashboardContentClientes />;
+        return <DashboardContentClientes onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")} />;
       case "Escanear":
         return <DashboardContentEscanear />;
+      case "HistorialNotificaciones":
+        return <NotificationHistoryScreen onBack={() => setSelected("Clientes")} />;
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
       case "Admin":
@@ -96,7 +99,7 @@ export default function Dashboard({ navigation }: any) {
     }
   };
 
-  const isListScreen = selected === "Clientes" || selected === "Logs";
+  const isListScreen = selected === "Clientes" || selected === "Logs" || selected === "HistorialNotificaciones";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>

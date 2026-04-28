@@ -100,7 +100,7 @@ export default function DashboardContentEscanear() {
           setWalletConfig(config);
         }
       } catch (error) {
-        console.error("Error cargando configuracion de wallet para escaner:", error);
+        console.error("Error cargando configuración de wallet para escaner:", error);
       }
     };
 
@@ -163,7 +163,7 @@ export default function DashboardContentEscanear() {
       }
 
       if (!walletConfig) {
-        resetToChooser({ type: "error", message: "No se pudo cargar la configuracion del wallet." });
+        resetToChooser({ type: "error", message: "No se pudo cargar la configuración del wallet." });
         return;
       }
 
@@ -438,8 +438,8 @@ export default function DashboardContentEscanear() {
 
                 <Text style={styles.modalTitle}>
                   {pendingConfirmation.action === "premio"
-                    ? `Desea canjear premio para ${pendingConfirmation.nombreCliente}?`
-                    : `Desea sumar visita para ${pendingConfirmation.nombreCliente}?`}
+                    ? `¿Desea canjear premio para ${pendingConfirmation.nombreCliente}?`
+                    : `¿Desea sumar visita para ${pendingConfirmation.nombreCliente}?`}
                 </Text>
 
                 <View style={styles.summaryBox}>

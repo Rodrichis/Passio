@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
 import { notifyApplePass, notifyAndroidPass } from "../../../services/apiWallet";
 import {
+  addDoc,
   collection,
   query,
   orderBy,
@@ -61,7 +62,11 @@ function formatDate(d?: Date | null) {
   }
 }
 
-export default function DashboardContentClientes() {
+type Props = {
+  onOpenNotificationHistory: () => void;
+};
+
+export default function DashboardContentClientes({ onOpenNotificationHistory }: Props) {
   const uid = auth.currentUser?.uid;
   const { width } = useWindowDimensions();
   const useDesktopWebLayout = IS_WEB && width >= 900;
@@ -263,6 +268,42 @@ export default function DashboardContentClientes() {
     const nombre = empresaNombre.trim();
     return nombre ? `${nombre} (Passio)` : "Passio";
   }, [empresaNombre]);
+
+  const saveNotificationHistory = useCallback(
+    async (mensaje: string, totalClientes: number, totalEnviados: number, totalFallidos: number) => {
+      if (!uid || !mensaje.trim() || totalClientes <= 0) {
+        return { ok: false as const, reason: "invalid_payload" as const };
+      }
+
+      const estado: "completada" | "parcial" | "erronea" =
+        totalEnviados === 0
+          ? "erronea"
+          : totalFallidos > 0
+            ? "parcial"
+            : "completada";
+
+      const payload = {
+        mensaje: mensaje.trim(),
+        totalClientes,
+        totalEnviados,
+        totalFallidos,
+        estado,
+        fechaEnvio: serverTimestamp(),
+      };
+
+      try {
+        const ref = await addDoc(collection(db, "Empresas", uid, "HistorialNotificaciones"), payload);
+        return { ok: true as const, id: ref.id, estado };
+      } catch (historyError: any) {
+        return {
+          ok: false as const,
+          reason: "write_failed" as const,
+          errorMessage: String(historyError?.message || historyError || "unknown_error"),
+        };
+      }
+    },
+    [uid]
+  );
 
   const sortedItems = useMemo(
     () => sortItems(filteredItems, sortOrder),
@@ -546,7 +587,7 @@ export default function DashboardContentClientes() {
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
-              tooltipText="Próximamente"
+              tooltipText="PrÃ³ximamente"
               onPress={() => {}}
               disabled
             />
@@ -602,7 +643,7 @@ export default function DashboardContentClientes() {
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
-              tooltipText="Próximamente"
+              tooltipText="PrÃ³ximamente"
               onPress={() => {}}
               disabled
             />
@@ -723,8 +764,9 @@ export default function DashboardContentClientes() {
         </TouchableOpacity>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 10, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <TouchableOpacity
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center", flexWrap: "wrap", flex: 1 }}>
+          <TouchableOpacity
           onPress={() => {}}
           disabled
           style={[
@@ -764,6 +806,14 @@ export default function DashboardContentClientes() {
           >
             Enviar notificacion ({selectedCount})
           </Text>
+        </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          onPress={onOpenNotificationHistory}
+          style={[cStyles.sendButton, { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#cfd8dc", marginBottom: 10 }]}
+        >
+          <Text style={[cStyles.sendButtonText, { color: "#023047" }]}>Historial notificaciones</Text>
         </TouchableOpacity>
       </View>
 
@@ -1080,14 +1130,18 @@ export default function DashboardContentClientes() {
                       if (targets.length === 0) {
                         setPushStatus("No hay destinatarios.");
                         return;
-                        }
-                        if (!pushBody.trim()) {
-                          setPushStatus("Ingresa un mensaje.");
-                          return;
-                        }
-                        try {
-                          setSendingPush(true);
-                          setPushStatus("Enviando...");
+                      }
+
+                      const message = pushBody.trim();
+                      if (!message) {
+                        setPushStatus("Ingresa un mensaje.");
+                        return;
+                      }
+
+                      try {
+                        setSendingPush(true);
+                        setPushStatus("Enviando...");
+
                         try {
                           await updatePushCounter(targets.length);
                         } catch (e: any) {
@@ -1099,27 +1153,47 @@ export default function DashboardContentClientes() {
                           throw e;
                         }
 
-                          let okCount = 0;
-                          for (const tgt of targets) {
-                            const isIOS = tgt.so === "ios";
-                            const resp = isIOS
-                              ? await notifyApplePass({ idUsuario: tgt.id, notificacion: pushBody.trim() })
-                              : await notifyAndroidPass({
-                                  idUsuario: tgt.id,
-                                  notificacion: pushBody.trim(),
-                                  cabecera: androidNotificationHeader,
-                                });
-                            if (resp.ok) okCount += 1;
-                          }
-                          setPushStatus(`Enviadas ${okCount}/${targets.length}`);
-                          setPushBody("");
-                          setPushSent(true);
-                        } catch (err) {
-                          setPushStatus(`Error: ${String(err)}`);
-                        } finally {
-                          setSendingPush(false);
+                        let okCount = 0;
+                        for (const tgt of targets) {
+                          const isIOS = tgt.so === "ios";
+                          const resp = isIOS
+                            ? await notifyApplePass({ idUsuario: tgt.id, notificacion: message })
+                            : await notifyAndroidPass({
+                                idUsuario: tgt.id,
+                                notificacion: message,
+                                cabecera: androidNotificationHeader,
+                              });
+                          if (resp.ok) okCount += 1;
                         }
-                      }}
+
+                        let historyResult:
+                          | { ok: true; id: string; estado: "completada" | "parcial" | "erronea" }
+                          | { ok: false; reason: "invalid_payload" | "write_failed"; errorMessage?: string }
+                          | null = null;
+
+                        const failCount = Math.max(0, targets.length - okCount);
+
+                        if (targets.length > 0) {
+                          historyResult = await saveNotificationHistory(message, targets.length, okCount, failCount);
+                        }
+
+                        if (historyResult?.ok) {
+                          setPushStatus(`Enviadas ${okCount}/${targets.length}.`);
+                        } else if (okCount > 0) {
+                          setPushStatus(
+                            `Enviadas ${okCount}/${targets.length}.`
+                          );
+                        } else {
+                          setPushStatus(`Enviadas ${okCount}/${targets.length}`);
+                        }
+                        setPushBody("");
+                        setPushSent(true);
+                      } catch (err) {
+                        setPushStatus(`Error: ${String(err)}`);
+                      } finally {
+                        setSendingPush(false);
+                      }
+                    }}
                       style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
                       disabled={sendingPush}
                     >
@@ -1219,6 +1293,9 @@ export default function DashboardContentClientes() {
     </View>
   );
 }
+
+
+
 
 
 
