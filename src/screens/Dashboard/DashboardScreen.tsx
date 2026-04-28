@@ -8,8 +8,9 @@ import DashboardContentPrincipal from "./content/DashboardContentPrincipal";
 import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
-import AdminHomeScreen from "../logs/AdminHomeScreen";
+import AdminHomeScreen from "../admin/AdminHomeScreen";
 import AdminLogsScreen from "../logs/AdminLogsScreen";
+import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
 import NotificationHistoryScreen from "../notifications/NotificationHistoryScreen";
 import { auth, db } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
@@ -91,15 +92,17 @@ export default function Dashboard({ navigation }: any) {
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
       case "Admin":
-        return <AdminHomeScreen onOpenLogs={() => setSelected("Logs")} />;
+        return <AdminHomeScreen onOpenLogs={() => setSelected("Logs")} onOpenCompanies={() => setSelected("EmpresasAdmin")} />;
       case "Logs":
         return <AdminLogsScreen onBack={() => setSelected("Admin")} />;
+      case "EmpresasAdmin":
+        return <AdminCompaniesScreen onBack={() => setSelected("Admin")} />;
       default:
         return null;
     }
   };
 
-  const isListScreen = selected === "Clientes" || selected === "Logs" || selected === "HistorialNotificaciones";
+  const isListScreen = selected === "Clientes" || selected === "Logs" || selected === "HistorialNotificaciones" || selected === "EmpresasAdmin";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f5f5" }}>

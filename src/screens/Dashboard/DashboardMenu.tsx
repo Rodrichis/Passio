@@ -19,7 +19,7 @@ export default function DashboardMenu({ selected, setSelected, isMobile, isAdmin
     ...(isAdmin ? [{ name: "Admin", icon: "shield-checkmark-outline" }] : []),
   ];
 
-  const activeKey = selected === "Logs" ? "Admin" : selected === "HistorialNotificaciones" ? "Clientes" : selected;
+  const activeKey = selected === "Logs" || selected === "EmpresasAdmin" ? "Admin" : selected === "HistorialNotificaciones" ? "Clientes" : selected;
 
   if (isMobile) {
     return (
