@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "passio",
     "slug": "passio",
@@ -26,16 +26,34 @@
         "translucent": false
       },
       "edgeToEdgeEnabled": false,
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
       "package": "com.anonymous.passio"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [["expo-image-picker", { "photosPermission": "Passio necesita acceder a tus fotos para seleccionar el icono del wallet." }]],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Passio necesita acceder a tus fotos para seleccionar el icono del wallet."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Passio necesita acceder a tus fotos para guardar el codigo QR.",
+          "savePhotosPermission": "Passio necesita permiso para guardar el codigo QR en tu galeria.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
+    ],
     "experiments": {
       "baseUrl": "/app"
     }
   }
 }
-
