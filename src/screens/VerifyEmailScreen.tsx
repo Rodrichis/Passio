@@ -26,7 +26,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     try {
       setStatus("Enviando correo...");
       await sendEmailVerification(user);
-      setStatus("Correo de verificaciÃ³n enviado.");
+      setStatus("Correo de verificación enviado.");
       setCooldown(60);
     } catch (e) {
       setStatus("No se pudo enviar el correo. Intenta nuevamente.");
@@ -41,7 +41,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     if (user.emailVerified) {
       navigation.replace("CompanyGate");
     } else {
-      setStatus("AÃºn no estÃ¡ verificado. Revisa tu correo.");
+      setStatus("Aún no está verificado. Revisa tu correo.");
     }
   };
 
