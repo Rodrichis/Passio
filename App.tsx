@@ -1,4 +1,4 @@
-﻿import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { onAuthStateChanged } from "firebase/auth";
 import React from "react";
@@ -50,12 +50,30 @@ export default function App() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    let active = true;
+
     const unsub = onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
-      setLoading(false);
+      setLoading(true);
+
+      void (async () => {
+        try {
+          if (nextUser && !nextUser.isAnonymous) {
+            await nextUser.reload();
+          }
+        } catch (reloadError) {
+          console.error("No se pudo refrescar el estado de verificacion del usuario:", reloadError);
+        } finally {
+          if (!active) return;
+          setUser(auth.currentUser);
+          setLoading(false);
+        }
+      })();
     });
 
-    return unsub;
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   React.useEffect(() => {
@@ -106,5 +124,7 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+
 
 
