@@ -68,7 +68,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
         <View style={globalStyles.card}>
           <Text style={globalStyles.title}>Confirma tu cuenta</Text>
           <Text style={{ marginBottom: 12, color: "#333", textAlign: "center" }}>
-            Enviamos un correo de verificaciÃ³n a:
+            Enviamos un correo de verificación a:
           </Text>
           <Text style={{ fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
             {email || "tu correo"}

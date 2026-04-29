@@ -620,7 +620,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
-              tooltipText="PrÃ³ximamente"
+              tooltipText="Próximamente"
               onPress={() => {}}
               disabled
             />
@@ -676,7 +676,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
-              tooltipText="PrÃ³ximamente"
+              tooltipText="Próximamente"
               onPress={() => {}}
               disabled
             />

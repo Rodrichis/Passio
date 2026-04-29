@@ -927,7 +927,7 @@ export default function RegisterClientScreen({ route }: Props) {
               No se pudo crear tu wallet
             </Text>
             <Text style={{ color: "#444" }}>
-              {walletFriendlyError || "OcurriÃ³ un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
+              {walletFriendlyError || "Ocurrió un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
             </Text>
             <TouchableOpacity
               onPress={() => {
@@ -974,10 +974,10 @@ export default function RegisterClientScreen({ route }: Props) {
             }}
           >
             <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828", textAlign: "center" }}>
-              No se pueden registrar mÃ¡s usuarios.
+              No se pueden registrar más usuarios.
             </Text>
             <Text style={{ color: "#444", textAlign: "center" }}>
-              Este comercio alcanzÃ³ el lÃ­mite de registros disponible.
+              Este comercio alcanzo el lí­mite de registros disponible.
             </Text>
             <TouchableOpacity
               onPress={() => setShowLimitModal(false)}
