@@ -17,8 +17,11 @@ export type Cliente = {
 
 export function mapDoc(d: any): Cliente {
   const data = d.data() || {};
+  const nombreBase = String(data.nombre ?? "").trim();
+  const apellidoBase = String(data.apellido ?? "").trim();
+  const nombreArmado = [nombreBase, apellidoBase].filter(Boolean).join(" ");
   const nombre =
-    data.nombreCompleto ?? data["Nombre completo"] ?? data.nombre ?? "";
+    data.nombreCompleto ?? data["Nombre completo"] ?? nombreArmado;
   const so = data.so ?? data.SO ?? undefined;
   const creado =
     data.creadoEn?.toDate?.() ??
@@ -86,3 +89,4 @@ export function sortItems(
   });
   return copy;
 }
+
