@@ -184,9 +184,10 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
     loadFirstPage();
   }, [loadFirstPage]);
 
-  // Helper: actualiza contador de notificaciones con reset mensual y limite
+  // Helper: actualiza contador de notificaciones con reset mensual y limite.
+  // Cada envio cuenta como 1, independiente de cuántos destinatarios tenga.
   const updatePushCounter = useCallback(
-    async (toSend: number) => {
+    async (sendCount: number) => {
       if (!uid) throw new Error("NO_UID");
       let contRef = doc(db, "Empresas", uid, "Contador", "contador");
       const coll = await getDocs(collection(db, "Empresas", uid, "Contador"));
@@ -204,7 +205,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
         if (mesConteo !== mesKey) {
           current = 0;
         }
-        const nuevoTotal = current + toSend;
+        const nuevoTotal = current + sendCount;
         if (limitePush != null && nuevoTotal > limitePush) {
           throw new Error("LIMIT_PUSH");
         }
@@ -1178,7 +1179,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
                         );
 
                         try {
-                          await updatePushCounter(targets.length);
+                          await updatePushCounter(1);
                         } catch (e: any) {
                           if (String(e?.message).includes("LIMIT_PUSH")) {
                             setPushStatus("Alcanzaste el limite de notificaciones de tu plan.");
@@ -1317,7 +1318,6 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
     </View>
   );
 }
-
 
 
 
