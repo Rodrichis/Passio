@@ -6,6 +6,7 @@ import WalletIconUploadField from "../../components/wallet-onboarding/WalletIcon
 import WalletStampPackSelector from "../../components/wallet-onboarding/WalletStampPackSelector";
 import WalletVisitsField from "../../components/wallet-onboarding/WalletVisitsField";
 import WalletPreviewCard from "../../components/wallet-onboarding/WalletPreviewCard";
+import { ESTADO_WALLET } from "../../constants/empresa";
 import { auth } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
 import { syncAndroidWalletClass } from "../../services/apiWallet";
@@ -122,7 +123,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
       setSaveStep("Guardando configuración final...");
       await saveWalletConfig(user.uid, {
         walletConfigurado: true,
-        estadoWallet: "listo",
+        estadoWallet: ESTADO_WALLET.LISTO,
         colorWallet: normalizedColor,
         visitasPorPremio: safeVisitas,
         urlIconoWallet: nextIconUrl,

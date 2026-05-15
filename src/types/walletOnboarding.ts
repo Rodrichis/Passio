@@ -1,4 +1,6 @@
-export type EstadoWallet = "pendiente" | "listo" | "error";
+import { ESTADO_WALLET } from "../constants/empresa";
+
+export type EstadoWallet = typeof ESTADO_WALLET[keyof typeof ESTADO_WALLET];
 
 export type TipoSellosWallet = "generico" | "personalizado";
 

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
+import { ESTADO_WALLET } from "../../constants/empresa";
 import { db } from "../../services/firebaseConfig";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../styles/ClientesStyles";
@@ -81,8 +82,8 @@ function formatShortDate(value: Date | null) {
 
 function walletStatusLabel(configured: boolean, status: string) {
   if (!configured) return "Sin configurar";
-  if (status === "listo") return "Listo";
-  if (status === "error") return "Error";
+  if (status === ESTADO_WALLET.LISTO) return "Listo";
+  if (status === ESTADO_WALLET.ERROR) return "Error";
   return "Pendiente";
 }
 
@@ -90,10 +91,10 @@ function walletStatusColors(configured: boolean, status: string) {
   if (!configured) {
     return { bg: "#EEF2F6", border: "#D7E2E8", text: "#51616F" };
   }
-  if (status === "listo") {
+  if (status === ESTADO_WALLET.LISTO) {
     return { bg: "#E8F5E9", border: "#C8E6C9", text: "#2E7D32" };
   }
-  if (status === "error") {
+  if (status === ESTADO_WALLET.ERROR) {
     return { bg: "#FDECEC", border: "#F5C2C2", text: "#B42318" };
   }
   return { bg: "#FFF4E5", border: "#FFD39B", text: "#B54708" };

@@ -12,6 +12,7 @@ import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 
+import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../constants/empresa";
 import { auth, db } from "../services/firebaseConfig";
 import { globalStyles } from "../styles/theme";
 import { RootStackParamList } from "../types/navigation";
@@ -162,11 +163,11 @@ export default function RegisterScreen({ navigation }: Props) {
         LinkRegistro: buildRegistrationUrl(user.uid),
         Activo: true,
         FechaRegistro: now,
-        plan: "Free",
-        estadoSuscripcion: "prueba",
+        plan: PLAN.FREE,
+        estadoSuscripcion: ESTADO_SUSCRIPCION.PRUEBA,
         expiraEl: Timestamp.fromDate(expira),
         walletConfigurado: false,
-        estadoWallet: "pendiente",
+        estadoWallet: ESTADO_WALLET.PENDIENTE,
         colorWallet: "#A99985",
         visitasPorPremio: 6,
         urlIconoWallet: "",

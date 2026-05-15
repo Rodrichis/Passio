@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../../../constants/empresa";
 import { auth, db } from "../../../services/firebaseConfig";
 import {
   doc,
@@ -139,8 +140,8 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const applyPlanState = async (hasPro: boolean) => {
     if (!uid) return;
 
-    const nextPlan = hasPro ? "Pro" : "Free";
-    const nextState = hasPro ? "activa" : "inactiva";
+    const nextPlan = hasPro ? PLAN.PRO : PLAN.FREE;
+    const nextState = hasPro ? ESTADO_SUSCRIPCION.ACTIVA : ESTADO_SUSCRIPCION.INACTIVA;
 
     await setDoc(
       doc(db, "Empresas", uid),
@@ -207,7 +208,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
 
     const rcAvailable = isRevenueCatAvailable();
     const rcApiKey = hasRevenueCatApiKey();
-    const isAlreadyPro = String(empresa?.plan || "").toLowerCase() === "pro";
+    const isAlreadyPro = String(empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
 
     if (!rcAvailable || !rcApiKey) {
       const reason = !rcAvailable
@@ -315,7 +316,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
 
   const limiteUsuarios = planInfo.limiteUsuarios;
   const atUserLimit = typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
-  const isProPlan = String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() === "pro";
+  const isProPlan = String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
   const rawStampPack = typeof empresa?.paqueteSellosWallet === "string" && empresa.paqueteSellosWallet.trim().length > 0
     ? empresa.paqueteSellosWallet.trim()
     : "generico1";
@@ -428,7 +429,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             Usuarios: {usados.usuarios} / {planInfo.limiteUsuarios ?? "-"}
           </Text>
           <Text style={{ color: "#455a64" }}>
-            Estado suscripcion: {empresa?.estadoSuscripcion || (isProPlan ? "activa" : "inactiva")}
+            Estado suscripcion: {empresa?.estadoSuscripcion || (isProPlan ? ESTADO_SUSCRIPCION.ACTIVA : ESTADO_SUSCRIPCION.INACTIVA)}
           </Text>
           {atUserLimit && (
             <View
@@ -553,7 +554,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         }}
       >
         <Text style={{ color: "#0d47a1", fontSize: 16, fontWeight: "700" }}>
-          Estado wallet: {empresa?.walletConfigurado ? empresa?.estadoWallet || "pendiente" : "sin configurar"}
+          Estado wallet: {empresa?.walletConfigurado ? empresa?.estadoWallet || ESTADO_WALLET.PENDIENTE : "sin configurar"}
         </Text>
         <Text style={{ color: "#455a64" }}>Visitas por premio: {empresa?.visitasPorPremio ?? 6}</Text>
 

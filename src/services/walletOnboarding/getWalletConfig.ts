@@ -1,4 +1,5 @@
 import { doc, getDoc } from "firebase/firestore";
+import { ESTADO_WALLET } from "../../constants/empresa";
 import { db } from "../firebaseConfig";
 import type { EstadoWallet, PaqueteSellosWallet, TipoSellosWallet, WalletConfigData } from "../../types/walletOnboarding";
 import {
@@ -12,7 +13,9 @@ import { isGenericStampPack } from "../../utils/walletOnboarding/stampPacks";
 const DEFAULT_STAMP_PACK: PaqueteSellosWallet = "generico1";
 
 function resolveEstadoWallet(value: unknown): EstadoWallet {
-  return value === "listo" || value === "error" ? value : "pendiente";
+  return value === ESTADO_WALLET.LISTO || value === ESTADO_WALLET.ERROR
+    ? value
+    : ESTADO_WALLET.PENDIENTE;
 }
 
 function resolvePaqueteSellosWallet(value: unknown): PaqueteSellosWallet {
