@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from "react";
-import { View, TextInput, Text, ScrollView, TouchableOpacity, Modal, ScrollView as RNScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  Modal,
+  ScrollView,
+  ScrollView as RNScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
-import { auth, db } from "../services/firebaseConfig";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+import { auth, db } from "../services/firebaseConfig";
 import { globalStyles } from "../styles/theme";
-import { buildRegistrationUrl } from "../utils/publicUrls";
 import { RootStackParamList } from "../types/navigation";
+import { buildRegistrationUrl } from "../utils/publicUrls";
 import { resolveWalletClassIdFromName } from "../utils/walletOnboarding/walletClassId";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
@@ -30,6 +39,18 @@ const REGIONES_CHILE = [
   "Magallanes",
 ];
 
+const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+const EMPTY_TOUCHED = {
+  empresa: false,
+  email: false,
+  password: false,
+  telefono: false,
+  region: false,
+  ciudad: false,
+  direccion: false,
+};
+
 export default function RegisterScreen({ navigation }: Props) {
   const [empresa, setEmpresa] = useState("");
   const [email, setEmail] = useState("");
@@ -37,42 +58,75 @@ export default function RegisterScreen({ navigation }: Props) {
   const [telefono, setTelefono] = useState("");
   const [region, setRegion] = useState("");
   const [ciudad, setCiudad] = useState("");
-  const [Dirección, setDirección] = useState("");
+  const [direccion, setDireccion] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
-  const [passwordHint, setPasswordHint] = useState("");
+  const [touched, setTouched] = useState(EMPTY_TOUCHED);
 
-  // Asegura que al entrar a registro no quedes logueado con otra cuenta previa
   useEffect(() => {
     if (auth.currentUser) {
       signOut(auth).catch(() => {});
     }
   }, []);
 
+  const markTouched = (field: keyof typeof EMPTY_TOUCHED) => {
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  };
+
+  const markAllTouched = () => {
+    setTouched({
+      empresa: true,
+      email: true,
+      password: true,
+      telefono: true,
+      region: true,
+      ciudad: true,
+      direccion: true,
+    });
+  };
+
+  const empresaTrim = empresa.trim();
+  const emailTrim = email.trim().toLowerCase();
+  const passwordTrim = password.trim();
+  const telefonoTrim = telefono.trim();
+  const regionTrim = region.trim();
+  const ciudadTrim = ciudad.trim();
+  const direccionTrim = direccion.trim();
+
+  const emailValido = EMAIL_REGEX.test(emailTrim);
+  const passwordHasLetter = /[A-Za-z]/.test(passwordTrim);
+  const passwordHasNumber = /\d/.test(passwordTrim);
+  const passwordValida = passwordTrim.length >= 8 && passwordHasLetter && passwordHasNumber;
+
+  const fieldErrors = {
+    empresa: empresaTrim ? "" : "Ingresa el nombre de la empresa.",
+    email: !emailTrim ? "Ingresa un correo electrónico." : emailValido ? "" : "Ingresa un correo válido.",
+    password: !passwordTrim
+      ? "Ingresa una contraseña."
+      : passwordValida
+      ? ""
+      : "Usa al menos 8 caracteres con letras y números.",
+    telefono: telefonoTrim ? "" : "Ingresa un teléfono.",
+    region: regionTrim ? "" : "Selecciona una región.",
+    ciudad: ciudadTrim ? "" : "Ingresa una comuna.",
+    direccion: direccionTrim ? "" : "Ingresa una dirección.",
+  };
+
+  const isValid = Object.values(fieldErrors).every((value) => !value);
+  const hasTouchedField = Object.values(touched).some(Boolean);
+  const passwordHint = !passwordTrim
+    ? ""
+    : fieldErrors.password
+    ? "Usa al menos 8 caracteres con letras y números."
+    : "Contraseña fuerte.";
+  const passwordHintColor = fieldErrors.password ? "#fb8500" : "#2e7d32";
+  const inlineErrorStyle = { marginTop: -10, marginBottom: 10, color: "#fb8500" };
+
   const handleRegister = async () => {
-    const empresaTrim = empresa.trim();
-    const emailTrim = email.trim().toLowerCase();
-    const passwordTrim = password.trim();
-    const telefonoTrim = telefono.trim();
-    const regionTrim = region.trim();
-    const ciudadTrim = ciudad.trim();
-    const DirecciónTrim = Dirección.trim();
-
-    if (!empresaTrim || !emailTrim || !passwordTrim || !telefonoTrim || !regionTrim || !ciudadTrim || !DirecciónTrim) {
-      setError("Por favor completa todos los campos obligatorios.");
-      return;
-    }
-
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTrim)) {
-      setError("Correo inválido.");
-      return;
-    }
-
-    const hasLetter = /[A-Za-z]/.test(passwordTrim);
-    const hasNumber = /\d/.test(passwordTrim);
-    if (passwordTrim.length < 8 || !hasLetter || !hasNumber) {
-      setError("La Contraseña debe tener al menos 8 caracteres e incluir letras y números.");
+    if (!isValid) {
+      markAllTouched();
+      setError("Revisa los campos marcados para continuar.");
       return;
     }
 
@@ -87,13 +141,13 @@ export default function RegisterScreen({ navigation }: Props) {
 
       try {
         await sendEmailVerification(user);
-      } catch (e) {
-        console.warn("No se pudo enviar verificación de correo:", e);
+      } catch (verificationError) {
+        console.warn("No se pudo enviar verificación de correo:", verificationError);
       }
 
       const now = new Date();
       const expira = new Date(now.getTime());
-      expira.setFullYear(expira.getFullYear() + 1);
+      expira.setDate(expira.getDate() + 14);
 
       await setDoc(doc(db, "Empresas", user.uid), {
         uid: user.uid,
@@ -102,13 +156,14 @@ export default function RegisterScreen({ navigation }: Props) {
         telefono: telefonoTrim,
         region: regionTrim,
         ciudad: ciudadTrim,
-        Dirección: DirecciónTrim,
+        Dirección: direccionTrim,
         Descripcion: "",
         ColorPrincipal: "#A99985",
         LinkRegistro: buildRegistrationUrl(user.uid),
         Activo: true,
         FechaRegistro: now,
         plan: "Free",
+        estadoSuscripcion: "prueba",
         expiraEl: Timestamp.fromDate(expira),
         walletConfigurado: false,
         estadoWallet: "pendiente",
@@ -119,7 +174,7 @@ export default function RegisterScreen({ navigation }: Props) {
         "wallet-class-id": walletClassId,
       });
 
-      // La navegacion depende de onAuthStateChanged en App.tsx
+      // La navegación depende de onAuthStateChanged en App.tsx
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
       if (err?.code === "auth/email-already-in-use") {
@@ -131,17 +186,6 @@ export default function RegisterScreen({ navigation }: Props) {
       setLoading(false);
     }
   };
-
-  const isValid =
-    empresa.trim().length > 0 &&
-    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim().toLowerCase()) &&
-    password.trim().length >= 8 &&
-    /[A-Za-z]/.test(password.trim()) &&
-    /\d/.test(password.trim()) &&
-    telefono.trim().length > 0 &&
-    region.trim().length > 0 &&
-    ciudad.trim().length > 0 &&
-    Dirección.trim().length > 0;
 
   return (
     <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
@@ -156,23 +200,35 @@ export default function RegisterScreen({ navigation }: Props) {
             placeholder="Nombre de la empresa"
             value={empresa}
             placeholderTextColor="#607d8b"
-            onChangeText={setEmpresa}
+            onChangeText={(value) => {
+              setEmpresa(value);
+              setError("");
+              markTouched("empresa");
+            }}
+            onBlur={() => markTouched("empresa")}
             returnKeyType="done"
-            autoCapitalize="none"
+            autoCapitalize="words"
             autoCorrect={false}
           />
+          {touched.empresa && fieldErrors.empresa ? <Text style={inlineErrorStyle}>{fieldErrors.empresa}</Text> : null}
 
           <TextInput
             style={globalStyles.input}
             placeholder="Correo electrónico"
             value={email}
             placeholderTextColor="#607d8b"
-            onChangeText={setEmail}
+            onChangeText={(value) => {
+              setEmail(value);
+              setError("");
+              markTouched("email");
+            }}
+            onBlur={() => markTouched("email")}
             keyboardType="email-address"
             returnKeyType="done"
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {touched.email && fieldErrors.email ? <Text style={inlineErrorStyle}>{fieldErrors.email}</Text> : null}
 
           <TextInput
             style={globalStyles.input}
@@ -180,24 +236,18 @@ export default function RegisterScreen({ navigation }: Props) {
             secureTextEntry
             value={password}
             placeholderTextColor="#607d8b"
-            onChangeText={(v) => {
-              setPassword(v);
-              const hasLetterPwd = /[A-Za-z]/.test(v);
-              const hasNumberPwd = /\d/.test(v);
-              if (v.length === 0) {
-                setPasswordHint("");
-              } else if (v.length < 8 || !hasLetterPwd || !hasNumberPwd) {
-                setPasswordHint("Usa al menos 8 caracteres con letras y números.");
-              } else {
-                setPasswordHint("Contraseña fuerte.");
-              }
+            onChangeText={(value) => {
+              setPassword(value);
+              setError("");
+              markTouched("password");
             }}
+            onBlur={() => markTouched("password")}
             returnKeyType="done"
             autoCapitalize="none"
             autoCorrect={false}
           />
           {passwordHint ? (
-            <Text style={{ marginTop: -8, marginBottom: 10, color: passwordHint.includes("fuerte") ? "#2e7d32" : "#fb8500" }}>
+            <Text style={{ marginTop: -8, marginBottom: 10, color: passwordHintColor }}>
               {passwordHint}
             </Text>
           ) : null}
@@ -221,10 +271,13 @@ export default function RegisterScreen({ navigation }: Props) {
                   placeholder="Teléfono"
                   placeholderTextColor="#607d8b"
                   value={telefono}
-                  onChangeText={(v) => {
-                    const digits = v.replace(/\D/g, "");
+                  onChangeText={(value) => {
+                    const digits = value.replace(/\D/g, "");
                     setTelefono(digits.slice(0, 15));
+                    setError("");
+                    markTouched("telefono");
                   }}
+                  onBlur={() => markTouched("telefono")}
                   keyboardType="phone-pad"
                   returnKeyType="done"
                   autoCapitalize="none"
@@ -232,10 +285,15 @@ export default function RegisterScreen({ navigation }: Props) {
                   maxLength={15}
                 />
               </View>
+              {touched.telefono && fieldErrors.telefono ? <Text style={inlineErrorStyle}>{fieldErrors.telefono}</Text> : null}
             </View>
+
             <View style={{ flex: 1 }}>
               <TouchableOpacity
-                onPress={() => setShowRegionPicker(true)}
+                onPress={() => {
+                  setShowRegionPicker(true);
+                  markTouched("region");
+                }}
                 style={[
                   globalStyles.input,
                   { justifyContent: "center", paddingVertical: 12 },
@@ -245,6 +303,7 @@ export default function RegisterScreen({ navigation }: Props) {
                   {region || "Selecciona región"}
                 </Text>
               </TouchableOpacity>
+              {touched.region && fieldErrors.region ? <Text style={inlineErrorStyle}>{fieldErrors.region}</Text> : null}
             </View>
           </View>
 
@@ -255,25 +314,44 @@ export default function RegisterScreen({ navigation }: Props) {
                 placeholder="Comuna"
                 value={ciudad}
                 placeholderTextColor="#607d8b"
-                onChangeText={setCiudad}
+                onChangeText={(value) => {
+                  setCiudad(value);
+                  setError("");
+                  markTouched("ciudad");
+                }}
+                onBlur={() => markTouched("ciudad")}
                 returnKeyType="done"
                 autoCapitalize="words"
                 autoCorrect={false}
               />
+              {touched.ciudad && fieldErrors.ciudad ? <Text style={inlineErrorStyle}>{fieldErrors.ciudad}</Text> : null}
             </View>
+
             <View style={{ flex: 1 }}>
               <TextInput
                 style={globalStyles.input}
                 placeholder="Dirección"
-                value={Dirección}
+                value={direccion}
                 placeholderTextColor="#607d8b"
-                onChangeText={setDirección}
+                onChangeText={(value) => {
+                  setDireccion(value);
+                  setError("");
+                  markTouched("direccion");
+                }}
+                onBlur={() => markTouched("direccion")}
                 returnKeyType="done"
                 autoCapitalize="sentences"
                 autoCorrect={false}
               />
+              {touched.direccion && fieldErrors.direccion ? <Text style={inlineErrorStyle}>{fieldErrors.direccion}</Text> : null}
             </View>
           </View>
+
+          {hasTouchedField && !isValid ? (
+            <Text style={[globalStyles.error, { marginTop: -4 }]}>
+              Revisa los campos marcados para continuar.
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={[
@@ -323,11 +401,13 @@ export default function RegisterScreen({ navigation }: Props) {
               Selecciona tu región
             </Text>
             <RNScrollView>
-              {REGIONES_CHILE.map((r) => (
+              {REGIONES_CHILE.map((regionItem) => (
                 <TouchableOpacity
-                  key={r}
+                  key={regionItem}
                   onPress={() => {
-                    setRegion(r);
+                    setRegion(regionItem);
+                    setError("");
+                    markTouched("region");
                     setShowRegionPicker(false);
                   }}
                   style={{
@@ -337,7 +417,7 @@ export default function RegisterScreen({ navigation }: Props) {
                     borderBottomColor: "#eee",
                   }}
                 >
-                  <Text style={{ color: "#023047" }}>{r}</Text>
+                  <Text style={{ color: "#023047" }}>{regionItem}</Text>
                 </TouchableOpacity>
               ))}
             </RNScrollView>
@@ -358,6 +438,3 @@ export default function RegisterScreen({ navigation }: Props) {
     </ScrollView>
   );
 }
-
-
-

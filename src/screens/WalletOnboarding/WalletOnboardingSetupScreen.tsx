@@ -248,7 +248,7 @@ export default function WalletOnboardingSetupScreen({ navigation }: Props) {
                 textAlign: "center",
               }}
             >
-              {saveCompleted ? "Configuracion guardada" : "Guardando wallet"}
+              {saveCompleted ? "Configuración guardada" : "Guardando wallet"}
             </Text>
 
             <Text
