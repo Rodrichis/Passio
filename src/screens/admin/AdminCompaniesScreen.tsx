@@ -109,11 +109,7 @@ async function loadCountersForCompany(empresaId: string): Promise<CompanyCounter
   };
 
   try {
-    let counterSnap = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
-    if (counterSnap.empty) {
-      counterSnap = await getDocs(collection(db, "Empresas", empresaId, "Contadores"));
-    }
-
+    const counterSnap = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
     if (counterSnap.empty) return defaultCounter;
 
     const data = counterSnap.docs[0].data() || {};
@@ -123,8 +119,7 @@ async function loadCountersForCompany(empresaId: string): Promise<CompanyCounter
       correosMes: normalizeNumber(data.correosMes),
       mesConteo: normalizeString(data.mesConteo),
     };
-  } catch (error) {
-    console.error("Error cargando contadores de empresa:", empresaId, error);
+  } catch {
     return defaultCounter;
   }
 }

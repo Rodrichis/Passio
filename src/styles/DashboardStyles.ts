@@ -1,15 +1,17 @@
 import { StyleSheet } from "react-native";
+import { COLORS } from "./theme";
 
 export const dashboardStyles = StyleSheet.create({
   sidebar: {
     width: 200,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: COLORS.textDark,
     padding: 20,
   },
   sidebarTitle: {
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 20,
+    color: COLORS.secondary,
   },
   menuButton: {
     flexDirection: "row",
@@ -19,7 +21,7 @@ export const dashboardStyles = StyleSheet.create({
     marginBottom: 10,
   },
   menuText: {
-    color: "#023047",
+    color: "#fff",
     fontWeight: "bold",
   },
   contentContainer: {
@@ -35,7 +37,7 @@ export const dashboardStyles = StyleSheet.create({
   mobileBottomMenu: {
     flexDirection: "row",
     justifyContent: "space-around",
-    backgroundColor: "#cfd8dc",
+    backgroundColor: COLORS.textDark,
     paddingVertical: 10,
   },
   bottomMenuButton: {
