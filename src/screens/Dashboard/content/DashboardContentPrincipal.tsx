@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   Linking,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
@@ -15,7 +16,6 @@ import { auth, db } from "../../../services/firebaseConfig";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
   collection,
-  getCountFromServer,
   getDocs,
   getDoc,
   limit,
@@ -26,12 +26,26 @@ import {
   doc,
 } from "firebase/firestore";
 import { useIsFocused } from "@react-navigation/native";
+import { mapDoc } from "../../../utils/clientesHelpers";
 
 type ActivityItem = {
   title: string;
   subtitle?: string;
   date?: Date | null;
   type: "alta" | "otros";
+};
+
+type HighlightClient = {
+  name: string;
+  visits: number;
+};
+
+type LatestNotification = {
+  date: Date | null;
+};
+
+type ClientWithBirthday = ReturnType<typeof mapDoc> & {
+  fechaNacimiento: Date | null;
 };
 
 type Props = {
@@ -42,6 +56,8 @@ type Props = {
 export default function DashboardContentPrincipal({ goToClientes, companyName }: Props) {
   const uid = auth.currentUser?.uid;
   const isFocused = useIsFocused();
+  const { width } = useWindowDimensions();
+  const isCompactLayout = width < 900;
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [totalClientes, setTotalClientes] = React.useState<number | null>(null);
@@ -54,6 +70,9 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
   const [atUserLimit, setAtUserLimit] = React.useState(false);
   const [registrationUrl, setRegistrationUrl] = React.useState("");
   const [showQrModal, setShowQrModal] = React.useState(false);
+  const [birthdayNames, setBirthdayNames] = React.useState<string[]>([]);
+  const [topVisitedClient, setTopVisitedClient] = React.useState<HighlightClient | null>(null);
+  const [lastNotification, setLastNotification] = React.useState<LatestNotification | null>(null);
 
   const registroURL = registrationUrl || buildRegistrationUrl(uid);
 
@@ -64,10 +83,13 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
         return;
       }
 
+      setLoading(true);
+      setError(null);
+
       try {
         const col = collection(db, "Empresas", uid, "Clientes");
-        // Info de empresa/plan
         let planName: string | null = null;
+
         try {
           const empSnap = await getDoc(doc(db, "Empresas", uid));
           if (empSnap.exists()) {
@@ -75,13 +97,13 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
             planName = empresaData?.plan || null;
             const savedRegistrationUrl =
               typeof empresaData?.LinkRegistro === "string" ? empresaData.LinkRegistro.trim() : "";
+
             if (savedRegistrationUrl) {
               setRegistrationUrl(savedRegistrationUrl);
             }
           }
         } catch {}
 
-        // Límite del plan
         let limitePlan: number | null = null;
         if (planName) {
           try {
@@ -91,68 +113,123 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
             const first = planSnap.docs[0];
             if (first) {
               const data = first.data() as any;
-              if (typeof data.limiteUsuarios === "number") limitePlan = data.limiteUsuarios;
+              if (typeof data.limiteUsuarios === "number") {
+                limitePlan = data.limiteUsuarios;
+              }
             }
           } catch {}
         }
         setLimiteUsuarios(limitePlan);
 
-        // Contador de usuarios desde "Contador"
-        let totalFromCont: number | null = null;
-        try {
-          const contSnap = await getDocs(collection(db, "Empresas", uid, "Contador"));
-          const first = contSnap.docs[0];
-          if (first) {
-            const data = first.data() as any;
-            if (typeof data.totalUsuarios === "number") totalFromCont = data.totalUsuarios;
-          }
-        } catch {}
+        const allClientsSnap = await getDocs(col);
+        const allClients: ClientWithBirthday[] = allClientsSnap.docs.map((clientDoc) => {
+          const cliente = mapDoc(clientDoc);
+          const data = clientDoc.data() || {};
+          const rawBirthday = data.fechaNacimiento;
+          const fechaNacimiento =
+            rawBirthday?.toDate?.() ||
+            (rawBirthday instanceof Timestamp ? rawBirthday.toDate() : rawBirthday instanceof Date ? rawBirthday : null);
 
-        const totalSnap = await getCountFromServer(col);
-        const totalCount = totalFromCont ?? totalSnap.data().count;
+          return {
+            ...cliente,
+            fechaNacimiento,
+          };
+        });
+
+        const totalCount = allClients.length;
         setTotalClientes(totalCount);
 
         const limitNum =
           typeof limitePlan === "number"
             ? limitePlan
             : limitePlan != null
-            ? parseInt(String(limitePlan), 10)
-            : null;
+              ? parseInt(String(limitePlan), 10)
+              : null;
         const hasLimit = limitNum != null && !isNaN(limitNum);
-        setAtUserLimit(hasLimit ? totalCount >= (limitNum as number) : false);
+        setAtUserLimit(hasLimit ? totalCount >= limitNum : false);
 
-        const androidSnap = await getDocs(query(col, where("so", "==", "android")));
-        setAndroidCount(androidSnap.size);
-        const iosSnap = await getDocs(query(col, where("so", "==", "ios")));
-        setIosCount(iosSnap.size);
+        const androidTotal = allClients.filter((client) => String(client.so || "").toLowerCase() === "android").length;
+        const iosTotal = allClients.filter((client) => String(client.so || "").toLowerCase() === "ios").length;
+        setAndroidCount(androidTotal);
+        setIosCount(iosTotal);
 
-        const oneWeekAgo = Timestamp.fromDate(
-          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        );
-        const weekSnap = await getDocs(query(col, where("creadoEn", ">", oneWeekAgo)));
-        setNuevosSemana(weekSnap.size);
+        const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const nuevosUltimos7Dias = allClients.filter((client) => {
+          return client.creadoEn instanceof Date && client.creadoEn.getTime() > oneWeekAgo.getTime();
+        }).length;
+        setNuevosSemana(nuevosUltimos7Dias);
 
-        // Visitas registradas hoy (aprox: clientes con ultimaVisita >= inicio del día)
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-        const visitasHoySnap = await getDocs(query(col, where("ultimaVisita", ">", Timestamp.fromDate(startOfDay))));
-        setPuntosHoy(visitasHoySnap.size);
 
-        const recentSnap = await getDocs(query(col, orderBy("creadoEn", "desc"), limit(5)));
-        const recent = recentSnap.docs.map((d) => {
-          const data = d.data() || {};
-          const fecha =
-            data.creadoEn?.toDate?.() ||
-            data.fechaRegistro?.toDate?.() ||
-            null;
-          return {
-            title: data.nombreCompleto || data.nombre || "Nuevo cliente",
-            subtitle: data.email || "",
-            date: fecha,
+        const visitasRegistradasHoy = allClients.filter((client) => {
+          return client.ultimaVisita instanceof Date && client.ultimaVisita.getTime() > startOfDay.getTime();
+        }).length;
+        setPuntosHoy(visitasRegistradasHoy);
+
+        const birthdaysToday = allClients
+          .filter((client) => {
+            return (
+              client.fechaNacimiento instanceof Date &&
+              client.fechaNacimiento.getMonth() === startOfDay.getMonth() &&
+              client.fechaNacimiento.getDate() === startOfDay.getDate()
+            );
+          })
+          .map((client) => client.nombreCompleto)
+          .filter(Boolean);
+        setBirthdayNames(birthdaysToday);
+
+        const topVisited = allClients.reduce<HighlightClient | null>((best, client) => {
+          const visits = Number(client.visitasTotales ?? 0);
+          if (!best || visits > best.visits) {
+            return {
+              name: client.nombreCompleto || "Cliente sin nombre",
+              visits,
+            };
+          }
+          return best;
+        }, null);
+        setTopVisitedClient(topVisited);
+
+        const recent = allClients
+          .slice()
+          .sort((a, b) => {
+            const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;
+            const bTime = b.creadoEn instanceof Date ? b.creadoEn.getTime() : 0;
+            return bTime - aTime;
+          })
+          .slice(0, 5)
+          .map((client) => ({
+            title: client.nombreCompleto || "Nuevo cliente",
+            subtitle: client.email || "",
+            date: client.creadoEn || null,
             type: "alta" as const,
-          };
-        });
+          }));
         setActividad(recent);
+
+        try {
+          const latestNotificationSnap = await getDocs(
+            query(
+              collection(db, "Empresas", uid, "HistorialNotificaciones"),
+              orderBy("fechaEnvio", "desc"),
+              limit(1)
+            )
+          );
+
+          const firstNotification = latestNotificationSnap.docs[0];
+          if (!firstNotification) {
+            setLastNotification(null);
+          } else {
+            const notificationData = firstNotification.data() || {};
+            const rawDate = notificationData.fechaEnvio;
+            const date =
+              rawDate?.toDate?.() ||
+              (rawDate instanceof Timestamp ? rawDate.toDate() : rawDate instanceof Date ? rawDate : null);
+            setLastNotification({ date });
+          }
+        } catch {
+          setLastNotification(null);
+        }
       } catch (e) {
         console.error(e);
         setError("No se pudieron cargar las métricas.");
@@ -172,6 +249,87 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
       return "";
     }
   };
+
+  const formatDateOnly = (d?: Date | null) => {
+    if (!d) return "--";
+    try {
+      return d.toLocaleDateString("es-CL");
+    } catch {
+      return "--";
+    }
+  };
+
+  const formatTimeOnly = (d?: Date | null) => {
+    if (!d) return "--";
+    try {
+      const base = d.toLocaleTimeString("es-CL", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+      return `${base} hrs`;
+    } catch {
+      return "--";
+    }
+  };
+
+  const highlightCards = [
+    birthdayNames.length > 0
+      ? {
+          key: "birthday",
+          title: "Cumpleaños hoy",
+          primary: String(birthdayNames.length),
+          secondary: birthdayNames.join(", "),
+          icon: "gift-outline" as const,
+          iconColor: "#7C3AED",
+          iconBg: "#F3E8FF",
+          primaryColor: "#6D28D9",
+        }
+      : null,
+    {
+      key: "top",
+      title: "Cliente con más visitas",
+      primary: loading ? "..." : topVisitedClient?.name || "Sin clientes",
+      secondary: loading
+        ? "Cargando..."
+        : topVisitedClient
+          ? `${topVisitedClient.visits} visitas en total`
+          : "Aún no hay clientes registrados",
+      icon: "trophy-outline" as const,
+      iconColor: "#16A34A",
+      iconBg: "#E8F7EE",
+      primaryColor: "#16A34A",
+    },
+    {
+      key: "notification",
+      title: "Última notificación",
+      primary: loading
+        ? "..."
+        : lastNotification?.date
+          ? formatDateOnly(lastNotification.date)
+          : "Sin notificaciones",
+      secondary: loading
+        ? "Cargando..."
+        : lastNotification?.date
+          ? formatTimeOnly(lastNotification.date)
+          : "Aún no envías notificaciones",
+      icon: "notifications-outline" as const,
+      iconColor: "#2563EB",
+      iconBg: "#E8F1FF",
+      primaryColor: "#2563EB",
+    },
+  ].filter(Boolean) as Array<{
+    key: string;
+    title: string;
+    primary: string;
+    secondary: string;
+    icon: React.ComponentProps<typeof Ionicons>["name"];
+    iconColor: string;
+    iconBg: string;
+    primaryColor: string;
+  }>;
+
+  const highlightCardBasis = isCompactLayout ? "48%" : highlightCards.length === 2 ? "48%" : "31%";
 
   return (
     <ScrollView>
@@ -263,6 +421,24 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
 
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 
+      <Text style={styles.sectionTitle}>Actividad destacada</Text>
+      <View style={{ flexDirection: "row", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        {highlightCards.map((card) => (
+          <HighlightCard
+            key={card.key}
+            title={card.title}
+            primary={card.primary}
+            secondary={card.secondary}
+            icon={card.icon}
+            iconColor={card.iconColor}
+            iconBg={card.iconBg}
+            primaryColor={card.primaryColor}
+            basis={highlightCardBasis}
+            compact={isCompactLayout}
+          />
+        ))}
+      </View>
+
       <Text style={styles.sectionTitle}>Resumen de clientes</Text>
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <MetricCard
@@ -277,7 +453,7 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
           label="Visitas registradas hoy"
           value={puntosHoy ?? 0}
           loading={loading}
-          note="Clientes con ultima visita marcada hoy"
+          note="Clientes con última visita marcada hoy"
         />
       </View>
 
@@ -364,3 +540,134 @@ function MetricCard({
   );
 }
 
+function HighlightCard({
+  title,
+  primary,
+  secondary,
+  icon,
+  iconColor,
+  iconBg,
+  primaryColor,
+  basis,
+  compact,
+}: {
+  title: string;
+  primary: string;
+  secondary: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  iconColor: string;
+  iconBg: string;
+  primaryColor: string;
+  basis: string;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <View
+        style={{
+          flexBasis: basis as any,
+          flexGrow: 1,
+          minWidth: 0,
+          backgroundColor: "#fff",
+          borderRadius: 16,
+          padding: 12,
+          borderWidth: 1,
+          borderColor: "#E7EDF1",
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ color: "#51616F", fontSize: 12, fontWeight: "700", flex: 1, lineHeight: 17 }}
+          >
+            {title}
+          </Text>
+          <Ionicons name="chevron-forward-outline" size={16} color="#A3B1BA" />
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
+          <View
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              backgroundColor: iconBg,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name={icon} size={22} color={iconColor} />
+          </View>
+
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={{ color: primaryColor, fontSize: 16, fontWeight: "800", lineHeight: 20 }}
+            >
+              {primary}
+            </Text>
+            <Text
+              numberOfLines={3}
+              ellipsizeMode="tail"
+              style={{ color: "#51616F", fontSize: 12, lineHeight: 17, marginTop: 4 }}
+            >
+              {secondary}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        flexBasis: basis as any,
+        flexGrow: 1,
+        minWidth: 160,
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: "#E7EDF1",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 18,
+            backgroundColor: iconBg,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name={icon} size={28} color={iconColor} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: "#51616F", fontSize: 13, fontWeight: "700" }}>{title}</Text>
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{ color: primaryColor, fontSize: 18, fontWeight: "800", marginTop: 4 }}
+          >
+            {primary}
+          </Text>
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ color: "#51616F", fontSize: 13, lineHeight: 19, marginTop: 4 }}
+          >
+            {secondary}
+          </Text>
+        </View>
+
+        <Ionicons name="chevron-forward-outline" size={18} color="#A3B1BA" />
+      </View>
+    </View>
+  );
+}
