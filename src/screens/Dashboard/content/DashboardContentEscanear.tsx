@@ -34,16 +34,16 @@ const ACTION_THEME: Record<ScanAction, { label: string; title: string; color: st
   visita: {
     label: "Contar visita",
     title: "Modo visita",
-    color: "#0D7A52",
-    soft: "#E8F7EF",
-    border: "#BFE3CF",
+    color: "#2196F3",
+    soft: "#E3F2FD",
+    border: "#BBDEFB",
   },
   premio: {
     label: "Canjear premio",
     title: "Modo premio",
-    color: "#B84F2D",
-    soft: "#FFF0EA",
-    border: "#F0C3B3",
+    color: "#fb8500",
+    soft: "#FFF4E8",
+    border: "#FFD2A6",
   },
 };
 
@@ -702,8 +702,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 });
-
-
 
 
 
