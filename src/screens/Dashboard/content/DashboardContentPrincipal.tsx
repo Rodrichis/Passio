@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
+import DashboardViewHeader from "../../../components/dashboard/DashboardViewHeader";
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { auth, db } from "../../../services/firebaseConfig";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
@@ -35,9 +36,10 @@ type ActivityItem = {
 
 type Props = {
   goToClientes?: () => void;
+  companyName?: string;
 };
 
-export default function DashboardContentPrincipal({ goToClientes }: Props) {
+export default function DashboardContentPrincipal({ goToClientes, companyName }: Props) {
   const uid = auth.currentUser?.uid;
   const isFocused = useIsFocused();
   const [loading, setLoading] = React.useState(true);
@@ -172,8 +174,8 @@ export default function DashboardContentPrincipal({ goToClientes }: Props) {
   };
 
   return (
-    <ScrollView style={{ paddingHorizontal: 10 }}>
-      <Text style={styles.sectionTitle}>Principal</Text>
+    <ScrollView>
+      <DashboardViewHeader title="Principal" companyName={companyName} />
 
       <Text style={styles.sectionTitle}>Link de registro de clientes</Text>
       <View

@@ -13,12 +13,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
 import { ESTADO_WALLET } from "../../constants/empresa";
+import DashboardViewHeader from "../../components/dashboard/DashboardViewHeader";
 import { db } from "../../services/firebaseConfig";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../styles/ClientesStyles";
 
 type Props = {
   onBack: () => void;
+  companyName?: string;
 };
 
 type CompanyCounter = {
@@ -124,7 +126,7 @@ async function loadCountersForCompany(empresaId: string): Promise<CompanyCounter
   }
 }
 
-export default function AdminCompaniesScreen({ onBack }: Props) {
+export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
   const [items, setItems] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -218,30 +220,30 @@ export default function AdminCompaniesScreen({ onBack }: Props) {
   return (
     <>
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
-          <View>
-            <Text style={styles.sectionTitle}>Empresas</Text>
-            <Text style={{ color: "#51616F" }}>Monitoreo general de empresas y contadores.</Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={onBack}
-            style={{
-              borderWidth: 1,
-              borderColor: "#cfd8dc",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Ionicons name="arrow-back-outline" size={18} color="#023047" />
-            <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
-          </TouchableOpacity>
-        </View>
+        <DashboardViewHeader
+          title="Empresas"
+          subtitle="Monitoreo general de empresas y contadores."
+          companyName={companyName}
+          rightSlot={(
+            <TouchableOpacity
+              onPress={onBack}
+              style={{
+                borderWidth: 1,
+                borderColor: "#cfd8dc",
+                backgroundColor: "#fff",
+                borderRadius: 10,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Ionicons name="arrow-back-outline" size={18} color="#023047" />
+              <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
+            </TouchableOpacity>
+          )}
+        />
 
         <View style={cStyles.searchRow}>
           <TextInput

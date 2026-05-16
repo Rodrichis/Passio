@@ -27,6 +27,7 @@ type RootStackParamList = {
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [companyName, setCompanyName] = useState("");
   const { width } = useWindowDimensions();
   const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
   const isCompactWeb = Platform.OS === "web" && width < 900;
@@ -51,6 +52,7 @@ export default function Dashboard({ navigation }: any) {
         if (active && empresaSnap.exists()) {
           const data = empresaSnap.data() as any;
           setIsAdmin(data?.esAdmin === true);
+          setCompanyName(typeof data?.nombre === "string" ? data.nombre.trim() : "");
         }
       } catch (accessError) {
         console.error("Error verificando acceso admin:", accessError);
@@ -82,21 +84,21 @@ export default function Dashboard({ navigation }: any) {
   const renderContent = () => {
     switch (selected) {
       case "Principal":
-        return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} />;
+        return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} companyName={companyName} />;
       case "Clientes":
-        return <DashboardContentClientes onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")} />;
+        return <DashboardContentClientes onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")} companyName={companyName} />;
       case "Escanear":
-        return <DashboardContentEscanear />;
+        return <DashboardContentEscanear companyName={companyName} />;
       case "HistorialNotificaciones":
-        return <NotificationHistoryScreen onBack={() => setSelected("Clientes")} />;
+        return <NotificationHistoryScreen onBack={() => setSelected("Clientes")} companyName={companyName} />;
       case "Ajustes":
         return <DashboardContentAjustes navigation={navigation} />;
       case "Admin":
-        return <AdminHomeScreen onOpenLogs={() => setSelected("Logs")} onOpenCompanies={() => setSelected("EmpresasAdmin")} />;
+        return <AdminHomeScreen onOpenLogs={() => setSelected("Logs")} onOpenCompanies={() => setSelected("EmpresasAdmin")} companyName={companyName} />;
       case "Logs":
-        return <AdminLogsScreen onBack={() => setSelected("Admin")} />;
+        return <AdminLogsScreen onBack={() => setSelected("Admin")} companyName={companyName} />;
       case "EmpresasAdmin":
-        return <AdminCompaniesScreen onBack={() => setSelected("Admin")} />;
+        return <AdminCompaniesScreen onBack={() => setSelected("Admin")} companyName={companyName} />;
       default:
         return null;
     }

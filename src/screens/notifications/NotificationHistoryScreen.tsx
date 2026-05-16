@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../services/firebaseConfig";
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
+import DashboardViewHeader from "../../components/dashboard/DashboardViewHeader";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../styles/ClientesStyles";
 
@@ -30,6 +31,7 @@ type NotificationHistoryItem = {
 
 type Props = {
   onBack: () => void;
+  companyName?: string;
 };
 
 function normalizeString(value: unknown) {
@@ -102,7 +104,7 @@ function mapNotification(docSnap: any): NotificationHistoryItem {
   };
 }
 
-export default function NotificationHistoryScreen({ onBack }: Props) {
+export default function NotificationHistoryScreen({ onBack, companyName }: Props) {
   const empresaUid = auth.currentUser?.uid;
   const [items, setItems] = useState<NotificationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -173,30 +175,30 @@ export default function NotificationHistoryScreen({ onBack }: Props) {
   return (
     <>
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
-          <View>
-            <Text style={styles.sectionTitle}>Historial notificaciones</Text>
-            <Text style={{ color: "#51616F" }}>Mensajes enviados a tus clientes.</Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={onBack}
-            style={{
-              borderWidth: 1,
-              borderColor: "#cfd8dc",
-              backgroundColor: "#fff",
-              borderRadius: 10,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <Ionicons name="arrow-back-outline" size={18} color="#023047" />
-            <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
-          </TouchableOpacity>
-        </View>
+        <DashboardViewHeader
+          title="Historial notificaciones"
+          subtitle="Mensajes enviados a tus clientes."
+          companyName={companyName}
+          rightSlot={(
+            <TouchableOpacity
+              onPress={onBack}
+              style={{
+                borderWidth: 1,
+                borderColor: "#cfd8dc",
+                backgroundColor: "#fff",
+                borderRadius: 10,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Ionicons name="arrow-back-outline" size={18} color="#023047" />
+              <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
+            </TouchableOpacity>
+          )}
+        />
 
         <View style={cStyles.searchRow}>
           <TextInput

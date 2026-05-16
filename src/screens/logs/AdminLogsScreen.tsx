@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { collection, getDocs, limit, orderBy, query, Timestamp } from "firebase/firestore";
+import DashboardViewHeader from "../../components/dashboard/DashboardViewHeader";
 import { db } from "../../services/firebaseConfig";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../styles/ClientesStyles";
@@ -31,6 +32,7 @@ type LogItem = {
 
 type Props = {
   onBack: () => void;
+  companyName?: string;
 };
 
 function normalizeString(value: unknown) {
@@ -81,7 +83,7 @@ function severityColors(severity: LogSeverity) {
   return { bg: "#E8F4FD", border: "#B8DCF7", text: "#175CD3" };
 }
 
-export default function AdminLogsScreen({ onBack }: Props) {
+export default function AdminLogsScreen({ onBack, companyName }: Props) {
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,30 +154,30 @@ export default function AdminLogsScreen({ onBack }: Props) {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10 }}>
-        <View>
-          <Text style={styles.sectionTitle}>Logs</Text>
-          <Text style={{ color: "#51616F" }}>Eventos internos del sistema.</Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={onBack}
-          style={{
-            borderWidth: 1,
-            borderColor: "#cfd8dc",
-            backgroundColor: "#fff",
-            borderRadius: 10,
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <Ionicons name="arrow-back-outline" size={18} color="#023047" />
-          <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
-        </TouchableOpacity>
-      </View>
+      <DashboardViewHeader
+        title="Logs"
+        subtitle="Eventos internos del sistema."
+        companyName={companyName}
+        rightSlot={(
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              borderWidth: 1,
+              borderColor: "#cfd8dc",
+              backgroundColor: "#fff",
+              borderRadius: 10,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Ionicons name="arrow-back-outline" size={18} color="#023047" />
+            <Text style={{ color: "#023047", fontWeight: "700" }}>Volver</Text>
+          </TouchableOpacity>
+        )}
+      />
 
       <View style={cStyles.searchRow}>
         <TextInput

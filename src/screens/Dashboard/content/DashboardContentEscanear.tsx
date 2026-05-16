@@ -5,6 +5,7 @@ import { updateAndroidWalletState, updateApplePass, type WalletApiResponse } fro
 import { auth, db } from "../../../services/firebaseConfig";
 import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getWalletConfig } from "../../../services/walletOnboarding/getWalletConfig";
+import DashboardViewHeader from "../../../components/dashboard/DashboardViewHeader";
 
 type ParsedPayload = {
   idUsuario?: string;
@@ -28,6 +29,10 @@ type PendingConfirmation = {
   premiosDisponiblesNext: number;
   premiosCanjeadosPrev: number;
   premiosCanjeadosNext: number;
+};
+
+type Props = {
+  companyName?: string;
 };
 
 const ACTION_THEME: Record<ScanAction, { label: string; title: string; color: string; soft: string; border: string }> = {
@@ -59,7 +64,7 @@ const normalizeNonNegativeInt = (value: unknown) => {
   return parsed;
 };
 
-export default function DashboardContentEscanear() {
+export default function DashboardContentEscanear({ companyName }: Props) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [status, setStatus] = useState<string>("Selecciona una accion para comenzar.");
@@ -328,21 +333,26 @@ export default function DashboardContentEscanear() {
 
   if (hasPermission === null) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#023047" />
-        <Text style={{ marginTop: 8 }}>Solicitando permiso de camara...</Text>
+      <View style={styles.container}>
+        <DashboardViewHeader title="Escanear" companyName={companyName} />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color="#023047" />
+          <Text style={{ marginTop: 8 }}>Solicitando permiso de camara...</Text>
+        </View>
       </View>
     );
   }
 
   if (hasPermission === false) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>Escanear</Text>
-        <Text style={styles.text}>Permiso de camara denegado.</Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={requestPermission}>
-          <Text style={styles.primaryButtonText}>Otorgar permiso</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <DashboardViewHeader title="Escanear" companyName={companyName} />
+        <View style={styles.centerContent}>
+          <Text style={styles.text}>Permiso de camara denegado.</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={requestPermission}>
+            <Text style={styles.primaryButtonText}>Otorgar permiso</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -351,76 +361,78 @@ export default function DashboardContentEscanear() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Escanear QR</Text>
-      <Text style={styles.text}>{status}</Text>
+      <DashboardViewHeader title="Escanear QR" companyName={companyName} />
+      <View style={styles.contentBody}>
+        <Text style={styles.text}>{status}</Text>
 
-      {selectedAction === null ? (
-        <View style={styles.chooserCard}>
-          <Text style={styles.chooserTitle}>Elige la accion a realizar</Text>
-          <Text style={styles.chooserText}>Selecciona primero la accion y luego escanea el QR del cliente.</Text>
+        {selectedAction === null ? (
+          <View style={styles.chooserCard}>
+            <Text style={styles.chooserTitle}>Elige la accion a realizar</Text>
+            <Text style={styles.chooserText}>Selecciona primero la accion y luego escanea el QR del cliente.</Text>
 
-          <View style={styles.chooserButtons}>
-            <TouchableOpacity
-              onPress={() => startAction("visita")}
-              style={[styles.modeButton, { backgroundColor: ACTION_THEME.visita.color }]}
-            >
-              <Text style={styles.modeButtonText}>{ACTION_THEME.visita.label}</Text>
-            </TouchableOpacity>
+            <View style={styles.chooserButtons}>
+              <TouchableOpacity
+                onPress={() => startAction("visita")}
+                style={[styles.modeButton, { backgroundColor: ACTION_THEME.visita.color }]}
+              >
+                <Text style={styles.modeButtonText}>{ACTION_THEME.visita.label}</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => startAction("premio")}
-              style={[styles.modeButton, { backgroundColor: ACTION_THEME.premio.color }]}
-            >
-              <Text style={styles.modeButtonText}>{ACTION_THEME.premio.label}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <>
-          <View style={[styles.modeBanner, { backgroundColor: theme?.soft, borderColor: theme?.border }]}> 
-            <View style={[styles.modeBadge, { backgroundColor: theme?.color }]}>
-              <Text style={styles.modeBadgeText}>{theme?.title}</Text>
+              <TouchableOpacity
+                onPress={() => startAction("premio")}
+                style={[styles.modeButton, { backgroundColor: ACTION_THEME.premio.color }]}
+              >
+                <Text style={styles.modeButtonText}>{ACTION_THEME.premio.label}</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.modeBannerText}>
-              {selectedAction === "premio" ? "Escanea el QR y confirma el canje del premio." : "Escanea el QR y confirma la visita antes de guardar."}
-            </Text>
           </View>
-
-          <View style={[styles.scannerBox, { borderColor: theme?.color || "#023047" }]}>
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              facing="back"
-              autofocus="off"
-              onBarcodeScanned={selectedAction && !scanned ? handleBarCodeScanned : undefined}
-              barcodeScannerSettings={{
-                barcodeTypes: ["qr"],
-              }}
-            />
-            {loading && (
-              <View style={styles.loaderOverlay}>
-                <ActivityIndicator size="large" color="#fff" />
+        ) : (
+          <>
+            <View style={[styles.modeBanner, { backgroundColor: theme?.soft, borderColor: theme?.border }]}> 
+              <View style={[styles.modeBadge, { backgroundColor: theme?.color }]}>
+                <Text style={styles.modeBadgeText}>{theme?.title}</Text>
               </View>
-            )}
+              <Text style={styles.modeBannerText}>
+                {selectedAction === "premio" ? "Escanea el QR y confirma el canje del premio." : "Escanea el QR y confirma la visita antes de guardar."}
+              </Text>
+            </View>
+
+            <View style={[styles.scannerBox, { borderColor: theme?.color || "#023047" }]}>
+              <CameraView
+                style={StyleSheet.absoluteFillObject}
+                facing="back"
+                autofocus="off"
+                onBarcodeScanned={selectedAction && !scanned ? handleBarCodeScanned : undefined}
+                barcodeScannerSettings={{
+                  barcodeTypes: ["qr"],
+                }}
+              />
+              {loading && (
+                <View style={styles.loaderOverlay}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => resetToChooser(null)} disabled={loading}>
+              <Text style={styles.secondaryButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {feedback && (
+          <View style={[styles.resultBox, feedback.type === "success" ? styles.resultSuccess : styles.resultError]}>
+            <Text style={styles.resultTitle}>
+              {feedback.type === "success"
+                ? feedback.action === "premio"
+                  ? "Premio canjeado"
+                  : "Visita registrada"
+                : "No se pudo completar la accion"}
+            </Text>
+            <Text style={styles.resultText}>{feedback.message}</Text>
           </View>
-
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => resetToChooser(null)} disabled={loading}>
-            <Text style={styles.secondaryButtonText}>Cancelar</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {feedback && (
-        <View style={[styles.resultBox, feedback.type === "success" ? styles.resultSuccess : styles.resultError]}>
-          <Text style={styles.resultTitle}>
-            {feedback.type === "success"
-              ? feedback.action === "premio"
-                ? "Premio canjeado"
-                : "Visita registrada"
-              : "No se pudo completar la accion"}
-          </Text>
-          <Text style={styles.resultText}>{feedback.message}</Text>
-        </View>
-      )}
+        )}
+      </View>
 
       <Modal visible={Boolean(pendingConfirmation)} transparent animationType="fade" onRequestClose={() => (!loading ? resetToChooser(null) : undefined)}>
         <View style={styles.modalBackdrop}>
@@ -482,8 +494,10 @@ export default function DashboardContentEscanear() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: "#f5f5f5",
+  },
+  contentBody: {
+    flex: 1,
   },
   title: {
     fontSize: 20,
@@ -695,13 +709,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 15,
   },
-  center: {
+  centerContent: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
   },
 });
-
-
-

@@ -16,6 +16,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
 import { notifyApplePass, notifyAndroidPass } from "../../../services/apiWallet";
+import DashboardViewHeader from "../../../components/dashboard/DashboardViewHeader";
 import {
   addDoc,
   collection,
@@ -65,9 +66,10 @@ function formatDate(d?: Date | null) {
 
 type Props = {
   onOpenNotificationHistory: () => void;
+  companyName?: string;
 };
 
-export default function DashboardContentClientes({ onOpenNotificationHistory }: Props) {
+export default function DashboardContentClientes({ onOpenNotificationHistory, companyName }: Props) {
   const uid = auth.currentUser?.uid;
   const { width } = useWindowDimensions();
   const useDesktopWebLayout = IS_WEB && width >= 900;
@@ -724,7 +726,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
   if (!uid) {
     return (
       <View>
-        <Text style={styles.sectionTitle}>Clientes</Text>
+        <DashboardViewHeader title="Clientes" companyName={companyName} />
         <Text>Debes iniciar sesion para ver tus clientes.</Text>
       </View>
     );
@@ -733,7 +735,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
   if (loading) {
     return (
       <View>
-        <Text style={styles.sectionTitle}>Clientes</Text>
+        <DashboardViewHeader title="Clientes" companyName={companyName} />
         <ActivityIndicator size="large" color="#8ecae6" />
         <Text>Cargando clientes...</Text>
       </View>
@@ -742,7 +744,7 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
 
   return (
     <View style={{ flex: 1 }}>
-      <Text style={styles.sectionTitle}>Clientes</Text>
+      <DashboardViewHeader title="Clientes" companyName={companyName} />
 
       <View style={cStyles.searchRow}>
            <TextInput
@@ -1318,7 +1320,6 @@ export default function DashboardContentClientes({ onOpenNotificationHistory }: 
     </View>
   );
 }
-
 
 
 

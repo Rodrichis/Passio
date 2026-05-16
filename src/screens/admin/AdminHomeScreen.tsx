@@ -1,11 +1,12 @@
-﻿import React from "react";
+import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { dashboardStyles as styles } from "../../styles/DashboardStyles";
+import DashboardViewHeader from "../../components/dashboard/DashboardViewHeader";
 
 type Props = {
   onOpenLogs: () => void;
   onOpenCompanies: () => void;
+  companyName?: string;
 };
 
 type AdminCardProps = {
@@ -55,13 +56,14 @@ function AdminCard({ icon, iconColor, iconBg, title, description, onPress }: Adm
   );
 }
 
-export default function AdminHomeScreen({ onOpenLogs, onOpenCompanies }: Props) {
+export default function AdminHomeScreen({ onOpenLogs, onOpenCompanies, companyName }: Props) {
   return (
     <View>
-      <Text style={styles.sectionTitle}>Admin</Text>
-      <Text style={{ color: "#51616F", marginBottom: 16 }}>
-        Herramientas internas de administración.
-      </Text>
+      <DashboardViewHeader
+        title="Admin"
+        subtitle="Herramientas internas de administración."
+        companyName={companyName}
+      />
 
       <View style={{ gap: 12 }}>
         <AdminCard
