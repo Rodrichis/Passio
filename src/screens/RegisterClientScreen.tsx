@@ -48,6 +48,13 @@ function detectarSO(): SO | null {
   return null;
 }
 
+function formatLocalDateForInput(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function RegisterClientScreen({ route }: Props) {
   const { empresaId } = route.params;
 
@@ -77,6 +84,9 @@ export default function RegisterClientScreen({ route }: Props) {
   const [testAppleError, setTestAppleError] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const openedWalletRef = useRef(false);
+  const inputFontSize = 16;
+  const placeholderColor = "#90A4AE";
+  const todayInputMax = formatLocalDateForInput(new Date());
 
   // Anonymous auth to comply with security rules for public form
   useEffect(() => {
@@ -448,10 +458,16 @@ export default function RegisterClientScreen({ route }: Props) {
                       borderRadius: 8,
                       padding: 10,
                       backgroundColor: "#fff",
+                      fontSize: inputFontSize,
                     }}
                     value={nombre}
                     onChangeText={setNombre}
                     placeholder="Tu nombre"
+                    placeholderTextColor={placeholderColor}
+                    autoComplete="given-name"
+                    textContentType="givenName"
+                    importantForAutofill="yes"
+                    returnKeyType="next"
                     editable={!saving && walletStep !== "creating"}
                   />
                 </View>
@@ -464,10 +480,16 @@ export default function RegisterClientScreen({ route }: Props) {
                       borderRadius: 8,
                       padding: 10,
                       backgroundColor: "#fff",
+                      fontSize: inputFontSize,
                     }}
                     value={apellido}
                     onChangeText={setApellido}
                     placeholder="Tu apellido"
+                    placeholderTextColor={placeholderColor}
+                    autoComplete="family-name"
+                    textContentType="familyName"
+                    importantForAutofill="yes"
+                    returnKeyType="next"
                     editable={!saving && walletStep !== "creating"}
                   />
                 </View>
@@ -482,48 +504,49 @@ export default function RegisterClientScreen({ route }: Props) {
                   padding: 10,
                   backgroundColor: "#fff",
                   marginBottom: 10,
+                  fontSize: inputFontSize,
                 }}
                 value={email}
                 onChangeText={setEmail}
                 placeholder="correo@ejemplo.com"
+                placeholderTextColor={placeholderColor}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                importantForAutofill="yes"
+                returnKeyType="next"
                 editable={!saving && walletStep !== "creating"}
               />
 
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
               <View style={{ flex: 1 }}>
                 <Text>Telefono</Text>
-                <View
+                <TextInput
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
                     borderWidth: 1,
                     borderColor: "#ccc",
                     borderRadius: 8,
+                    padding: 10,
                     backgroundColor: "#fff",
-                    height: 42,
                     width: "100%",
-                    paddingHorizontal: 10,
-                    gap: 6,
+                    height: 42,
+                    fontSize: inputFontSize,
                   }}
-                >
-                  <Text style={{ color: "#555", fontWeight: "600" }}>+56</Text>
-                  <TextInput
-                    style={{
-                      flex: 1,
-                      paddingVertical: 10,
-                      paddingHorizontal: 4,
-                    }}
-                    value={telefono}
-                    onChangeText={(val) => {
-                      const digitsOnly = val.replace(/\D+/g, "");
-                      setTelefono(digitsOnly);
-                    }}
-                    keyboardType="numeric"
-                    editable={!saving && walletStep !== "creating"}
-                  />
-                </View>
+                  value={telefono}
+                  onChangeText={(val) => {
+                    const digitsOnly = val.replace(/\D+/g, "");
+                    setTelefono(digitsOnly);
+                  }}
+                  placeholder="9 123456789"
+                  placeholderTextColor={placeholderColor}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  importantForAutofill="yes"
+                  returnKeyType="next"
+                  editable={!saving && walletStep !== "creating"}
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text>Fecha de nacimiento</Text>
@@ -532,27 +555,33 @@ export default function RegisterClientScreen({ route }: Props) {
                 type="date"
                 value={birthInputWeb}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setBirthInputWeb(val);
-                  const d = val ? new Date(val) : null;
+                  const rawValue = e.target.value;
+                  const safeValue = rawValue && rawValue > todayInputMax ? todayInputMax : rawValue;
+                  if (safeValue !== rawValue) {
+                    e.currentTarget.value = safeValue;
+                  }
+                  setBirthInputWeb(safeValue);
+                  const d = safeValue ? new Date(`${safeValue}T00:00:00`) : null;
                   setBirthDate(d && !isNaN(d.getTime()) ? d : null);
                 }}
-                max={new Date().toISOString().slice(0, 10)}
+                max={todayInputMax}
                 style={{
                   borderWidth: 1,
                   borderColor: "#ccc",
                   borderRadius: 8,
                   padding: 10,
-                      backgroundColor: "#fff",
-                      width: "100%",
-                      boxSizing: "border-box",
-                      minWidth: 0,
-                      height: 42,
-                      appearance: "none",
-                      WebkitAppearance: "none",
-                    }}
-                    disabled={saving || walletStep === "creating"}
-                  />
+                  backgroundColor: "#fff",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  minWidth: 0,
+                  height: 42,
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  fontSize: inputFontSize,
+                }}
+                autoComplete="bday"
+                disabled={saving || walletStep === "creating"}
+              />
                 ) : (
                   <TextInput
                     style={{
@@ -563,6 +592,7 @@ export default function RegisterClientScreen({ route }: Props) {
                       backgroundColor: "#fff",
                       width: "100%",
                       height: 42,
+                      fontSize: inputFontSize,
                     }}
                     placeholder="AAAA-MM-DD"
                     value={birthInputWeb}
@@ -571,6 +601,10 @@ export default function RegisterClientScreen({ route }: Props) {
                       const d = val ? new Date(val) : null;
                       setBirthDate(d && !isNaN(d.getTime()) ? d : null);
                     }}
+                    placeholderTextColor={placeholderColor}
+                    autoComplete="birthdate-full"
+                    importantForAutofill="yes"
+                    returnKeyType="done"
                     editable={!saving && walletStep !== "creating"}
                   />
                 )}
