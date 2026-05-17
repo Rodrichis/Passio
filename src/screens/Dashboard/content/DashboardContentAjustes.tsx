@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   ScrollView,
   Platform,
   Linking,
-  Modal,
+  useWindowDimensions,
+  StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../../../constants/empresa";
 import { auth, db } from "../../../services/firebaseConfig";
@@ -23,7 +25,6 @@ import {
   where,
   getDocs,
 } from "firebase/firestore";
-import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
@@ -36,7 +37,11 @@ import {
   hasRevenueCatApiKey,
   isRevenueCatCustomerCenterAvailable,
 } from "../../../services/revenuecat";
-import { isGenericStampPack, resolveStampPackLabel } from "../../../utils/walletOnboarding/stampPacks";
+import {
+  isGenericStampPack,
+  resolveStampPackLabel,
+} from "../../../utils/walletOnboarding/stampPacks";
+
 type RootStackParamList = {
   Login: undefined;
   Register: undefined;
@@ -46,6 +51,7 @@ type RootStackParamList = {
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Dashboard">;
+  onOpenSupport?: () => void;
 };
 
 type PlanInfo = {
@@ -56,18 +62,31 @@ type PlanInfo = {
   precio?: number;
 };
 
-export default function DashboardContentAjustes({ navigation }: Props) {
+export default function DashboardContentAjustes({ navigation, onOpenSupport }: Props) {
   const [empresa, setEmpresa] = useState<any>(null);
   const [planData, setPlanData] = useState<PlanInfo | null>(null);
   const [contadores, setContadores] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-  const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const { width } = useWindowDimensions();
 
   const uid = auth.currentUser?.uid;
   const registroURL = empresa?.LinkRegistro || buildRegistrationUrl(uid);
+  const isDesktop = Platform.OS === "web" && width >= 900;
+  const showInlineSupport = !isDesktop;
+  const showInlineLogout = !isDesktop;
+  const compactMetricLayout = !isDesktop;
+  const twoColumnLayout = width >= 1024;
+  const companyInfoTwoColumns = width >= 760;
+
+  useEffect(() => {
+    if (!copiedLink) return;
+    const timer = setTimeout(() => setCopiedLink(false), 1800);
+    return () => clearTimeout(timer);
+  }, [copiedLink]);
 
   useEffect(() => {
     const fetchEmpresa = async () => {
@@ -95,7 +114,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             }
           }
 
-          // Contadores (coleccion "Contador")
           try {
             const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
             const first = contColl.docs[0];
@@ -106,7 +124,7 @@ export default function DashboardContentAjustes({ navigation }: Props) {
             console.log("No se pudo leer contadores:", e);
           }
         } else {
-          console.warn("No se encontro informacion de la empresa");
+          console.warn("No se encontró información de la empresa");
         }
       } catch (err) {
         console.error("Error al cargar empresa:", err);
@@ -141,7 +159,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     if (!uid) return;
 
     const nextPlan = hasPro ? PLAN.PRO : PLAN.FREE;
-    const nextState = hasPro ? ESTADO_SUSCRIPCION.ACTIVA : ESTADO_SUSCRIPCION.INACTIVA;
+    const nextState = hasPro
+      ? ESTADO_SUSCRIPCION.ACTIVA
+      : ESTADO_SUSCRIPCION.INACTIVA;
 
     await setDoc(
       doc(db, "Empresas", uid),
@@ -173,7 +193,6 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         { merge: true }
       );
       alert("Cambios guardados correctamente");
-      console.log("Empresa actualizada:", empresa);
     } catch (err: any) {
       console.error("Error al guardar cambios:", err);
       alert("No se pudo guardar. Intenta nuevamente.");
@@ -185,44 +204,32 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   const handleLogout = async () => {
     try {
       await auth.signOut();
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.reset({
-          index: 0,
-          routes: [{ name: "Login" as any }],
-        });
-      } else {
-        navigation.navigate("Login" as any);
-      }
     } catch (err) {
-      console.log("Error al cerrar sesion:", err);
+      console.log("Error al cerrar sesión:", err);
     }
   };
 
   const handleUpgrade = async () => {
-    console.log("handleUpgrade start", {
-      rcAvailable: isRevenueCatAvailable(),
-      rcApiKey: hasRevenueCatApiKey(),
-      uid,
-    });
-
     const rcAvailable = isRevenueCatAvailable();
     const rcApiKey = hasRevenueCatApiKey();
-    const isAlreadyPro = String(empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
+    const isAlreadyPro =
+      String(empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
 
     if (!rcAvailable || !rcApiKey) {
       const reason = !rcAvailable
-        ? "El modulo nativo de RevenueCat no esta disponible en esta build."
-        : "REVENUECAT_API_KEY no se cargo en runtime.";
+        ? "El módulo nativo de RevenueCat no está disponible en esta build."
+        : "REVENUECAT_API_KEY no se cargó en runtime.";
 
       alert(
-        `${reason}\n\nChecks:\n1) Recompila APK release despues de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android (prefijo goog_) en RevenueCat`
+        `${reason}\n\nChecks:\n1) Recompila APK release después de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android (prefijo goog_) en RevenueCat`
       );
       return;
     }
 
     if (isAlreadyPro) {
-      alert("Tu cuenta ya tiene plan Pro. Usa 'Gestionar suscripcion' para administrarla.");
+      alert(
+        "Tu cuenta ya tiene plan Pro. Usa 'Gestionar suscripción' para administrarla."
+      );
       return;
     }
 
@@ -232,7 +239,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     try {
       const offering = await fetchOfferings();
       if (!offering) {
-        alert("No encontramos ofertas disponibles. Revisa Offerings/Packages en RevenueCat.");
+        alert(
+          "No encontramos ofertas disponibles. Revisa Offerings/Packages en RevenueCat."
+        );
         return;
       }
 
@@ -242,10 +251,12 @@ export default function DashboardContentAjustes({ navigation }: Props) {
 
       if (hasPro) {
         await applyPlanState(true);
-        alert("Suscripcion Pro activada correctamente.");
+        alert("Suscripción Pro activada correctamente.");
       } else {
         console.log("Paywall result:", paywallResult);
-        alert("No se completo la compra. Si cancelaste el pago, tu plan sigue igual.");
+        alert(
+          "No se completó la compra. Si cancelaste el pago, tu plan sigue igual."
+        );
       }
     } catch (e) {
       console.log("Paywall error:", e);
@@ -260,7 +271,9 @@ export default function DashboardContentAjustes({ navigation }: Props) {
     const rcApiKey = hasRevenueCatApiKey();
 
     if (!rcAvailable || !rcApiKey) {
-      alert("RevenueCat no esta disponible para gestionar la suscripcion en esta build.");
+      alert(
+        "RevenueCat no está disponible para gestionar la suscripción en esta build."
+      );
       return;
     }
 
@@ -280,33 +293,51 @@ export default function DashboardContentAjustes({ navigation }: Props) {
       console.log("Customer center error:", e);
       if (Platform.OS === "android") {
         try {
-          await Linking.openURL("https://play.google.com/store/account/subscriptions");
+          await Linking.openURL(
+            "https://play.google.com/store/account/subscriptions"
+          );
           return;
         } catch {
           // no-op
         }
       }
-      alert("No se pudo abrir la gestion de suscripcion.");
+      alert("No se pudo abrir la gestión de suscripción.");
     } finally {
       setUpgrading(false);
     }
   };
-  if (loading) {
-    return (
-      <View style={{ marginTop: 20, alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#8ecae6" />
-        <Text>Cargando informacion...</Text>
-      </View>
-    );
-  }
 
-  const planInfo: PlanInfo = {
-    nombrePlan: planData?.nombrePlan || empresa?.plan,
-    limiteUsuarios: planData?.limiteUsuarios ?? empresa?.limiteUsuarios,
-    limiteNotificacion: planData?.limiteNotificacion ?? empresa?.limiteNotificacion,
-    limiteCorreo: planData?.limiteCorreo ?? empresa?.limiteCorreo,
-    precio: planData?.precio ?? empresa?.precio,
+  const handleCopyRegistrationLink = async () => {
+    if (!registroURL) return;
+
+    try {
+      if (
+        Platform.OS === "web" &&
+        typeof navigator !== "undefined" &&
+        (navigator as any).clipboard?.writeText
+      ) {
+        await (navigator as any).clipboard.writeText(registroURL);
+      } else {
+        await Clipboard.setStringAsync(registroURL);
+      }
+
+      setCopiedLink(true);
+    } catch (e) {
+      console.log("No se pudo copiar el link:", e);
+    }
   };
+
+  const planInfo: PlanInfo = useMemo(
+    () => ({
+      nombrePlan: planData?.nombrePlan || empresa?.plan,
+      limiteUsuarios: planData?.limiteUsuarios ?? empresa?.limiteUsuarios,
+      limiteNotificacion:
+        planData?.limiteNotificacion ?? empresa?.limiteNotificacion,
+      limiteCorreo: planData?.limiteCorreo ?? empresa?.limiteCorreo,
+      precio: planData?.precio ?? empresa?.precio,
+    }),
+    [empresa, planData]
+  );
 
   const usados = {
     usuarios: contadores?.totalUsuarios ?? 0,
@@ -315,222 +346,205 @@ export default function DashboardContentAjustes({ navigation }: Props) {
   };
 
   const limiteUsuarios = planInfo.limiteUsuarios;
-  const atUserLimit = typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
-  const isProPlan = String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
-  const rawStampPack = typeof empresa?.paqueteSellosWallet === "string" && empresa.paqueteSellosWallet.trim().length > 0
-    ? empresa.paqueteSellosWallet.trim()
-    : "generico1";
-  const tipoSellosWallet = empresa?.tipoSellosWallet === "generico" || empresa?.tipoSellosWallet === "personalizado"
-    ? empresa.tipoSellosWallet
-    : isGenericStampPack(rawStampPack)
-    ? "generico"
-    : "personalizado";
+  const atUserLimit =
+    typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
+  const isProPlan =
+    String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() ===
+    PLAN.PRO.toLowerCase();
+  const rawStampPack =
+    typeof empresa?.paqueteSellosWallet === "string" &&
+    empresa.paqueteSellosWallet.trim().length > 0
+      ? empresa.paqueteSellosWallet.trim()
+      : "generico1";
+  const tipoSellosWallet =
+    empresa?.tipoSellosWallet === "generico" ||
+    empresa?.tipoSellosWallet === "personalizado"
+      ? empresa.tipoSellosWallet
+      : isGenericStampPack(rawStampPack)
+      ? "generico"
+      : "personalizado";
   const stampPackLabel = resolveStampPackLabel(rawStampPack, tipoSellosWallet);
 
-  return (
-    <ScrollView style={{ paddingHorizontal: 10 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Ajustes de Empresa</Text>
+  const stats = [
+    {
+      key: "usuarios",
+      label: "Usuarios",
+      value: `${usados.usuarios} / ${planInfo.limiteUsuarios ?? "-"}`,
+      icon: "people-outline" as const,
+    },
+    {
+      key: "notificaciones",
+      label: "Notificaciones (mes)",
+      value: `${usados.notificaciones} / ${planInfo.limiteNotificacion ?? "-"}`,
+      icon: "notifications-outline" as const,
+    },
+    {
+      key: "correos",
+      label: "Correos (mes)",
+      value: `${usados.correos} / ${planInfo.limiteCorreo ?? "-"}`,
+      icon: "mail-outline" as const,
+    },
+  ];
 
-        <TouchableOpacity onPress={() => setSupportModalOpen(true)}>
-          <Text style={{ color: "#2196F3", fontWeight: "700" }}>Ayuda y soporte</Text>
-        </TouchableOpacity>
+  if (loading) {
+    return (
+      <View style={ajustesStyles.loadingWrap}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={ajustesStyles.loadingText}>Cargando información...</Text>
       </View>
+    );
+  }
 
-      <Modal visible={supportModalOpen} transparent animationType="fade" onRequestClose={() => setSupportModalOpen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(13, 25, 34, 0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-        >
-          <View
-            style={{
-              width: "100%",
-              maxWidth: 420,
-              backgroundColor: "#FFFFFF",
-              borderRadius: 24,
-              paddingHorizontal: 24,
-              paddingVertical: 24,
-              borderWidth: 1,
-              borderColor: "#E2ECF1",
-            }}
-          >
-            <Text style={{ color: "#123042", fontSize: 22, fontWeight: "800", marginBottom: 10 }}>Ayuda y soporte</Text>
-            <Text style={{ color: "#51616F", fontSize: 16, lineHeight: 24, marginBottom: 20 }}>
-              Si tienes errores, sugerencias o problemas, escribenos a hola@passio.cl
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => setSupportModalOpen(false)}
-              style={{
-                alignSelf: "flex-start",
-                backgroundColor: "#2196F3",
-                paddingVertical: 12,
-                paddingHorizontal: 18,
-                borderRadius: 999,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Cerrar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Plan actual */}
+  return (
+    <ScrollView
+      contentContainerStyle={[
+        ajustesStyles.container,
+        { paddingBottom: showInlineLogout ? 110 : 40 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
       <View
-        style={{
-          borderWidth: 1,
-          borderColor: "#e0e0e0",
-          borderRadius: 10,
-          padding: 12,
-          backgroundColor: "#f7f9fb",
-          marginBottom: 16,
-        }}
+        style={[
+          ajustesStyles.gridRow,
+          twoColumnLayout ? ajustesStyles.gridRowDesktop : ajustesStyles.gridRowMobile,
+        ]}
       >
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: "#0d47a1" }}>
-              Plan actual: {planInfo?.nombrePlan || "No definido"}
-            </Text>
-          </View>
-          {isProPlan ? null : (
-            <TouchableOpacity
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                backgroundColor: "#2196F3",
-              }}
-              onPress={handleUpgrade}
-              disabled={upgrading}
-            >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>
-                {upgrading ? "Abriendo..." : "Mejorar plan"}
+        <View
+          style={[
+            ajustesStyles.card,
+            twoColumnLayout ? ajustesStyles.halfCard : ajustesStyles.fullCard,
+          ]}
+        >
+          <View style={ajustesStyles.cardHeader}>
+            <View style={[ajustesStyles.iconBox, { backgroundColor: "#E8F3F7" }]}>
+              <Ionicons name="shield-checkmark-outline" size={22} color="#0A6F88" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={ajustesStyles.planTitle}>
+                Plan actual:{" "}
+                <Text style={ajustesStyles.planTitleAccent}>
+                  {planInfo?.nombrePlan || "No definido"}
+                </Text>
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={{ marginTop: 10, gap: 6 }}>
-          <Text style={{ color: "#455a64" }}>
-            Usuarios: {usados.usuarios} / {planInfo.limiteUsuarios ?? "-"}
-          </Text>
-          <Text style={{ color: "#455a64" }}>
-            Estado suscripcion: {empresa?.estadoSuscripcion || (isProPlan ? ESTADO_SUSCRIPCION.ACTIVA : ESTADO_SUSCRIPCION.INACTIVA)}
-          </Text>
-          {atUserLimit && (
-            <View
-              style={{
-                marginTop: 6,
-                padding: 8,
-                borderRadius: 8,
-                backgroundColor: "#fff4f4",
-                borderWidth: 1,
-                borderColor: "#ffcdd2",
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Ionicons name="warning-outline" size={16} color="#c62828" />
-              <Text style={{ color: "#c62828", flex: 1 }}>
-                Alcanzaste tu limite de usuarios registrados. Mejora tu plan.
+              <Text style={ajustesStyles.planSubtitle}>
+                Estado suscripción:{" "}
+                {empresa?.estadoSuscripcion ||
+                  (isProPlan
+                    ? ESTADO_SUSCRIPCION.ACTIVA
+                  : ESTADO_SUSCRIPCION.INACTIVA)}
               </Text>
             </View>
-          )}
-          <Text style={{ color: "#455a64" }}>
-            Notificaciones (mes): {usados.notificaciones} / {planInfo.limiteNotificacion ?? "-"}
-          </Text>
-          <Text style={{ color: "#455a64" }}>
-            Correos (mes): {usados.correos} / {planInfo.limiteCorreo ?? "-"}
-          </Text>
-          {!planData && (
-            <Text style={{ color: "#b71c1c", fontSize: 12 }}>
-              No pudimos leer los limites del plan. Revisa la coleccion "Planes" y los permisos de lectura.
-            </Text>
-          )}
-        </View>
-      </View>
 
-      <Text style={styles.sectionTitle}>Link de registro</Text>
-      <View
-        style={{
-          borderWidth: 1,
-          borderColor: "#e0e0e0",
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: "#fff",
-          marginBottom: 16,
-        }}
-      >
-        <Text selectable style={{ color: "#333", marginBottom: 10 }}>
-          {registroURL}
-        </Text>
-
-        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-          <TouchableOpacity
-            onPress={() => registroURL && Linking.openURL(registroURL)}
-            style={{
-              backgroundColor: "#2196F3",
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Abrir en navegador</Text>
-          </TouchableOpacity>
-
-          {Platform.OS === "web" &&
-            typeof navigator !== "undefined" &&
-            (navigator as any).clipboard && (
+            {showInlineSupport ? (
               <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    await (navigator as any).clipboard.writeText(registroURL);
-                    alert("Link copiado");
-                  } catch (e) {
-                    console.log(e);
-                  }
-                }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#2196F3",
-                  paddingVertical: 10,
-                  paddingHorizontal: 14,
-                  borderRadius: 8,
-                  backgroundColor: "#E3F2FD",
-                }}
+                onPress={onOpenSupport}
+                style={ajustesStyles.inlineSupportButtonCard}
               >
-                <Text style={{ color: "#0D47A1", fontWeight: "bold" }}>Copiar</Text>
+                <Ionicons name="help-circle-outline" size={16} color="#0A6F88" />
+                <Text style={ajustesStyles.inlineSupportText}>Ayuda y soporte</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
+          </View>
 
-          <TouchableOpacity
-            onPress={() => setShowQrModal(true)}
-            style={{
-              borderWidth: 1,
-              borderColor: "#fb8500",
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderRadius: 8,
-              backgroundColor: "#fb8500",
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Ver QR</Text>
-          </TouchableOpacity>
+          <View style={ajustesStyles.divider} />
+
+          <View style={ajustesStyles.metricRow}>
+            {stats.map((item) => (
+              <View key={item.key} style={ajustesStyles.metricCard}>
+                <Text style={ajustesStyles.metricLabel}>{item.label}</Text>
+                {compactMetricLayout ? (
+                  <View style={ajustesStyles.metricCompactRow}>
+                    <Text style={ajustesStyles.metricValue}>{item.value}</Text>
+                    <Ionicons
+                      name={item.icon}
+                      size={20}
+                      color="#B8C5CE"
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons
+                      name={item.icon}
+                      size={22}
+                      color="#B8C5CE"
+                      style={{ marginBottom: 10 }}
+                    />
+                    <Text style={ajustesStyles.metricValue}>{item.value}</Text>
+                  </>
+                )}
+              </View>
+            ))}
+          </View>
+
+          {atUserLimit ? (
+            <View style={ajustesStyles.warningBox}>
+              <Ionicons name="warning-outline" size={16} color="#C62828" />
+              <Text style={ajustesStyles.warningText}>
+                Alcanzaste tu límite de usuarios registrados. Mejora tu plan.
+              </Text>
+            </View>
+          ) : null}
+
+          {!planData ? (
+            <Text style={ajustesStyles.errorHint}>
+              No pudimos leer los límites del plan. Revisa la colección Planes y
+              los permisos de lectura.
+            </Text>
+          ) : null}
+        </View>
+
+        <View
+          style={[
+            ajustesStyles.card,
+            twoColumnLayout ? ajustesStyles.halfCard : ajustesStyles.fullCard,
+          ]}
+        >
+          <View style={ajustesStyles.simpleHeader}>
+            <Ionicons name="link-outline" size={22} color="#0A6F88" />
+            <Text style={ajustesStyles.simpleTitle}>Link de registro</Text>
+          </View>
+
+          <View style={ajustesStyles.linkBox}>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              selectable={Platform.OS === "web"}
+              style={ajustesStyles.linkText}
+            >
+              {registroURL}
+            </Text>
+
+            <TouchableOpacity
+              onPress={handleCopyRegistrationLink}
+              style={ajustesStyles.copyIconButton}
+            >
+              <Ionicons name="copy-outline" size={22} color="#0A6F88" />
+            </TouchableOpacity>
+          </View>
+
+          {copiedLink ? <Text style={ajustesStyles.copyFeedback}>Copiado</Text> : null}
+
+          <View style={ajustesStyles.divider} />
+
+          <View style={ajustesStyles.actionRow}>
+            <TouchableOpacity
+              onPress={() => registroURL && Linking.openURL(registroURL)}
+              style={ajustesStyles.primaryWideButton}
+            >
+              <Ionicons name="open-outline" size={18} color="#FFFFFF" />
+              <Text style={ajustesStyles.primaryWideButtonText}>
+                Abrir en navegador
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowQrModal(true)}
+              style={ajustesStyles.secondaryWideButton}
+            >
+              <Ionicons name="qr-code-outline" size={18} color="#6C4B00" />
+              <Text style={ajustesStyles.secondaryWideButtonText}>Ver QR</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -541,125 +555,453 @@ export default function DashboardContentAjustes({ navigation }: Props) {
         onClose={() => setShowQrModal(false)}
       />
 
-      <Text style={styles.sectionTitle}>Wallet</Text>
-      <View
-        style={{
-          borderWidth: 1,
-          borderColor: "#e0e0e0",
-          borderRadius: 10,
-          padding: 12,
-          backgroundColor: "#f7f9fb",
-          marginBottom: 16,
-          gap: 8,
-        }}
-      >
-        <Text style={{ color: "#0d47a1", fontSize: 16, fontWeight: "700" }}>
-          Estado wallet: {empresa?.walletConfigurado ? empresa?.estadoWallet || ESTADO_WALLET.PENDIENTE : "sin configurar"}
-        </Text>
-        <Text style={{ color: "#455a64" }}>Visitas por premio: {empresa?.visitasPorPremio ?? 6}</Text>
+      <View style={[ajustesStyles.card, ajustesStyles.fullCard, ajustesStyles.walletCard]}>
+        <View style={ajustesStyles.walletGlow} />
+        <View style={ajustesStyles.simpleHeader}>
+          <Ionicons name="wallet-outline" size={22} color="#0A6F88" />
+          <Text style={ajustesStyles.simpleTitle}>Wallet</Text>
+        </View>
 
-        <TouchableOpacity
-          onPress={() => navigation.navigate("WalletOnboardingSetup")}
-          style={{
-            marginTop: 6,
-            alignSelf: "flex-start",
-            backgroundColor: "#2196F3",
-            paddingVertical: 10,
-            paddingHorizontal: 14,
-            borderRadius: 8,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-          }}
+        <View style={ajustesStyles.walletRow}>
+          <View style={{ flex: 1, minWidth: 180 }}>
+            <Text style={ajustesStyles.walletState}>
+              Estado wallet:{" "}
+              <Text style={ajustesStyles.walletStateAccent}>
+                {empresa?.walletConfigurado
+                  ? empresa?.estadoWallet || ESTADO_WALLET.PENDIENTE
+                  : "sin configurar"}
+              </Text>
+            </Text>
+            <Text style={ajustesStyles.walletMeta}>
+              Visitas por premio: {empresa?.visitasPorPremio ?? 6}
+            </Text>
+            <Text style={ajustesStyles.walletMeta}>
+              Tipo de sellos: {stampPackLabel}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate("WalletOnboardingSetup")}
+            style={ajustesStyles.primaryWideButton}
+          >
+            <Ionicons name="settings-outline" size={18} color="#FFFFFF" />
+            <Text style={ajustesStyles.primaryWideButtonText}>Configurar wallet</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[ajustesStyles.card, ajustesStyles.fullCard]}>
+        <View style={ajustesStyles.simpleHeader}>
+          <Ionicons name="business-outline" size={22} color="#0A6F88" />
+          <Text style={ajustesStyles.simpleTitle}>Información de la empresa</Text>
+        </View>
+
+        <View
+          style={[
+            ajustesStyles.infoForm,
+            companyInfoTwoColumns ? ajustesStyles.infoFormDesktop : ajustesStyles.infoFormMobile,
+          ]}
         >
-          <Ionicons name="wallet-outline" size={18} color="#fff" />
-          <Text style={{ color: "#fff", fontWeight: "700" }}>Configurar wallet</Text>
+          <View style={[ajustesStyles.fieldGroup, companyInfoTwoColumns ? { flex: 0.6 } : null]}>
+            <Text style={ajustesStyles.fieldLabel}>Nombre empresa</Text>
+            <TextInput
+              style={[ajustesStyles.fieldInput, ajustesStyles.fieldInputDisabled]}
+              value={empresa?.nombre || ""}
+              editable={false}
+              selectTextOnFocus={false}
+            />
+          </View>
+
+          <View style={[ajustesStyles.fieldGroup, companyInfoTwoColumns ? { flex: 0.4 } : null]}>
+            <Text style={ajustesStyles.fieldLabel}>Teléfono</Text>
+            <TextInput
+              style={ajustesStyles.fieldInput}
+              value={empresa?.telefono || ""}
+              onChangeText={(t) => setEmpresa({ ...empresa, telefono: t })}
+              placeholder="+56 9 ..."
+              placeholderTextColor="#90A4AE"
+            />
+          </View>
+        </View>
+
+        <View style={ajustesStyles.fieldGroup}>
+          <Text style={ajustesStyles.fieldLabel}>Descripción</Text>
+          <TextInput
+            style={[ajustesStyles.fieldInput, ajustesStyles.textArea]}
+            multiline
+            numberOfLines={4}
+            value={empresa?.Descripcion || ""}
+            onChangeText={(t) => setEmpresa({ ...empresa, Descripcion: t })}
+            placeholder="Describe brevemente tu empresa..."
+            placeholderTextColor="#90A4AE"
+          />
+        </View>
+
+        <View style={ajustesStyles.divider} />
+
+        <View style={ajustesStyles.footerActionRow}>
+          <TouchableOpacity
+            style={[ajustesStyles.primaryWideButton, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Ionicons name="save-outline" size={18} color="#FFFFFF" />
+            <Text style={ajustesStyles.primaryWideButtonText}>
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {showInlineLogout ? (
+        <TouchableOpacity style={ajustesStyles.logoutButton} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+          <Text style={ajustesStyles.logoutButtonText}>Cerrar sesión</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Nombre + Telefono en una fila */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        <View style={{ flex: 0.6, marginRight: 8 }}>
-          <Text style={styles.label}>Nombre empresa</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: "#EEF3F6", color: "#607D8B" }]}
-            value={empresa?.nombre || ""}
-            editable={false}
-            selectTextOnFocus={false}
-          />
-        </View>
-
-        <View style={{ flex: 0.4 }}>
-          <Text style={styles.label}>Teléfono</Text>
-          <TextInput
-            style={styles.input}
-            value={empresa?.telefono || ""}
-            onChangeText={(t) => setEmpresa({ ...empresa, telefono: t })}
-            placeholder="+56 9 ..."
-            placeholderTextColor="#607d8b"
-          />
-        </View>
-      </View>
-
-      {/* Descripcion con textarea */}
-      <Text style={styles.label}>Descripción</Text>
-      <TextInput
-        style={[styles.input, { height: 100, textAlignVertical: "top" }]}
-        multiline
-        numberOfLines={4}
-        value={empresa?.Descripcion || ""}
-        onChangeText={(t) => setEmpresa({ ...empresa, Descripcion: t })}
-        placeholder="Describe brevemente tu empresa..."
-        placeholderTextColor="#607d8b"
-      />
-
-      {/* Boton guardar */}
-      <TouchableOpacity
-        style={[styles.saveButton, saving && { opacity: 0.6 }]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        <Ionicons name="save-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={styles.logoutText}>{saving ? "Guardando..." : "Guardar cambios"}</Text>
-      </TouchableOpacity>
-
-      <View style={{ height: 20 }} />
-
-      {/* Logout */}
-      <TouchableOpacity style={styles.smallLogoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
-        <Text style={styles.logoutText}>Cerrar sesión</Text>
-      </TouchableOpacity>
+      ) : null}
     </ScrollView>
   );
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+const ajustesStyles = StyleSheet.create({
+  container: {
+    gap: 22,
+  },
+  loadingWrap: {
+    marginTop: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingText: {
+    color: "#4F6470",
+    fontSize: 15,
+  },
+  inlineSupportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
+  inlineSupportButtonCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    marginLeft: "auto",
+  },
+  inlineSupportText: {
+    color: "#0A6F88",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  gridRow: {
+    gap: 22,
+  },
+  gridRowDesktop: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  gridRowMobile: {
+    flexDirection: "column",
+  },
+  fullCard: {
+    width: "100%",
+  },
+  halfCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#DDE8F0",
+    shadowColor: "#103B5C",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
+    gap: 16,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  simpleHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  simpleTitle: {
+    color: "#102A43",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  iconBox: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  planTitle: {
+    color: "#102A43",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  planTitleAccent: {
+    color: "#0A6F88",
+  },
+  planSubtitle: {
+    color: "#5F6F7A",
+    fontSize: 15,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E7EFF5",
+  },
+  primaryActionButton: {
+    backgroundColor: "#219EBC",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  primaryActionText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  secondaryActionButton: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D5E3EC",
+  },
+  secondaryActionText: {
+    color: "#123042",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  metricRow: {
+    flexDirection: "row",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: "#F6FAFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E0EAF2",
+    padding: 18,
+  },
+  metricCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 4,
+  },
+  metricLabel: {
+    color: "#50636F",
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  metricValue: {
+    color: "#102A43",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  warningBox: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#FFF4F4",
+    borderWidth: 1,
+    borderColor: "#FFD2D2",
+  },
+  warningText: {
+    color: "#C62828",
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  errorHint: {
+    color: "#B71C1C",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  linkBox: {
+    minHeight: 100,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#DFE8F0",
+    backgroundColor: "#F6FAFF",
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    overflow: "hidden",
+  },
+  linkText: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+    color: "#2B3F4E",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  copyIconButton: {
+    padding: 6,
+    borderRadius: 10,
+    alignSelf: "center",
+  },
+  copyFeedback: {
+    color: "#2E7D32",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: -4,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  primaryWideButton: {
+    backgroundColor: "#219EBC",
+    borderRadius: 14,
+    minHeight: 52,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  primaryWideButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  secondaryWideButton: {
+    backgroundColor: "#FFB703",
+    borderRadius: 14,
+    minHeight: 52,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  secondaryWideButtonText: {
+    color: "#6C4B00",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  walletCard: {
+    position: "relative",
+    overflow: "hidden",
+  },
+  walletGlow: {
+    position: "absolute",
+    top: -10,
+    right: -30,
+    width: 180,
+    height: 180,
+    backgroundColor: "rgba(142, 202, 230, 0.14)",
+    borderRadius: 999,
+  },
+  walletRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 18,
+  },
+  walletState: {
+    color: "#102A43",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  walletStateAccent: {
+    color: "#0A6F88",
+  },
+  walletMeta: {
+    color: "#5F6F7A",
+    fontSize: 15,
+    marginTop: 6,
+  },
+  infoForm: {
+    gap: 18,
+  },
+  infoFormDesktop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  infoFormMobile: {
+    flexDirection: "column",
+  },
+  fieldGroup: {
+    gap: 8,
+  },
+  fieldLabel: {
+    color: "#102A43",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  fieldInput: {
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D6E1EA",
+    backgroundColor: "#F3F7FB",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    color: "#102A43",
+    fontSize: 16,
+  },
+  fieldInputDisabled: {
+    color: "#607D8B",
+    backgroundColor: "#EEF3F6",
+  },
+  textArea: {
+    minHeight: 150,
+    textAlignVertical: "top",
+  },
+  footerActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  logoutButton: {
+    backgroundColor: "#C91919",
+    borderRadius: 16,
+    minHeight: 54,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  logoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+});

@@ -1,10 +1,19 @@
-﻿import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+﻿import React, { useMemo, useState, useEffect } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { sendEmailVerification } from "firebase/auth";
+import { Ionicons } from "@expo/vector-icons";
 import { auth } from "../services/firebaseConfig";
-import { globalStyles } from "../styles/theme";
 import RootStackParamList from "../types/navigation";
+import { authStyles } from "../styles/authStyles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "VerifyEmail">;
 
@@ -12,6 +21,9 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
   const [status, setStatus] = useState<string>("");
   const [cooldown, setCooldown] = useState<number>(0);
   const email = route.params?.email || auth.currentUser?.email || "";
+  const { width } = useWindowDimensions();
+  const isCompact = width < 640;
+  const year = useMemo(() => new Date().getFullYear(), []);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -26,7 +38,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     try {
       setStatus("Enviando correo...");
       await sendEmailVerification(user);
-      setStatus("Correo de verificación enviado.");
+      setStatus("Correo de verificacion enviado.");
       setCooldown(60);
     } catch (e) {
       setStatus("No se pudo enviar el correo. Intenta nuevamente.");
@@ -41,7 +53,7 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     if (user.emailVerified) {
       navigation.replace("CompanyGate");
     } else {
-      setStatus("Aún no está verificado. Revisa tu correo.");
+      setStatus("Aún no esta verificado. Revisa tu correo.");
     }
   };
 
@@ -49,57 +61,98 @@ export default function VerifyEmailScreen({ navigation, route }: Props) {
     try {
       await auth.signOut();
     } finally {
-      const parent = navigation.getParent();
-      if (parent) {
-        parent.reset({
-          index: 0,
-          routes: [{ name: "Login" as any }],
-        });
-      } else {
-        navigation.navigate("Login" as any);
-      }
+      // App.tsx cambia automaticamente al stack publico al cerrar sesión.
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
-      <View style={globalStyles.container}>
-        <Text style={globalStyles.header}>Verifica tu correo</Text>
-        <View style={globalStyles.card}>
-          <Text style={globalStyles.title}>Confirma tu cuenta</Text>
-          <Text style={{ marginBottom: 12, color: "#333", textAlign: "center" }}>
-            Enviamos un correo de verificación a:
-          </Text>
-          <Text style={{ fontWeight: "bold", marginBottom: 16, textAlign: "center" }}>
-            {email || "tu correo"}
-          </Text>
+    <KeyboardAvoidingView
+      style={authStyles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={authStyles.screen}>
+        <View style={[authStyles.glow, authStyles.glowTop]} />
+        <View style={[authStyles.glow, authStyles.glowBottom]} />
 
-          {status ? <Text style={{ color: "#023047", marginBottom: 12 }}>{status}</Text> : null}
+        <ScrollView
+          contentContainerStyle={[
+            authStyles.scrollContent,
+            { paddingHorizontal: isCompact ? 16 : 28, paddingVertical: isCompact ? 28 : 48 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={authStyles.brandWrap}>
+            <Text style={[authStyles.brand, { fontSize: isCompact ? 34 : 44 }]}>Passio</Text>
+          </View>
 
-          <TouchableOpacity
+          <View
             style={[
-              globalStyles.primaryButton,
-              cooldown > 0 && { opacity: 0.6 },
+              authStyles.card,
+              {
+                maxWidth: 560,
+                paddingHorizontal: isCompact ? 20 : 30,
+                paddingVertical: isCompact ? 24 : 30,
+                borderRadius: isCompact ? 24 : 28,
+              },
             ]}
-            onPress={handleResend}
-            disabled={cooldown > 0}
           >
-            <Text style={globalStyles.buttonText}>
-              {cooldown > 0 ? `Reenviar en ${cooldown}s` : "Reenviar correo"}
-            </Text>
-          </TouchableOpacity>
+            <View style={authStyles.headerBlock}>
+              <Text style={[authStyles.title, { fontSize: isCompact ? 18 : 22 }]}>
+                Confirma tu cuenta
+              </Text>
+              <Text style={authStyles.subtitle}>
+                Enviamos un correo de verificación a la dirección asociada a tu empresa.
+              </Text>
+            </View>
 
-          <TouchableOpacity style={globalStyles.secondaryButton} onPress={handleCheck}>
-            <Text style={globalStyles.buttonTextSecondary}>Ya verifiqué</Text>
-          </TouchableOpacity>
+            <View style={authStyles.formBlock}>
+              <View style={authStyles.infoBox}>
+                <Text style={authStyles.infoBoxText}>{email || "tu correo"}</Text>
+              </View>
 
-          <TouchableOpacity style={[globalStyles.secondaryButton, { backgroundColor: "#ccc" }]} onPress={handleLogout}>
-            <Text style={globalStyles.buttonTextSecondary}>Cambiar correo / salir</Text>
-          </TouchableOpacity>
-        </View>
+              {status ? (
+                <Text
+                  style={[
+                    authStyles.helperText,
+                    status.toLowerCase().includes("no se pudo") || status.toLowerCase().includes("aun")
+                      ? authStyles.warningText
+                      : authStyles.successText,
+                  ]}
+                >
+                  {status}
+                </Text>
+              ) : null}
+
+              <TouchableOpacity
+                style={[authStyles.primaryButton, cooldown > 0 && authStyles.buttonDisabled]}
+                onPress={handleResend}
+                disabled={cooldown > 0}
+              >
+                <Text style={authStyles.primaryButtonText}>
+                  {cooldown > 0 ? `Reenviar en ${cooldown}s` : "Reenviar correo"}
+                </Text>
+                <Ionicons name="mail-unread-outline" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={authStyles.secondaryButton} onPress={handleCheck}>
+                <Text style={authStyles.secondaryButtonText}>Ya verifiqué</Text>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#6C4B00" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={authStyles.ghostButton}
+                onPress={handleLogout}
+              >
+                <Text style={authStyles.ghostButtonText}>Cambiar correo / salir</Text>
+                <Ionicons name="log-out-outline" size={20} color="#123042" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={authStyles.footer}>© {year} Passio. Todos los derechos reservados.</Text>
+        </ScrollView>
       </View>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-

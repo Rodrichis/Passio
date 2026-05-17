@@ -1,37 +1,42 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  Platform,
-  Linking,
-  ScrollView,
-  StyleSheet,
+  View,
+  useWindowDimensions,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL } from "@env";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
-import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import {
-  doc,
-  getDoc,
   collection,
+  doc,
   DocumentReference,
-  serverTimestamp,
+  getDoc,
   getDocs,
   query,
-  where,
   runTransaction,
+  serverTimestamp,
+  where,
 } from "firebase/firestore";
 import { createAndSignWallet } from "../services/apiWallet";
+import { AUTH_WEB_INPUT_RESET } from "../styles/authStyles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
 type SO = "ios" | "android";
 
-// Detect platform (web) for convenience
+const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 function detectarSO(): SO | null {
   try {
     const uaData = (navigator as any)?.userAgentData;
@@ -42,7 +47,6 @@ function detectarSO(): SO | null {
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
     if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
     if (/Android/i.test(ua)) return "android";
-    // Safari en iPad puede reportar "MacIntel" pero con touchpoints
     if (navigator.platform === "MacIntel" && (navigator as any).maxTouchPoints > 1) return "ios";
   } catch {}
   return null;
@@ -55,8 +59,30 @@ function formatLocalDateForInput(value: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function extractLink(data: any): string | null {
+  if (!data) return null;
+  if (typeof data === "string" && data.startsWith("http")) return data;
+  if (typeof data === "object") {
+    return (
+      data.addToGoogleWalletUrl ||
+      data.saveUrl ||
+      data.url ||
+      data.link ||
+      data.saveLink ||
+      data.walletUrl ||
+      null
+    );
+  }
+  return null;
+}
+
 export default function RegisterClientScreen({ route }: Props) {
   const { empresaId } = route.params;
+  const { width } = useWindowDimensions();
+
+  const isDesktop = width >= 980;
+  const isTablet = width >= 720;
+  const isCompactWeb = Platform.OS === "web" && width < 720;
 
   const [empresa, setEmpresa] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -76,19 +102,22 @@ export default function RegisterClientScreen({ route }: Props) {
   const [walletSuccessMessage, setWalletSuccessMessage] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [birthInputWeb, setBirthInputWeb] = useState("");
-  const [testAppleUrl, setTestAppleUrl] = useState<string | null>(null);
-  const [testAppleMessage, setTestAppleMessage] = useState<string | null>(null);
-  const [testAppleStatus, setTestAppleStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [testAppleError, setTestAppleError] = useState<string | null>(null);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const openedWalletRef = useRef(false);
+
   const inputFontSize = 16;
   const placeholderColor = "#90A4AE";
   const todayInputMax = formatLocalDateForInput(new Date());
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailError = !normalizedEmail
+    ? "Ingresa un correo electrónico."
+    : EMAIL_REGEX.test(normalizedEmail)
+      ? ""
+      : "Ingresa un correo válido.";
 
-  // Anonymous auth to comply with security rules for public form
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) signInAnonymously(auth).catch((e) => console.error("Auth anon failed:", e));
@@ -96,7 +125,58 @@ export default function RegisterClientScreen({ route }: Props) {
     return unsub;
   }, []);
 
-  // Detect OS on mount (web)
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+
+    const styleId = "passio-register-client-no-zoom";
+    let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
+    const viewportMeta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+    const previousViewport = viewportMeta?.getAttribute("content") ?? null;
+    const previousHtmlTextSizeAdjust = document.documentElement.style.webkitTextSizeAdjust;
+    const previousBodyTextSizeAdjust = document.body.style.webkitTextSizeAdjust;
+
+    if (!styleTag) {
+      styleTag = document.createElement("style");
+      styleTag.id = styleId;
+      styleTag.textContent = `
+        html,
+        body {
+          -webkit-text-size-adjust: 100%;
+        }
+
+        input,
+        textarea,
+        select {
+          font-size: 16px !important;
+        }
+      `;
+      document.head.appendChild(styleTag);
+    }
+
+    if (viewportMeta) {
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+      );
+    }
+
+    document.documentElement.style.webkitTextSizeAdjust = "100%";
+    document.body.style.webkitTextSizeAdjust = "100%";
+
+    return () => {
+      styleTag?.remove();
+      if (viewportMeta) {
+        if (previousViewport) {
+          viewportMeta.setAttribute("content", previousViewport);
+        } else {
+          viewportMeta.removeAttribute("content");
+        }
+      }
+      document.documentElement.style.webkitTextSizeAdjust = previousHtmlTextSizeAdjust;
+      document.body.style.webkitTextSizeAdjust = previousBodyTextSizeAdjust;
+    };
+  }, []);
+
   useEffect(() => {
     if (Platform.OS === "web") {
       const detected = detectarSO();
@@ -126,9 +206,8 @@ export default function RegisterClientScreen({ route }: Props) {
         Linking.openURL(walletLink);
       }
     }
-  }, [showForm, walletStep, walletLink]);
+  }, [showForm, walletLink, walletStep]);
 
-  // Load company data
   useEffect(() => {
     (async () => {
       try {
@@ -144,21 +223,13 @@ export default function RegisterClientScreen({ route }: Props) {
     })();
   }, [empresaId]);
 
-  const extractLink = (data: any): string | null => {
-    if (!data) return null;
-    if (typeof data === "string" && data.startsWith("http")) return data;
-    if (typeof data === "object") {
-      return (
-        data.addToGoogleWalletUrl ||
-        data.saveUrl ||
-        data.url ||
-        data.link ||
-        data.saveLink ||
-        data.walletUrl ||
-        null
-      );
+  const openWalletLink = () => {
+    if (!walletLink) return;
+    if (Platform.OS === "web") {
+      window.location.href = walletLink;
+    } else {
+      Linking.openURL(walletLink);
     }
-    return null;
   };
 
   const handleSubmit = async () => {
@@ -166,24 +237,35 @@ export default function RegisterClientScreen({ route }: Props) {
     setWalletError(null);
     setWalletFriendlyError(null);
     setShowLimitModal(false);
+
     if (!nombre.trim() || !apellido.trim() || !email.trim() || !telefono.trim()) {
-      setFormError("Completa nombre, apellido, email y telefono.");
+      setFormError("Completa nombre, apellido, email y teléfono.");
       return;
     }
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setEmailTouched(true);
+      setFormError("Ingresa un correo válido.");
+      return;
+    }
+
     if (!so) {
       setFormError("Selecciona tu sistema: iPhone o Android.");
       return;
     }
+
     if (!birthDate) {
       setFormError("Selecciona tu fecha de nacimiento.");
       return;
     }
+
     const todayMax = new Date();
     todayMax.setHours(23, 59, 59, 999);
     if (birthDate.getTime() > todayMax.getTime()) {
       setFormError("La fecha de nacimiento no puede ser futura.");
       return;
     }
+
     setSaving(true);
     setWalletStep("idle");
     setWalletLink(null);
@@ -192,8 +274,6 @@ export default function RegisterClientScreen({ route }: Props) {
     setShowForm(true);
 
     try {
-      // Traer limites del plan solo si vamos a crear un cliente nuevo
-      const normalizedEmail = email.trim().toLowerCase();
       const clientesRef = collection(db, "Empresas", empresaId, "Clientes");
 
       let limiteUsuarios: number | null = null;
@@ -212,7 +292,7 @@ export default function RegisterClientScreen({ route }: Props) {
           }
         }
       } catch (planErr) {
-        console.log("No se pudieron leer los limites del plan:", planErr);
+        console.log("No se pudieron leer los límites del plan:", planErr);
       }
 
       const clientRef = doc(clientesRef) as DocumentReference;
@@ -235,7 +315,9 @@ export default function RegisterClientScreen({ route }: Props) {
           ? Math.min(10, Math.max(6, Math.trunc(empresa.visitasPorPremio)))
           : 6;
       const nombreEmpresa =
-        typeof empresa?.nombre === "string" && empresa.nombre.trim().length > 0 ? empresa.nombre.trim() : "Passio";
+        typeof empresa?.nombre === "string" && empresa.nombre.trim().length > 0
+          ? empresa.nombre.trim()
+          : "Passio";
       const colorWallet =
         typeof empresa?.colorWallet === "string" && empresa.colorWallet.trim().length > 0
           ? empresa.colorWallet.trim()
@@ -248,7 +330,7 @@ export default function RegisterClientScreen({ route }: Props) {
           : walletClassId
             ? `https://storage.googleapis.com/passio-wallet-bucket/${walletClassId}/icon.png`
             : "";
-      // Generar y firmar wallet
+
       setWalletStep("creating");
       let walletOk = false;
       let walletLinkLocal: string | null = null;
@@ -269,7 +351,7 @@ export default function RegisterClientScreen({ route }: Props) {
           colorWallet,
           urlIconoWallet,
         }).toString();
-        const directUrl = EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL + "/v1/crearPasses?" + walletQuery;
+        const directUrl = `${EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL}/v1/crearPasses?${walletQuery}`;
         walletOk = true;
         walletLinkLocal = directUrl;
       } else {
@@ -298,7 +380,6 @@ export default function RegisterClientScreen({ route }: Props) {
         }
       }
 
-      // Solo si el wallet fue OK escribimos el cliente en Firestore
       if (walletOk) {
         const clientData = {
           nombre: walletNombre,
@@ -323,8 +404,6 @@ export default function RegisterClientScreen({ route }: Props) {
           premiosCanjeados: 0,
         };
 
-        // Transaccion: valida limite y crea cliente + incrementa contador
-        // Contador de usuarios: intenta coleccion "Contador" (singular) y luego "Contadores" (plural)
         let contRefToUse = doc(db, "Empresas", empresaId, "Contador", "contador");
         try {
           let contColl = await getDocs(collection(db, "Empresas", empresaId, "Contador"));
@@ -339,7 +418,7 @@ export default function RegisterClientScreen({ route }: Props) {
             }
           }
         } catch (e) {
-          console.log("No se pudo leer coleccion Contador/Contadores, se usara contador:", e);
+          console.log("No se pudo leer la colección Contador/Contadores, se usará contador:", e);
         }
 
         try {
@@ -347,12 +426,11 @@ export default function RegisterClientScreen({ route }: Props) {
             const contSnap = await tx.get(contRefToUse);
             const contData = contSnap.exists() ? contSnap.data() || {} : {};
             const current = typeof contData.totalUsuarios === "number" ? contData.totalUsuarios : 0;
-            const currentNoti =
-              typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
+            const currentNoti = typeof contData.notificacionesMes === "number" ? contData.notificacionesMes : 0;
             const currentMail = typeof contData.correosMes === "number" ? contData.correosMes : 0;
 
             const now = new Date();
-            const mesKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+            const mesKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
             const storedMes = contData.mesConteo as string | undefined;
             const resetMonthly = storedMes !== mesKey;
             const nextNoti = resetMonthly ? 0 : currentNoti;
@@ -386,13 +464,13 @@ export default function RegisterClientScreen({ route }: Props) {
         }
 
         setWalletSuccessMessage("Tarjeta creada correctamente.");
-        setNombre("");        setNombre("");
+        setNombre("");
         setApellido("");
         setEmail("");
+        setEmailTouched(false);
         setTelefono("");
         setBirthDate(null);
         setBirthInputWeb("");
-
         setWalletLink(walletLinkLocal);
         setWalletStep("success");
         setWalletFriendlyError(null);
@@ -411,626 +489,739 @@ export default function RegisterClientScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" />
-        <Text>Cargando...</Text>
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingCard}>
+          <ActivityIndicator size="large" color="#023047" />
+          <Text style={styles.loadingText}>Cargando formulario...</Text>
+        </View>
       </View>
     );
   }
 
   if (!empresa) {
     return (
-      <View style={{ padding: 20 }}>
-        <Text>Empresa no encontrada o enlace invalido.</Text>
+      <View style={styles.loadingScreen}>
+        <View style={styles.loadingCard}>
+          <Ionicons name="alert-circle-outline" size={26} color="#C62828" />
+          <Text style={styles.loadingTitle}>Empresa no encontrada</Text>
+          <Text style={styles.loadingText}>El enlace de registro no es válido o la empresa ya no está disponible.</Text>
+        </View>
       </View>
     );
   }
 
+  const companyColor = empresa?.ColorPrincipal || "#219EBC";
+
   return (
-    <View style={{ flex: 1, position: "relative" }}>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <View style={{ flex: 1 }}>
+    <View style={styles.screen}>
+      <View style={[styles.glow, styles.glowTop]} />
+      <View style={[styles.glow, styles.glowBottom]} />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={[styles.card, isDesktop ? styles.cardDesktop : styles.cardCompact]}>
           <View
-            style={{
-              backgroundColor: empresa?.ColorPrincipal || "#222",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 16,
-            }}
+            style={[
+              styles.hero,
+              isCompactWeb ? styles.heroCompactWeb : null,
+              { backgroundColor: companyColor },
+            ]}
           >
-            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 18 }}>
-              {empresa?.nombre || "Comercio"}
-            </Text>
-            <Text style={{ color: "#fff", opacity: 0.85 }}>
-              Registrate para acumular visitas y beneficios
-            </Text>
+            <View style={styles.heroPattern} />
+            <View style={styles.heroContent}>
+              <Text style={[styles.heroTitle, isCompactWeb ? styles.heroTitleCompactWeb : null]}>
+                {empresa?.nombre || "Comercio"}
+              </Text>
+              <Text style={[styles.heroSubtitle, isCompactWeb ? styles.heroSubtitleCompactWeb : null]}>
+                Regístrate para acumular visitas y beneficios
+              </Text>
+            </View>
           </View>
 
-          {showForm ? (
-            <>
-              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text>Nombre</Text>
-                  <TextInput
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      borderRadius: 8,
-                      padding: 10,
-                      backgroundColor: "#fff",
-                      fontSize: inputFontSize,
-                    }}
-                    value={nombre}
-                    onChangeText={setNombre}
-                    placeholder="Tu nombre"
-                    placeholderTextColor={placeholderColor}
-                    autoComplete="given-name"
-                    textContentType="givenName"
-                    importantForAutofill="yes"
-                    returnKeyType="next"
-                    editable={!saving && walletStep !== "creating"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text>Apellido</Text>
-                  <TextInput
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      borderRadius: 8,
-                      padding: 10,
-                      backgroundColor: "#fff",
-                      fontSize: inputFontSize,
-                    }}
-                    value={apellido}
-                    onChangeText={setApellido}
-                    placeholder="Tu apellido"
-                    placeholderTextColor={placeholderColor}
-                    autoComplete="family-name"
-                    textContentType="familyName"
-                    importantForAutofill="yes"
-                    returnKeyType="next"
-                    editable={!saving && walletStep !== "creating"}
-                  />
-                </View>
-              </View>
+          <View style={[styles.formArea, isCompactWeb ? styles.formAreaCompactWeb : null]}>
+            {showForm ? (
+              <>
+                <View style={[styles.row, !isTablet && !isCompactWeb && styles.rowStack]}>
+                  <View style={styles.rowItem}>
+                    <Text style={styles.label}>Nombre</Text>
+                    <View style={styles.inputShell}>
+                      <TextInput
+                        style={[styles.input, AUTH_WEB_INPUT_RESET]}
+                        value={nombre}
+                        onChangeText={setNombre}
+                        placeholder="Tu nombre"
+                        placeholderTextColor={placeholderColor}
+                        autoComplete="given-name"
+                        textContentType="givenName"
+                        importantForAutofill="yes"
+                        returnKeyType="next"
+                        editable={!saving && walletStep !== "creating"}
+                      />
+                    </View>
+                  </View>
 
-              <Text>Email</Text>
-              <TextInput
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  marginBottom: 10,
-                  fontSize: inputFontSize,
-                }}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="correo@ejemplo.com"
-                placeholderTextColor={placeholderColor}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                textContentType="emailAddress"
-                importantForAutofill="yes"
-                returnKeyType="next"
-                editable={!saving && walletStep !== "creating"}
-              />
+                  <View style={styles.rowItem}>
+                    <Text style={styles.label}>Apellido</Text>
+                    <View style={styles.inputShell}>
+                      <TextInput
+                        style={[styles.input, AUTH_WEB_INPUT_RESET]}
+                        value={apellido}
+                        onChangeText={setApellido}
+                        placeholder="Tu apellido"
+                        placeholderTextColor={placeholderColor}
+                        autoComplete="family-name"
+                        textContentType="familyName"
+                        importantForAutofill="yes"
+                        returnKeyType="next"
+                        editable={!saving && walletStep !== "creating"}
+                      />
+                    </View>
+                  </View>
+                </View>
 
-            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
-              <View style={{ flex: 1 }}>
-                <Text>Telefono</Text>
-                <TextInput
-                  style={{
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                    borderRadius: 8,
-                    padding: 10,
-                    backgroundColor: "#fff",
-                    width: "100%",
-                    height: 42,
-                    fontSize: inputFontSize,
-                  }}
-                  value={telefono}
-                  onChangeText={(val) => {
-                    const digitsOnly = val.replace(/\D+/g, "");
-                    setTelefono(digitsOnly);
-                  }}
-                  placeholder="9 123456789"
-                  placeholderTextColor={placeholderColor}
-                  keyboardType="phone-pad"
-                  autoComplete="tel"
-                  textContentType="telephoneNumber"
-                  importantForAutofill="yes"
-                  returnKeyType="next"
-                  editable={!saving && walletStep !== "creating"}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text>Fecha de nacimiento</Text>
-            {Platform.OS === "web" ? (
-              <input
-                type="date"
-                value={birthInputWeb}
-                onChange={(e) => {
-                  const rawValue = e.target.value;
-                  const safeValue = rawValue && rawValue > todayInputMax ? todayInputMax : rawValue;
-                  if (safeValue !== rawValue) {
-                    e.currentTarget.value = safeValue;
-                  }
-                  setBirthInputWeb(safeValue);
-                  const d = safeValue ? new Date(`${safeValue}T00:00:00`) : null;
-                  setBirthDate(d && !isNaN(d.getTime()) ? d : null);
-                }}
-                max={todayInputMax}
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#ccc",
-                  borderRadius: 8,
-                  padding: 10,
-                  backgroundColor: "#fff",
-                  width: "100%",
-                  boxSizing: "border-box",
-                  minWidth: 0,
-                  height: 42,
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  fontSize: inputFontSize,
-                }}
-                autoComplete="bday"
-                disabled={saving || walletStep === "creating"}
-              />
+                <View style={styles.fieldBlock}>
+                  <Text style={styles.label}>Email</Text>
+                  <View style={styles.inputShell}>
+                    <Ionicons name="mail-outline" size={18} color="#9AA9B5" style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.input, AUTH_WEB_INPUT_RESET]}
+                      value={email}
+                      onChangeText={(value) => {
+                        setEmail(value);
+                        setFormError(null);
+                        setEmailTouched(true);
+                      }}
+                      placeholder="correo@ejemplo.com"
+                      placeholderTextColor={placeholderColor}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="email"
+                      textContentType="emailAddress"
+                      importantForAutofill="yes"
+                      returnKeyType="next"
+                      onBlur={() => setEmailTouched(true)}
+                      editable={!saving && walletStep !== "creating"}
+                    />
+                  </View>
+                  {emailTouched && emailError ? <Text style={styles.inlineErrorText}>{emailError}</Text> : null}
+                </View>
+
+                <View style={[styles.row, !isTablet && !isCompactWeb && styles.rowStack]}>
+                  <View style={styles.rowItem}>
+                    <Text style={styles.label}>Teléfono</Text>
+                    <View style={styles.inputShell}>
+                      <Ionicons name="call-outline" size={18} color="#9AA9B5" style={styles.inputIcon} />
+                      <TextInput
+                        style={[styles.input, AUTH_WEB_INPUT_RESET]}
+                        value={telefono}
+                        onChangeText={(val) => {
+                          const digitsOnly = val.replace(/\D+/g, "");
+                          setTelefono(digitsOnly);
+                        }}
+                        placeholder="9 123456789"
+                        placeholderTextColor={placeholderColor}
+                        keyboardType="phone-pad"
+                        autoComplete="tel"
+                        textContentType="telephoneNumber"
+                        importantForAutofill="yes"
+                        returnKeyType="next"
+                        editable={!saving && walletStep !== "creating"}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.rowItem}>
+                    <Text style={styles.label}>Fecha de nacimiento</Text>
+                    <View style={styles.inputShell}>
+                      {Platform.OS === "web" ? (
+                        <input
+                          type="date"
+                          value={birthInputWeb}
+                          onChange={(e) => {
+                            const rawValue = e.target.value;
+                            const safeValue = rawValue && rawValue > todayInputMax ? todayInputMax : rawValue;
+                            if (safeValue !== rawValue) {
+                              e.currentTarget.value = safeValue;
+                            }
+                            setBirthInputWeb(safeValue);
+                            const d = safeValue ? new Date(`${safeValue}T00:00:00`) : null;
+                            setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                          }}
+                          max={todayInputMax}
+                          style={{
+                            flex: 1,
+                            width: "100%",
+                            height: "100%",
+                            minHeight: 54,
+                            border: "0",
+                            outline: "none",
+                            background: "transparent",
+                            fontSize: inputFontSize,
+                            color: "#102A43",
+                            boxSizing: "border-box",
+                            padding: "0",
+                            appearance: "none",
+                            WebkitAppearance: "none",
+                          }}
+                          autoComplete="bday"
+                          disabled={saving || walletStep === "creating"}
+                        />
+                      ) : (
+                        <TextInput
+                          style={[styles.input, AUTH_WEB_INPUT_RESET]}
+                          placeholder="AAAA-MM-DD"
+                          value={birthInputWeb}
+                          onChangeText={(val) => {
+                            setBirthInputWeb(val);
+                            const d = val ? new Date(val) : null;
+                            setBirthDate(d && !isNaN(d.getTime()) ? d : null);
+                          }}
+                          placeholderTextColor={placeholderColor}
+                          autoComplete="birthdate-full"
+                          importantForAutofill="yes"
+                          returnKeyType="done"
+                          editable={!saving && walletStep !== "creating"}
+                        />
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {so && !needsSelector ? (
+                  <View style={styles.systemCard}>
+                    <View style={styles.systemInfo}>
+                      <View style={styles.systemIconWrap}>
+                        <Ionicons name="phone-portrait-outline" size={20} color="#008DB0" />
+                      </View>
+                      <Text style={styles.systemText}>
+                        Sistema detectado:{" "}
+                        <Text style={styles.systemTextStrong}>{so === "ios" ? "iPhone (iOS)" : "Android"}</Text>
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={() => setNeedsSelector(true)}
+                      disabled={saving || walletStep === "creating"}
+                      style={[
+                        styles.changeSystemButton,
+                        saving || walletStep === "creating" ? styles.buttonDisabled : null,
+                      ]}
+                    >
+                      <Text style={styles.changeSystemButtonText}>Cambiar</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
-                  <TextInput
-                    style={{
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      borderRadius: 8,
-                      padding: 10,
-                      backgroundColor: "#fff",
-                      width: "100%",
-                      height: 42,
-                      fontSize: inputFontSize,
-                    }}
-                    placeholder="AAAA-MM-DD"
-                    value={birthInputWeb}
-                    onChangeText={(val) => {
-                      setBirthInputWeb(val);
-                      const d = val ? new Date(val) : null;
-                      setBirthDate(d && !isNaN(d.getTime()) ? d : null);
-                    }}
-                    placeholderTextColor={placeholderColor}
-                    autoComplete="birthdate-full"
-                    importantForAutofill="yes"
-                    returnKeyType="done"
-                    editable={!saving && walletStep !== "creating"}
-                  />
-                )}
-              </View>
-            </View>
-
-            {/* SO selector */}
-            {so && !needsSelector ? (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text>
-                    Sistema detectado:{" "}
-                    <Text style={{ fontWeight: "bold" }}>
-                      {so === "ios" ? "iPhone (iOS)" : "Android"}
-                    </Text>
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setNeedsSelector(true)}
-                    disabled={saving || walletStep === "creating"}
-                    style={{
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#ccc",
-                      opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                    }}
-                  >
-                    <Text>Cambiar</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={{ flexDirection: "row", marginBottom: 16 }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSo("ios");
-                      setNeedsSelector(false);
-                    }}
-                    disabled={saving || walletStep === "creating"}
-                    style={{
-                      flex: 1,
-                      padding: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: so === "ios" ? "#2196F3" : "#ccc",
-                      backgroundColor: so === "ios" ? "#E3F2FD" : "#fff",
-                      marginRight: 8,
-                      alignItems: "center",
-                      opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                    }}
-                  >
-                    <Text style={{ fontWeight: "bold" }}>Tengo iPhone</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSo("android");
-                      setNeedsSelector(false);
-                    }}
-                    disabled={saving || walletStep === "creating"}
-                    style={{
-                      flex: 1,
-                      padding: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: so === "android" ? "#2196F3" : "#ccc",
-                      backgroundColor: so === "android" ? "#E3F2FD" : "#fff",
-                      alignItems: "center",
-                      opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                    }}
-                  >
-                    <Text style={{ fontWeight: "bold" }}>Tengo Android</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              <TouchableOpacity
-                onPress={handleSubmit}
-                disabled={saving || walletStep === "creating"}
-                style={{
-                  backgroundColor: "#2196F3",
-                  padding: 14,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                  {saving ? "Registrando..." : "Registrarme"}
-                </Text>
-              </TouchableOpacity>
-
-              {/*
-              Botones de prueba ocultos para la beta.
-
-              Botones de prueba con payload de ejemplo
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    setWalletError(null);
-                    setWalletFriendlyError(null);
-                    setTestAppleUrl(null);
-                    setTestAppleMessage(null);
-                    setTestAppleError(null);
-                    setTestAppleStatus("loading");
-                    if (!EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL) {
-                      setWalletError("Base URL de Apple no configurada.");
-                      setTestAppleError("Base URL de Apple no configurada.");
-                      setTestAppleStatus("error");
-                      return;
-                    }
-                    const query = new URLSearchParams({
-                      idUsuario: "100",
-                      cantidad: "1",
-                      premiosDisponibles: "3",
-                      nombre: "Ricardo",
-                      apellido: "Riedman",
-                      codigoQR: "QR-demo",
-                    }).toString();
-                    const directUrl = `${EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL}/v1/crearPasses?${query}`;
-                    setTestAppleUrl(directUrl);
-                    setTestAppleMessage("Estamos generando tu tarjeta...");
-                    if (Platform.OS === "web") {
-                      window.location.href = directUrl;
-                    } else {
-                      Linking.openURL(directUrl);
-                    }
-                    setTestAppleMessage("Tarjeta creada. Si no se descarga automaticamente, usa el boton de descarga.");
-                    setTestAppleStatus("idle");
-                  } catch (err) {
-                    console.error("Test Apple error", err);
-                    setWalletError("Test Apple error: " + String(err));
-                    setTestAppleError(String(err));
-                    setTestAppleStatus("error");
-                    setWalletStep("idle");
-                  }
-                }}
-                disabled={saving || walletStep === "creating"}
-                style={{
-                  marginTop: 10,
-                  backgroundColor: "#455a64",
-                  padding: 12,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Test Apple (payload ejemplo)</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    setWalletError(null);
-                    setWalletFriendlyError(null);
-                    setTestAppleMessage(null);
-                    const { create, sign } = await createAndSignWallet({
-                      idUsuario: "test-android-100",
-                      nombreUsuario: "Ricardo Riedman",
-                      nombre: "Ricardo",
-                      apellido: "Riedman",
-                      codigoQR: "QR-demo",
-                      cantidad: 9,
-                      premios: 4,
-                    });
-                    const payloadInfo = {
-                      create: {
-                        ok: create.ok,
-                        status: create.status,
-                        data: create.data,
-                        error: create.errorText,
-                      },
-                      sign: sign
-                        ? {
-                            ok: sign.ok,
-                            status: sign.status,
-                            data: sign.data,
-                            error: sign.errorText,
-                          }
-                        : null,
-                    };
-                    console.log("Test Android respuesta:", payloadInfo);
-                    if (create.ok && sign?.ok) {
-                      setWalletError(
-                        "Test Android OK. Respuesta:\n" + JSON.stringify(payloadInfo, null, 2)
-                      );
-                    } else {
-                      setWalletError(
-                        "Test Android fallo:\n" +
-                          (sign?.errorText || create.errorText || "sin detalle") +
-                          "\n" +
-                          JSON.stringify(payloadInfo, null, 2)
-                      );
-                    }
-                  } catch (err) {
-                    setWalletError("Test Android error: " + String(err));
-                  }
-                }}
-                disabled={saving || walletStep === "creating"}
-                style={{
-                  marginTop: 10,
-                  backgroundColor: "#2e7d32",
-                  padding: 12,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  opacity: saving || walletStep === "creating" ? 0.6 : 1,
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Test Android (payload ejemplo)</Text>
-              </TouchableOpacity>
-              */}
-
-              {formError ? (
-                <Text style={{ marginTop: 8, color: "#c62828" }}>{formError}</Text>
-              ) : null}
-              {walletError ? (
-                <Text selectable style={{ marginTop: 8, color: "#c62828" }}>
-                  {walletError}
-                </Text>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {walletStep === "success" && (
-                <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#e8f5e9" }}>
-                  <Text style={{ color: "#2e7d32", fontWeight: "700" }}>{walletSuccessMessage || "Tarjeta creada correctamente."}</Text>
-                  {walletLink ? (
+                  <View style={[styles.systemSelectorRow, !isTablet && styles.rowStack]}>
                     <TouchableOpacity
                       onPress={() => {
-                        if (!walletLink) return;
-                        if (Platform.OS === "web") {
-                          window.location.href = walletLink;
-                        } else {
-                          Linking.openURL(walletLink);
-                        }
+                        setSo("ios");
+                        setNeedsSelector(false);
                       }}
-                      style={{
-                        marginTop: 10,
-                        backgroundColor: "#023047",
-                        paddingVertical: 10,
-                        borderRadius: 8,
-                        alignItems: "center",
-                      }}
+                      disabled={saving || walletStep === "creating"}
+                      style={[
+                        styles.systemOption,
+                        so === "ios" ? styles.systemOptionActive : null,
+                        saving || walletStep === "creating" ? styles.buttonDisabled : null,
+                      ]}
                     >
-                      <Text style={{ color: "#fff", fontWeight: "700" }}>Agregar a mi wallet</Text>
+                      <Ionicons name="logo-apple" size={18} color={so === "ios" ? "#0A6F88" : "#5C7382"} />
+                      <Text style={[styles.systemOptionText, so === "ios" ? styles.systemOptionTextActive : null]}>
+                        Tengo iPhone
+                      </Text>
                     </TouchableOpacity>
-                  ) : (
-                    <Text style={{ marginTop: 8, color: "#023047" }}>
-                      No recibimos un link de tarjeta en la respuesta.
-                    </Text>
-                  )}
-                </View>
-              )}
 
-              {walletStep === "error" && walletError ? (
-                <View style={{ marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#ffebee" }}>
-                  <Text style={{ color: "#c62828", fontWeight: "700" }}>No se pudo crear la tarjeta.</Text>
-                  <Text style={{ color: "#c62828" }}>{walletError}</Text>
-                </View>
-              ) : null}
-            </>
-          )}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSo("android");
+                        setNeedsSelector(false);
+                      }}
+                      disabled={saving || walletStep === "creating"}
+                      style={[
+                        styles.systemOption,
+                        so === "android" ? styles.systemOptionActive : null,
+                        saving || walletStep === "creating" ? styles.buttonDisabled : null,
+                      ]}
+                    >
+                      <Ionicons name="logo-android" size={18} color={so === "android" ? "#0A6F88" : "#5C7382"} />
+                      <Text
+                        style={[
+                          styles.systemOptionText,
+                          so === "android" ? styles.systemOptionTextActive : null,
+                        ]}
+                      >
+                        Tengo Android
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
+                <TouchableOpacity
+                  onPress={handleSubmit}
+                  disabled={saving || walletStep === "creating"}
+                  style={[styles.primaryButton, saving || walletStep === "creating" ? styles.buttonDisabled : null]}
+                >
+                  <Text style={styles.primaryButtonText}>{saving ? "Registrando..." : "Registrarme"}</Text>
+                  {!saving ? <Ionicons name="arrow-forward" size={20} color="#FFFFFF" /> : null}
+                </TouchableOpacity>
+
+                <Text style={styles.footerText}>
+                  Al registrarte, aceptas nuestros términos y condiciones.
+                </Text>
+
+                {formError && formError !== "Ingresa un correo válido." ? (
+                  <Text style={styles.inlineErrorText}>{formError}</Text>
+                ) : null}
+                {walletError ? (
+                  <Text selectable style={styles.inlineErrorText}>
+                    {walletError}
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <View style={styles.successState}>
+                <View style={styles.successIconWrap}>
+                  <Ionicons name="checkmark-circle" size={28} color="#2E7D32" />
+                </View>
+                <Text style={styles.successTitle}>Tarjeta creada correctamente</Text>
+                <Text style={styles.successText}>
+                  {walletSuccessMessage || "Ya puedes agregar tu tarjeta y comenzar a acumular visitas."}
+                </Text>
+
+                {walletLink ? (
+                  <TouchableOpacity onPress={openWalletLink} style={styles.primaryButton}>
+                    <Text style={styles.primaryButtonText}>Agregar a mi wallet</Text>
+                    <Ionicons name="wallet-outline" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.inlineHelperText}>No recibimos un enlace de tarjeta en la respuesta.</Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
 
-      {testAppleStatus === "loading" && (
-        <View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 999,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 16,
-              borderRadius: 12,
-              width: "85%",
-              maxWidth: 360,
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
+      <Modal visible={walletStep === "creating"} transparent animationType="fade">
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.overlayCard}>
             <ActivityIndicator size="large" color="#023047" />
-            <Text style={{ fontWeight: "800", fontSize: 16, color: "#023047", textAlign: "center" }}>
-              Estamos generando la tarjeta...
-            </Text>
+            <Text style={styles.overlayTitle}>Estamos generando tu tarjeta...</Text>
           </View>
         </View>
-      )}
+      </Modal>
 
-      {walletStep === "creating" && (
-        <View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 999,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 16,
-              borderRadius: 12,
-              width: "80%",
-              maxWidth: 320,
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <ActivityIndicator size="large" color="#023047" />
-            <Text style={{ fontWeight: "700", color: "#023047", textAlign: "center" }}>
-              Estamos generando la tarjeta...
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {walletStep === "error" && (
-        <View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 999,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 16,
-              borderRadius: 12,
-              width: "85%",
-              maxWidth: 360,
-              gap: 10,
-            }}
-          >
-            <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828" }}>
-              No se pudo crear tu wallet
-            </Text>
-            <Text style={{ color: "#444" }}>
+      <Modal visible={walletStep === "error"} transparent animationType="fade" onRequestClose={() => setWalletStep("idle")}>
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitleError}>No se pudo crear tu wallet</Text>
+            <Text style={styles.modalMessage}>
               {walletFriendlyError || "Ocurrió un problema al generar tu tarjeta. Intenta nuevamente en unos segundos."}
             </Text>
             <TouchableOpacity
-              onPress={() => {
-                setWalletStep("idle");
-                // Dejamos walletError y walletFriendlyError para depurar
-              }}
-              style={{
-                marginTop: 4,
-                alignSelf: "flex-end",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "#cfd8dc",
-                backgroundColor: "#fff",
-              }}
+              onPress={() => setWalletStep("idle")}
+              style={styles.modalSecondaryButton}
             >
-              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+              <Text style={styles.modalSecondaryButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      </Modal>
 
-      {showLimitModal && (
-        <View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: "rgba(0,0,0,0.45)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            zIndex: 999,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              padding: 16,
-              borderRadius: 12,
-              width: "85%",
-              maxWidth: 360,
-              gap: 10,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontWeight: "800", fontSize: 16, color: "#c62828", textAlign: "center" }}>
-              No se pueden registrar más usuarios.
-            </Text>
-            <Text style={{ color: "#444", textAlign: "center" }}>
-              Este comercio alcanzo el lí­mite de registros disponible.
+      <Modal visible={showLimitModal} transparent animationType="fade" onRequestClose={() => setShowLimitModal(false)}>
+        <View style={styles.overlayBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitleError}>No se pueden registrar más usuarios</Text>
+            <Text style={styles.modalMessage}>
+              Este comercio alcanzó el límite de registros disponible.
             </Text>
             <TouchableOpacity
               onPress={() => setShowLimitModal(false)}
-              style={{
-                marginTop: 4,
-                alignSelf: "center",
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "#cfd8dc",
-                backgroundColor: "#fff",
-              }}
+              style={styles.modalSecondaryButton}
             >
-              <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+              <Text style={styles.modalSecondaryButtonText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#F6FAFF",
+    position: "relative",
+    overflow: "hidden",
+  },
+  glow: {
+    position: "absolute",
+    borderRadius: 9999,
+    opacity: 0.5,
+  },
+  glowTop: {
+    width: 280,
+    height: 280,
+    backgroundColor: "rgba(142, 202, 230, 0.28)",
+    top: -90,
+    left: -80,
+  },
+  glowBottom: {
+    width: 340,
+    height: 340,
+    backgroundColor: "rgba(255, 183, 3, 0.14)",
+    right: -110,
+    bottom: -120,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 860,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderWidth: 1,
+    borderColor: "rgba(189, 200, 205, 0.38)",
+    shadowColor: "#0F3554",
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.1,
+    shadowRadius: 36,
+    elevation: 10,
+    overflow: "hidden",
+  },
+  cardDesktop: {
+    borderRadius: 26,
+  },
+  cardCompact: {
+    borderRadius: 22,
+  },
+  hero: {
+    paddingHorizontal: 28,
+    paddingVertical: 28,
+    position: "relative",
+    overflow: "hidden",
+  },
+  heroCompactWeb: {
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  heroPattern: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.12,
+    backgroundColor: "transparent",
+  },
+  heroContent: {
+    zIndex: 1,
+  },
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  heroTitleCompactWeb: {
+    fontSize: 22,
+    lineHeight: 28,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    color: "rgba(255,255,255,0.92)",
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  heroSubtitleCompactWeb: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  formArea: {
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    gap: 16,
+  },
+  formAreaCompactWeb: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 14,
+  },
+  fieldBlock: {
+    gap: 8,
+  },
+  row: {
+    flexDirection: "row",
+    gap: 14,
+  },
+  rowStack: {
+    flexDirection: "column",
+  },
+  rowItem: {
+    flex: 1,
+    minWidth: 0,
+  },
+  label: {
+    color: "#102A43",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  inputShell: {
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: "#D6E1EA",
+    backgroundColor: "#F3F7FB",
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    color: "#102A43",
+    fontSize: 16,
+    paddingVertical: Platform.OS === "web" ? 14 : 12,
+    borderWidth: 0,
+  },
+  systemCard: {
+    marginTop: 2,
+    borderRadius: 16,
+    backgroundColor: "#DDEEFF",
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  systemInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  systemIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#F7FBFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  systemText: {
+    color: "#123042",
+    fontSize: 15,
+    lineHeight: 22,
+    flex: 1,
+  },
+  systemTextStrong: {
+    fontWeight: "800",
+  },
+  changeSystemButton: {
+    minHeight: 42,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D7E3EB",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  changeSystemButtonText: {
+    color: "#0A6F88",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  systemSelectorRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  systemOption: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D6E1EA",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+  },
+  systemOptionActive: {
+    borderColor: "#A8D7E6",
+    backgroundColor: "#EAF6FB",
+  },
+  systemOptionText: {
+    color: "#46606E",
+    fontWeight: "700",
+  },
+  systemOptionTextActive: {
+    color: "#0A6F88",
+  },
+  primaryButton: {
+    marginTop: 4,
+    minHeight: 58,
+    borderRadius: 14,
+    backgroundColor: "#219EBC",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    shadowColor: "#219EBC",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  buttonDisabled: {
+    opacity: 0.58,
+  },
+  footerText: {
+    marginTop: 10,
+    color: "#6E7F8D",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  inlineErrorText: {
+    color: "#C62828",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  inlineHelperText: {
+    color: "#102A43",
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  successState: {
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 18,
+  },
+  successIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    backgroundColor: "#E7F6ED",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  successTitle: {
+    color: "#102A43",
+    fontSize: 24,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  successText: {
+    color: "#4F6470",
+    fontSize: 15,
+    lineHeight: 23,
+    textAlign: "center",
+    maxWidth: 460,
+  },
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: "#F6FAFF",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  loadingCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2ECF1",
+    padding: 24,
+    alignItems: "center",
+    gap: 10,
+  },
+  loadingTitle: {
+    color: "#102A43",
+    fontSize: 20,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  loadingText: {
+    color: "#4F6470",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  overlayBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(13, 25, 34, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  overlayCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2ECF1",
+    paddingHorizontal: 20,
+    paddingVertical: 22,
+    alignItems: "center",
+    gap: 10,
+  },
+  overlayTitle: {
+    color: "#102A43",
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 380,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E2ECF1",
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    gap: 12,
+  },
+  modalTitleError: {
+    color: "#C62828",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  modalMessage: {
+    color: "#4F6470",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  modalSecondaryButton: {
+    alignSelf: "flex-end",
+    minHeight: 42,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D7E3EB",
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSecondaryButtonText: {
+    color: "#023047",
+    fontWeight: "700",
+  },
+});

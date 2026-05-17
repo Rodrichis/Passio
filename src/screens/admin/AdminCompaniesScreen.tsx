@@ -166,7 +166,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
             walletClassId: normalizeString(data["wallet-class-id"]),
             region: normalizeString(data.region),
             ciudad: normalizeString(data.ciudad),
-            direccion: normalizeString(data["Dirección"] || data["Direccion"]),
+            direccion: normalizeString(data["Dirección"] || data["Dirección"]),
             linkRegistro: normalizeString(data.LinkRegistro),
             counters,
           } satisfies CompanyItem;

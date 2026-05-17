@@ -644,7 +644,7 @@ export default function DashboardContentClientes({
 
         <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
           <View style={cStyles.rowActions}>
-            <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
+            <ActionIconButton icon="notifications-outline" label="Enviar notificación" onPress={() => openPush(item)} />
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
@@ -700,7 +700,7 @@ export default function DashboardContentClientes({
             <Text style={{ color: "#023047", fontWeight: "700" }}>{premiosDisponibles}</Text>
           </View>
           <View style={cStyles.rowActions}>
-            <ActionIconButton icon="notifications-outline" label="Enviar notificacion" onPress={() => openPush(item)} />
+            <ActionIconButton icon="notifications-outline" label="Enviar notificación" onPress={() => openPush(item)} />
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
@@ -752,7 +752,7 @@ export default function DashboardContentClientes({
     return (
       <View>
         <DashboardViewHeader title="Clientes" companyName={companyName} />
-        <Text>Debes iniciar sesion para ver tus clientes.</Text>
+        <Text>Debes iniciar sesión para ver tus clientes.</Text>
       </View>
     );
   }
@@ -768,7 +768,7 @@ export default function DashboardContentClientes({
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, minHeight: 0 }}>
       <DashboardViewHeader title="Clientes" companyName={companyName} />
 
       <View style={cStyles.searchRow}>
@@ -865,7 +865,7 @@ export default function DashboardContentClientes({
               selectedCount === 0 && cStyles.sendButtonTextDisabled,
             ]}
           >
-            Enviar notificacion ({selectedCount})
+            Enviar notificación ({selectedCount})
           </Text>
         </TouchableOpacity>
         </View>
@@ -1021,7 +1021,7 @@ export default function DashboardContentClientes({
                 Email: {detailClient?.email || "--"}
               </Text>
               <Text style={cStyles.detailRow}>
-                Telefono: {detailClient?.telefono || "--"}
+                Teléfono: {detailClient?.telefono || "--"}
               </Text>
               <Text style={cStyles.detailRow}>
                 SO: {formatSO(detailClient?.so)}
@@ -1129,7 +1129,7 @@ export default function DashboardContentClientes({
       <Modal visible={showPushModal} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
           <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
-            <Text style={cStyles.modalTitle}>Notificacion push</Text>
+            <Text style={cStyles.modalTitle}>Notificación push</Text>
             <Text style={cStyles.detailRow}>
               {pushMode === "single"
                 ? `Cliente: ${pushTarget?.nombreCompleto || "--"}`
@@ -1137,7 +1137,7 @@ export default function DashboardContentClientes({
             </Text>
             {pushSent ? (
               <>
-                <Text style={{ color: "#2e7d32", fontWeight: "700", marginTop: 8 }}>Notificacion enviada.</Text>
+                <Text style={{ color: "#2e7d32", fontWeight: "700", marginTop: 8 }}>Notificación enviada.</Text>
                 <View style={cStyles.modalActions}>
                   <TouchableOpacity
                     onPress={closePushModal}
@@ -1158,7 +1158,7 @@ export default function DashboardContentClientes({
             ) : (
               <>
           <TextInput
-            placeholder="Mensaje de la notificacion"
+            placeholder="Mensaje de la notificación"
             placeholderTextColor="#607d8b"
             value={pushBody}
             onChangeText={setPushBody}
@@ -1315,6 +1315,7 @@ export default function DashboardContentClientes({
         </Text>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={sortedItems}
           keyExtractor={(it) => it.id}
           ListHeaderComponent={useDesktopWebLayout ? <HeaderWeb /> : null}
@@ -1345,6 +1346,5 @@ export default function DashboardContentClientes({
     </View>
   );
 }
-
 
 

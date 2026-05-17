@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import DashboardViewHeader from "../../../components/dashboard/DashboardViewHeader";
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
@@ -65,6 +66,17 @@ type Props = {
   onOpenNotificationComposer?: () => void;
 };
 
+const ELEVATED_CARD = {
+  backgroundColor: "#FFFFFF",
+  borderWidth: 1,
+  borderColor: "#E3EDF5",
+  shadowColor: "#0C2340",
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.06,
+  shadowRadius: 24,
+  elevation: 4,
+} as const;
+
 export default function DashboardContentPrincipal({
   goToClientes,
   companyName,
@@ -77,6 +89,7 @@ export default function DashboardContentPrincipal({
   const { width } = useWindowDimensions();
   const isCompactLayout = width < 900;
   const isCompactWeb = Platform.OS === "web" && isCompactLayout;
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [totalClientes, setTotalClientes] = React.useState<number | null>(null);
@@ -94,8 +107,15 @@ export default function DashboardContentPrincipal({
   const [lastNotification, setLastNotification] = React.useState<LatestNotification | null>(null);
   const [showBirthdayModal, setShowBirthdayModal] = React.useState(false);
   const [showLastNotificationModal, setShowLastNotificationModal] = React.useState(false);
+  const [copiedLink, setCopiedLink] = React.useState(false);
 
   const registroURL = registrationUrl || buildRegistrationUrl(uid);
+
+  React.useEffect(() => {
+    if (!copiedLink) return;
+    const timer = setTimeout(() => setCopiedLink(false), 1800);
+    return () => clearTimeout(timer);
+  }, [copiedLink]);
 
   React.useEffect(() => {
     const fetchStats = async () => {
@@ -316,12 +336,42 @@ export default function DashboardContentPrincipal({
     }
   };
 
+  const getInitials = (value?: string) => {
+    const parts = String(value || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (!parts.length) return "CL";
+    return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+  };
+
+  const handleCopyRegistrationLink = async () => {
+    if (!registroURL) return;
+
+    try {
+      if (
+        Platform.OS === "web" &&
+        typeof navigator !== "undefined" &&
+        (navigator as any).clipboard?.writeText
+      ) {
+        await (navigator as any).clipboard.writeText(registroURL);
+      } else {
+        await Clipboard.setStringAsync(registroURL);
+      }
+
+      setCopiedLink(true);
+    } catch (e) {
+      console.log("No se pudo copiar el link:", e);
+    }
+  };
+
   const handleOpenBirthdayGreeting = () => {
     const ids = birthdayClients.map((client) => client.id).filter(Boolean);
     if (!ids.length) return;
 
     setShowBirthdayModal(false);
-    onOpenBirthdayGreeting?.(ids, "¡Feliz cumpleaños! Te deseamos un gran día.");
+    onOpenBirthdayGreeting?.(ids, "Feliz cumpleaños. Te deseamos un gran dia.");
   };
 
   const handleOpenNotificationHistory = () => {
@@ -352,7 +402,7 @@ export default function DashboardContentPrincipal({
       : null,
     {
       key: "top",
-      title: "Cliente con mas visitas",
+      title: "Cliente top visitas",
       primary: loading ? "..." : topVisitedClient?.name || "Sin clientes",
       secondary: loading
         ? "Cargando..."
@@ -366,7 +416,7 @@ export default function DashboardContentPrincipal({
     },
     {
       key: "notification",
-      title: "Ultima notificación",
+      title: "Última notificación",
       primary: loading
         ? "..."
         : lastNotification?.date
@@ -395,83 +445,111 @@ export default function DashboardContentPrincipal({
     onPress?: () => void;
   }>;
 
-  const highlightCardBasis = isCompactLayout ? "48%" : highlightCards.length === 2 ? "48%" : "31%";
+  const highlightCardBasis = isCompactLayout ? "47%" : highlightCards.length === 2 ? "48%" : "31%";
 
   return (
-    <ScrollView>
+    <ScrollView contentContainerStyle={{ paddingBottom: 8 }}>
       <DashboardViewHeader title="Principal" companyName={companyName} />
 
       <Text style={styles.sectionTitle}>Link de registro de clientes</Text>
       <View
         style={{
-          borderWidth: 1,
-          borderColor: "#e0e0e0",
-          borderRadius: 8,
-          padding: 12,
-          backgroundColor: "#fff",
-          marginBottom: 16,
+          ...ELEVATED_CARD,
+          borderRadius: 24,
+          padding: isCompactLayout ? 18 : 24,
+          marginBottom: 26,
         }}
       >
-        <Text selectable style={{ color: "#333", marginBottom: 10 }}>
-          {registroURL}
-        </Text>
+        <View
+          style={{
+            backgroundColor: "#F0F7FF",
+            borderWidth: 1,
+            borderColor: "#D5E5F3",
+            borderRadius: 14,
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            marginBottom: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            overflow: "hidden",
+          }}
+        >
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            selectable={Platform.OS === "web"}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              flexShrink: 1,
+              color: "#4B6170",
+              fontSize: isCompactLayout ? 14 : 15,
+            }}
+          >
+            {registroURL}
+          </Text>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
+          <TouchableOpacity
+            onPress={handleCopyRegistrationLink}
+            style={{
+              padding: 6,
+              borderRadius: 10,
+            }}
+          >
+            <Ionicons name="copy-outline" size={20} color="#0A6F88" />
+          </TouchableOpacity>
+        </View>
+
+        {copiedLink ? (
+          <Text
+            style={{
+              color: "#2E7D32",
+              fontSize: 13,
+              fontWeight: "600",
+              marginTop: -8,
+              marginBottom: 14,
+            }}
+          >
+            Copiado
+          </Text>
+        ) : null}
+
+        <View style={{ flexDirection: "row", gap: 14, flexWrap: "wrap" }}>
           <TouchableOpacity
             onPress={() => registroURL && Linking.openURL(registroURL)}
             style={{
               backgroundColor: "#2196F3",
-              paddingVertical: 6,
-              paddingHorizontal: 10,
-              borderRadius: 5,
+              paddingVertical: 14,
+              paddingHorizontal: 18,
+              borderRadius: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 14 }}>
+            <Ionicons name="open-outline" size={18} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>
               Abrir navegador
             </Text>
           </TouchableOpacity>
-
-          {Platform.OS === "web" &&
-            typeof navigator !== "undefined" &&
-            (navigator as any).clipboard && (
-              <TouchableOpacity
-                onPress={async () => {
-                  try {
-                    if (registroURL) {
-                      await (navigator as any).clipboard.writeText(registroURL);
-                      alert("Link copiado");
-                    }
-                  } catch (e) {
-                    console.log(e);
-                  }
-                }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#2196F3",
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  borderRadius: 5,
-                  backgroundColor: "#E3F2FD",
-                }}
-              >
-                <Text style={{ color: "#0D47A1", fontWeight: "bold", fontSize: 14 }}>
-                  Copiar
-                </Text>
-              </TouchableOpacity>
-            )}
 
           <TouchableOpacity
             onPress={() => setShowQrModal(true)}
             style={{
               borderWidth: 1,
-              borderColor: "#fb8500",
-              paddingVertical: 6,
-              paddingHorizontal: 10,
-              borderRadius: 5,
-              backgroundColor: "#fb8500",
+              borderColor: "#FFB703",
+              paddingVertical: 14,
+              paddingHorizontal: 18,
+              borderRadius: 12,
+              backgroundColor: "#FFB703",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 14 }}>
+            <Ionicons name="qr-code-outline" size={18} color="#102A43" />
+            <Text style={{ color: "#102A43", fontWeight: "700", fontSize: 14 }}>
               Ver QR
             </Text>
           </TouchableOpacity>
@@ -529,11 +607,12 @@ export default function DashboardContentPrincipal({
           <Pressable style={modalStyles.dismissLayer} onPress={() => setShowLastNotificationModal(false)} />
           <View style={modalStyles.card}>
             <View style={modalStyles.headerRow}>
-              <Text style={modalStyles.title}>Ultima notificación</Text>
+              <Text style={modalStyles.title}>Última notificación</Text>
               <TouchableOpacity onPress={() => setShowLastNotificationModal(false)} style={modalStyles.closeButton}>
                 <Ionicons name="close" size={20} color="#51616F" />
               </TouchableOpacity>
             </View>
+
             {isCompactWeb ? (
               <>
                 <View>
@@ -600,7 +679,7 @@ export default function DashboardContentPrincipal({
                 <Text style={modalStyles.secondaryButtonText}>Ver historial</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleOpenNotificationComposer} style={modalStyles.primaryButton}>
-                <Text style={modalStyles.primaryButtonText}>Nueva notificacion</Text>
+                <Text style={modalStyles.primaryButtonText}>Nueva notificación</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -610,7 +689,7 @@ export default function DashboardContentPrincipal({
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 
       <Text style={styles.sectionTitle}>Actividad destacada</Text>
-      <View style={{ flexDirection: "row", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+      <View style={{ flexDirection: "row", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
         {highlightCards.map((card) => (
           <HighlightCard
             key={card.key}
@@ -628,65 +707,151 @@ export default function DashboardContentPrincipal({
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>Resumen de clientes</Text>
-      <View style={{ flexDirection: "row", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 16,
+        }}
+      >
+        <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Resumen de clientes</Text>
+        <TouchableOpacity
+          onPress={goToClientes}
+          style={{
+            backgroundColor: "#2196F3",
+            paddingVertical: 12,
+            paddingHorizontal: 18,
+            borderRadius: 12,
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Ver clientes</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <MetricCard
           label="Clientes totales"
           value={totalClientes}
           loading={loading}
-          note={`Android: ${androidCount ?? 0} · iOS: ${iosCount ?? 0}`}
+          note={`Android: ${androidCount ?? 0} | iOS: ${iosCount ?? 0}`}
           warning={atUserLimit ? "Alcanzaste el limite." : undefined}
+          icon="people-outline"
+          compact={isCompactLayout}
         />
-        <MetricCard label="Nuevos 7 dias" value={nuevosSemana} loading={loading} />
+        <MetricCard
+          label="Nuevos 7 dias"
+          value={nuevosSemana}
+          loading={loading}
+          icon="trending-up-outline"
+          compact={isCompactLayout}
+        />
         <MetricCard
           label="Visitas registradas hoy"
           value={puntosHoy ?? 0}
           loading={loading}
           note="Clientes con ultima visita marcada hoy"
+          icon="pulse-outline"
+          compact={isCompactLayout}
         />
       </View>
 
-      <TouchableOpacity
-        onPress={goToClientes}
+      <Text style={styles.sectionTitle}>Actividad reciente</Text>
+      <View
         style={{
-          alignSelf: "flex-start",
-          backgroundColor: "#2196F3",
-          paddingVertical: 7,
-          paddingHorizontal: 11,
-          borderRadius: 6,
+          ...ELEVATED_CARD,
+          borderRadius: 24,
+          overflow: "hidden",
           marginBottom: 12,
         }}
       >
-        <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 14 }}>
-          Ver clientes
-        </Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionTitle}>Actividad reciente</Text>
-      {actividad.length === 0 && !loading ? (
-        <Text style={{ color: "#555", marginBottom: 16 }}>Sin actividad aun.</Text>
-      ) : (
-        actividad.map((item, idx) => (
-          <View
-            key={`${item.title}-${idx}`}
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 10,
-              padding: 12,
-              borderWidth: 1,
-              borderColor: "#e0e0e0",
-              marginBottom: 10,
-            }}
-          >
-            <Text style={{ fontWeight: "bold", color: "#023047" }}>{item.title}</Text>
-            {item.subtitle ? <Text style={{ color: "#555" }}>{item.subtitle}</Text> : null}
-            <Text style={{ color: "#777", fontSize: 12 }}>{formatDate(item.date)}</Text>
-            <Text style={{ color: "#2196F3", fontSize: 12, marginTop: 4 }}>
-              {item.type === "alta" ? "Registro de cliente" : "Actividad"}
-            </Text>
+        {actividad.length === 0 && !loading ? (
+          <View style={{ padding: 22 }}>
+            <Text style={{ color: "#556875" }}>Sin actividad aun.</Text>
           </View>
-        ))
-      )}
+        ) : (
+          actividad.map((item, idx) => (
+            <View
+              key={`${item.title}-${idx}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 14,
+                paddingHorizontal: isCompactLayout ? 18 : 24,
+                paddingVertical: 20,
+                borderTopWidth: idx === 0 ? 0 : 1,
+                borderTopColor: "#EDF3F8",
+              }}
+            >
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 26,
+                  backgroundColor: "#EFF4F8",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ color: "#102A43", fontWeight: "800", fontSize: 18 }}>
+                  {getInitials(item.title)}
+                </Text>
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{ color: "#102A43", fontSize: 16, fontWeight: "800" }}
+                >
+                  {item.title}
+                </Text>
+                {item.subtitle ? (
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={{ color: "#5A6C78", fontSize: 15, marginTop: 4 }}
+                  >
+                    {item.subtitle}
+                  </Text>
+                ) : null}
+
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    marginTop: 12,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="calendar-outline" size={16} color="#72808C" />
+                    <Text style={{ color: "#72808C", fontSize: 14 }}>{formatDate(item.date)}</Text>
+                  </View>
+
+                  <View
+                    style={{
+                      backgroundColor: "#EDF6FF",
+                      borderWidth: 1,
+                      borderColor: "#D3E6FF",
+                      borderRadius: 8,
+                      paddingVertical: 6,
+                      paddingHorizontal: 10,
+                    }}
+                  >
+                    <Text style={{ color: "#0B7BB4", fontSize: 13, fontWeight: "700" }}>
+                      {item.type === "alta" ? "Registro de cliente" : "Actividad"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -697,34 +862,48 @@ function MetricCard({
   loading,
   note,
   warning,
+  icon,
+  compact,
 }: {
   label: string;
   value: number | null;
   loading: boolean;
   note?: string;
   warning?: string;
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
+  compact?: boolean;
 }) {
   return (
     <View
       style={{
-        flexBasis: "30%",
+        flexBasis: compact ? "47%" : "30%",
         flexGrow: 1,
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: "#e0e0e0",
-        minWidth: 160,
+        minWidth: compact ? 0 : 190,
+        borderRadius: 20,
+        padding: 20,
+        overflow: "hidden",
+        ...ELEVATED_CARD,
       }}
     >
+      {icon ? (
+        <Ionicons
+          name={icon}
+          size={54}
+          color="#E1EFFA"
+          style={{ position: "absolute", top: 14, right: 14 }}
+        />
+      ) : null}
+
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 13, color: "#555" }}>{label}</Text>
+        <Text style={{ fontSize: 15, color: "#364C5A", fontWeight: "600" }}>{label}</Text>
         {warning ? <Text style={{ fontSize: 11, color: "#c62828" }}>{warning}</Text> : null}
       </View>
-      <Text style={{ fontSize: 22, fontWeight: "700", color: "#023047" }}>
+
+      <Text style={{ fontSize: 28, fontWeight: "800", color: "#023047", marginTop: 12 }}>
         {loading ? "..." : value ?? "0"}
       </Text>
-      {note ? <Text style={{ fontSize: 11, color: "#888" }}>{note}</Text> : null}
+
+      {note ? <Text style={{ fontSize: 14, color: "#617483", marginTop: 18 }}>{note}</Text> : null}
     </View>
   );
 }
@@ -764,11 +943,9 @@ function HighlightCard({
           flexBasis: basis as any,
           flexGrow: 1,
           minWidth: 0,
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          padding: 12,
-          borderWidth: 1,
-          borderColor: "#E7EDF1",
+          borderRadius: 20,
+          padding: 16,
+          ...ELEVATED_CARD,
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -782,18 +959,18 @@ function HighlightCard({
           {showChevron ? <Ionicons name="chevron-forward-outline" size={16} color="#A3B1BA" /> : null}
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 12 }}>
           <View
             style={{
-              width: 42,
-              height: 42,
-              borderRadius: 14,
+              width: 48,
+              height: 48,
+              borderRadius: 16,
               backgroundColor: iconBg,
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <Ionicons name={icon} size={22} color={iconColor} />
+            <Ionicons name={icon} size={24} color={iconColor} />
           </View>
 
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -824,19 +1001,17 @@ function HighlightCard({
         flexBasis: basis as any,
         flexGrow: 1,
         minWidth: 160,
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: "#E7EDF1",
+        borderRadius: 20,
+        padding: 18,
+        ...ELEVATED_CARD,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
         <View
           style={{
-            width: 56,
-            height: 56,
-            borderRadius: 18,
+            width: 60,
+            height: 60,
+            borderRadius: 20,
             backgroundColor: iconBg,
             alignItems: "center",
             justifyContent: "center",
@@ -846,11 +1021,13 @@ function HighlightCard({
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: "#51616F", fontSize: 13, fontWeight: "700" }}>{title}</Text>
+          <Text style={{ color: "#51616F", fontSize: 13, fontWeight: "700", letterSpacing: 0.5 }}>
+            {title}
+          </Text>
           <Text
             numberOfLines={1}
             ellipsizeMode="tail"
-            style={{ color: primaryColor, fontSize: 18, fontWeight: "800", marginTop: 4 }}
+            style={{ color: primaryColor, fontSize: 18, fontWeight: "800", marginTop: 6 }}
           >
             {primary}
           </Text>

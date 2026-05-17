@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Escanear QR - Passio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#ffffff",
+                      "on-secondary-container": "#6b4b00",
+                      "background": "#f6faff",
+                      "surface-tint": "#00677d",
+                      "on-surface": "#001e2f",
+                      "on-tertiary-container": "#452000",
+                      "secondary-container": "#ffb702",
+                      "primary-fixed-dim": "#69d4f4",
+                      "on-tertiary-fixed": "#301400",
+                      "on-background": "#001e2f",
+                      "surface-container-low": "#ebf5ff",
+                      "on-surface-variant": "#3e484d",
+                      "surface": "#f6faff",
+                      "primary-fixed": "#b2ebff",
+                      "on-secondary-fixed": "#271900",
+                      "surface-variant": "#c8e6ff",
+                      "on-primary-fixed": "#001f27",
+                      "secondary-fixed": "#ffdea9",
+                      "tertiary-fixed": "#ffdcc4",
+                      "on-primary-container": "#002f3a",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-bright": "#f6faff",
+                      "surface-container-high": "#d4ebff",
+                      "error-container": "#ffdad6",
+                      "surface-container-highest": "#c8e6ff",
+                      "inverse-on-surface": "#e5f2ff",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed-dim": "#ffb781",
+                      "surface-dim": "#b9dffc",
+                      "on-error-container": "#93000a",
+                      "primary": "#00677d",
+                      "secondary": "#7d5800",
+                      "on-primary-fixed-variant": "#004e5f",
+                      "on-error": "#ffffff",
+                      "tertiary-container": "#df7500",
+                      "primary-container": "#219ebc",
+                      "inverse-surface": "#07344b",
+                      "outline-variant": "#bdc8cd",
+                      "on-secondary-fixed-variant": "#5e4100",
+                      "outline": "#6e797d",
+                      "inverse-primary": "#69d4f4",
+                      "tertiary": "#934b00",
+                      "secondary-fixed-dim": "#ffba27",
+                      "on-tertiary-fixed-variant": "#703800",
+                      "on-primary": "#ffffff",
+                      "surface-container": "#e0f0ff",
+                      "on-tertiary": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-gap": "16px",
+                      "margin-mobile": "16px",
+                      "gutter": "24px",
+                      "container-max": "1280px",
+                      "card-padding": "24px",
+                      "margin-desktop": "32px"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "display-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "data-tabular": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "title-sm": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md-mobile": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "data-tabular": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "title-sm": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+          font-variation-settings: 'FILL' 1;
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<aside class="bg-on-background dark:bg-on-primary-fixed w-[260px] h-screen fixed left-0 top-0 overflow-y-auto border-r border-outline-variant/10 shadow-lg flex flex-col z-50">
+<div class="flex flex-col gap-2 pt-8 pb-4 h-full">
+<!-- Header -->
+<div class="px-6 mb-6">
+<h1 class="text-headline-md font-headline-md font-bold text-secondary-container">Passio</h1>
+<p class="text-label-md font-label-md text-on-secondary/70">Gestión Empresarial</p>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 flex flex-col gap-2 px-2">
+<a class="text-on-secondary/70 hover:text-on-secondary hover:bg-surface-variant/10 hover:bg-surface-variant/20 transition-colors duration-200 rounded-lg mx-2 flex items-center py-3 px-4 group" href="#">
+<span class="material-symbols-outlined mr-3">dashboard</span>
+<span class="font-label-md text-label-md">Principal</span>
+</a>
+<a class="text-on-secondary/70 hover:text-on-secondary hover:bg-surface-variant/10 hover:bg-surface-variant/20 transition-colors duration-200 rounded-lg mx-2 flex items-center py-3 px-4 group" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-label-md text-label-md">Clientes</span>
+</a>
+<a class="bg-secondary-container text-on-secondary-container font-bold rounded-lg mx-2 flex items-center py-3 px-4 relative" href="#">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-secondary-container rounded-l-lg"></div>
+<span class="material-symbols-outlined mr-3" data-weight="fill">qr_code_scanner</span>
+<span class="font-label-md text-label-md">Escanear</span>
+</a>
+<a class="text-on-secondary/70 hover:text-on-secondary hover:bg-surface-variant/10 hover:bg-surface-variant/20 transition-colors duration-200 rounded-lg mx-2 flex items-center py-3 px-4 group" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-label-md text-label-md">Ajustes</span>
+</a>
+<a class="text-on-secondary/70 hover:text-on-secondary hover:bg-surface-variant/10 hover:bg-surface-variant/20 transition-colors duration-200 rounded-lg mx-2 flex items-center py-3 px-4 group" href="#">
+<span class="material-symbols-outlined mr-3">admin_panel_settings</span>
+<span class="font-label-md text-label-md">Admin</span>
+</a>
+</nav>
+<!-- Footer -->
+<div class="mt-auto px-2 pb-4">
+<a class="text-on-secondary/70 hover:text-on-secondary hover:bg-surface-variant/10 hover:bg-surface-variant/20 transition-colors duration-200 rounded-lg mx-2 flex items-center py-3 px-4 group" href="#">
+<span class="material-symbols-outlined mr-3">logout</span>
+<span class="font-label-md text-label-md">Cerrar sesión</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[260px] flex flex-col h-screen overflow-hidden bg-surface relative">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-on-background h-16 flex items-center justify-between px-8 sticky top-0 z-40 border-b border-outline-variant/20 shadow-sm w-full transition-all">
+<div class="flex items-center justify-between w-full">
+<!-- Product/Brand Name (Optional based on design, usually handled by sidebar) -->
+<div class="font-headline-md text-on-surface dark:text-on-surface-variant hidden">loligo spa</div>
+<!-- Center Navigation (If applicable, usually hidden on dashboard) -->
+<div class="hidden md:flex gap-6 items-center">
+<!-- Navigation links would go here if not in sidebar -->
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-4 ml-auto">
+<button class="text-on-surface-variant hover:text-primary hover:text-primary-container transition-all hover:scale-95 flex items-center gap-2 group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">help</span>
+<span class="font-label-md text-label-md text-outline group-hover:text-primary">Ayuda y soporte</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary hover:text-primary-container transition-all hover:scale-95 relative">
+<span class="material-symbols-outlined text-outline">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-outline-variant/30 ml-2">
+<div class="flex flex-col items-end">
+<span class="font-label-md text-label-md text-on-surface font-semibold">loligo spa</span>
+<span class="font-data-tabular text-data-tabular text-outline text-xs">Administrador</span>
+</div>
+<img alt="Logo Empresa" class="w-8 h-8 rounded-full border border-outline-variant/20 cursor-pointer hover:scale-95 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXZn-uNe_AYZZPZqIwgaLv958ZGxceidc7pW_HrBZmtNOJV2-z1lfObmz8-wF8B_0uGja9oV9ZlbtOW5gyhZ1VY4fFtUhu_YnhDYcSSXaq2RyX4kB13tIBJAwRa5MsqJdjN2TYQHrNxQIQPOJtvW5avorNfuodnG7gGodp7Sp783BtaepmaqGmPWrWSYmt4vcIhEg6SA1xA0x_8jBKAHtCkAImDWB0LAJluSVg2OOaIV23glm0ehLtQtjrUfSzMUR6Xdf6Wq3rET8Z"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Page Content Canvas -->
+<div class="flex-1 overflow-y-auto p-gutter lg:p-margin-desktop">
+<div class="max-w-container-max mx-auto h-full flex flex-col">
+<!-- Page Header -->
+<div class="mb-8">
+<h2 class="font-display-lg text-display-lg text-on-surface mb-2">Escanear QR</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Selecciona una acción para comenzar el proceso.</p>
+</div>
+<!-- Main Interaction Card (Centered Layout) -->
+<div class="flex-1 flex flex-col items-center justify-start pt-8">
+<div class="w-full max-w-2xl bg-surface-container-lowest rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10 hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-shadow duration-300 overflow-hidden">
+<div class="p-8 border-b border-outline-variant/10 bg-surface-bright/50">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary" data-weight="fill">touch_app</span>
+<h3 class="font-title-sm text-title-sm text-on-surface">Elige la acción a realizar</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Selecciona primero la acción y luego escanea el código QR del cliente.</p>
+</div>
+<div class="p-8 flex flex-col gap-4 bg-surface-container-lowest">
+<button class="w-full bg-primary-container hover:bg-primary-container/90 text-on-primary font-title-sm text-title-sm py-4 px-6 rounded-lg shadow-sm transition-all duration-200 flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined text-on-primary/80 group-hover:text-on-primary transition-colors">add_circle</span>
+                                Contar visita
+                            </button>
+<button class="w-full bg-secondary hover:bg-secondary/90 text-on-secondary font-title-sm text-title-sm py-4 px-6 rounded-lg shadow-sm transition-all duration-200 flex items-center justify-center gap-2 group">
+<span class="material-symbols-outlined text-on-secondary/80 group-hover:text-on-secondary transition-colors">redeem</span>
+                                Canjear premio
+                            </button>
+</div>
+</div>
+<!-- Subtle Placeholder for Camera/Scanner -->
+<div class="mt-12 w-full max-w-lg flex flex-col items-center opacity-60">
+<div class="w-48 h-48 border-2 border-dashed border-outline-variant/50 rounded-xl flex items-center justify-center mb-4 bg-surface-variant/20 relative">
+<!-- Scanning animation visual cue -->
+<div class="absolute w-[80%] h-0.5 bg-primary/30 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 shadow-[0_0_8px_rgba(0,103,125,0.5)]"></div>
+<span class="material-symbols-outlined text-outline text-4xl">qr_code</span>
+</div>
+<p class="font-data-tabular text-data-tabular text-outline text-center">Esperando selección para activar cámara...</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -87,7 +87,7 @@ export default function App() {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 8 }}>Cargando sesion...</Text>
+        <Text style={{ marginTop: 8 }}>Cargando sesión...</Text>
       </View>
     );
   }

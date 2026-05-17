@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
   ScrollView,
   ScrollView as RNScrollView,
@@ -7,36 +8,39 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { Ionicons } from "@expo/vector-icons";
 
 import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../constants/empresa";
 import { auth, db } from "../services/firebaseConfig";
-import { globalStyles } from "../styles/theme";
 import { RootStackParamList } from "../types/navigation";
 import { buildRegistrationUrl } from "../utils/publicUrls";
 import { resolveWalletClassIdFromName } from "../utils/walletOnboarding/walletClassId";
+import { AUTH_WEB_INPUT_RESET, authStyles } from "../styles/authStyles";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 
 const REGIONES_CHILE = [
   "Arica y Parinacota",
-  "Tarapacá",
+  "Tarapaca",
   "Antofagasta",
   "Atacama",
   "Coquimbo",
-  "Valparaíso",
+  "Valparaiso",
   "Metropolitana",
   "O'Higgins",
   "Maule",
-  "Ñuble",
-  "Biobío",
-  "La Araucanía",
-  "Los Ríos",
+  "Nuble",
+  "Biobio",
+  "La Araucania",
+  "Los Rios",
   "Los Lagos",
-  "Aysén",
+  "Aysen",
   "Magallanes",
 ];
 
@@ -63,7 +67,13 @@ export default function RegisterScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState(EMPTY_TOUCHED);
+  const [focusedField, setFocusedField] = useState<keyof typeof EMPTY_TOUCHED | null>(null);
+  const { width } = useWindowDimensions();
+  const isCompact = width < 640;
+  const isWideForm = width >= 760;
+  const year = useMemo(() => new Date().getFullYear(), []);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -102,12 +112,12 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const fieldErrors = {
     empresa: empresaTrim ? "" : "Ingresa el nombre de la empresa.",
-    email: !emailTrim ? "Ingresa un correo electrónico." : emailValido ? "" : "Ingresa un correo válido.",
+    email: !emailTrim ? "Ingresa un correo electrónico." : emailValido ? "" : "Ingresa un correo valido.",
     password: !passwordTrim
       ? "Ingresa una contraseña."
       : passwordValida
       ? ""
-      : "Usa al menos 8 caracteres con letras y números.",
+      : "Usa al menos 8 caracteres con letras y numeros.",
     telefono: telefonoTrim ? "" : "Ingresa un teléfono.",
     region: regionTrim ? "" : "Selecciona una región.",
     ciudad: ciudadTrim ? "" : "Ingresa una comuna.",
@@ -119,10 +129,8 @@ export default function RegisterScreen({ navigation }: Props) {
   const passwordHint = !passwordTrim
     ? ""
     : fieldErrors.password
-    ? "Usa al menos 8 caracteres con letras y números."
+    ? "Usa al menos 8 caracteres con letras y numeros."
     : "Contraseña fuerte.";
-  const passwordHintColor = fieldErrors.password ? "#fb8500" : "#2e7d32";
-  const inlineErrorStyle = { marginTop: -10, marginBottom: 10, color: "#fb8500" };
 
   const handleRegister = async () => {
     if (!isValid) {
@@ -143,7 +151,7 @@ export default function RegisterScreen({ navigation }: Props) {
       try {
         await sendEmailVerification(user);
       } catch (verificationError) {
-        console.warn("No se pudo enviar verificación de correo:", verificationError);
+        console.warn("No se pudo enviar verificacion de correo:", verificationError);
       }
 
       const now = new Date();
@@ -157,7 +165,7 @@ export default function RegisterScreen({ navigation }: Props) {
         telefono: telefonoTrim,
         region: regionTrim,
         ciudad: ciudadTrim,
-        Dirección: direccionTrim,
+        Direccion: direccionTrim,
         Descripcion: "",
         ColorPrincipal: "#A99985",
         LinkRegistro: buildRegistrationUrl(user.uid),
@@ -174,8 +182,6 @@ export default function RegisterScreen({ navigation }: Props) {
         paqueteSellosWallet: "generico1",
         "wallet-class-id": walletClassId,
       });
-
-      // La navegación depende de onAuthStateChanged en App.tsx
     } catch (err: any) {
       console.error("Error al registrar empresa:", err);
       if (err?.code === "auth/email-already-in-use") {
@@ -188,254 +194,422 @@ export default function RegisterScreen({ navigation }: Props) {
     }
   };
 
+  const rowStyle = isWideForm ? authStyles.row : { gap: 16 };
+  const inlineErrorStyle = authStyles.warningText;
+
   return (
-    <ScrollView contentContainerStyle={globalStyles.scrollContainer}>
-      <View style={globalStyles.container}>
-        <Text style={globalStyles.header}>Passio</Text>
+    <KeyboardAvoidingView
+      style={authStyles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={authStyles.screen}>
+        <View style={[authStyles.glow, authStyles.glowTop]} />
+        <View style={[authStyles.glow, authStyles.glowBottom]} />
 
-        <View style={globalStyles.card}>
-          <Text style={globalStyles.title}>Registrar empresa</Text>
-
-          <TextInput
-            style={globalStyles.input}
-            placeholder="Nombre de la empresa"
-            value={empresa}
-            placeholderTextColor="#607d8b"
-            onChangeText={(value) => {
-              setEmpresa(value);
-              setError("");
-              markTouched("empresa");
-            }}
-            onBlur={() => markTouched("empresa")}
-            returnKeyType="done"
-            autoCapitalize="words"
-            autoCorrect={false}
-          />
-          {touched.empresa && fieldErrors.empresa ? <Text style={inlineErrorStyle}>{fieldErrors.empresa}</Text> : null}
-
-          <TextInput
-            style={globalStyles.input}
-            placeholder="Correo electrónico"
-            value={email}
-            placeholderTextColor="#607d8b"
-            onChangeText={(value) => {
-              setEmail(value);
-              setError("");
-              markTouched("email");
-            }}
-            onBlur={() => markTouched("email")}
-            keyboardType="email-address"
-            returnKeyType="done"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {touched.email && fieldErrors.email ? <Text style={inlineErrorStyle}>{fieldErrors.email}</Text> : null}
-
-          <TextInput
-            style={globalStyles.input}
-            placeholder="Contraseña"
-            secureTextEntry
-            value={password}
-            placeholderTextColor="#607d8b"
-            onChangeText={(value) => {
-              setPassword(value);
-              setError("");
-              markTouched("password");
-            }}
-            onBlur={() => markTouched("password")}
-            returnKeyType="done"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {passwordHint ? (
-            <Text style={{ marginTop: -8, marginBottom: 10, color: passwordHintColor }}>
-              {passwordHint}
-            </Text>
-          ) : null}
-
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <View
-                style={[
-                  globalStyles.input,
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingHorizontal: 10,
-                    paddingVertical: 12,
-                  },
-                ]}
-              >
-                <Text style={{ color: "#555", marginRight: 6 }}>+56</Text>
-                <TextInput
-                  style={{ flex: 1, paddingVertical: 0, paddingHorizontal: 0, outlineStyle: "none" as any }}
-                  placeholder="Teléfono"
-                  placeholderTextColor="#607d8b"
-                  value={telefono}
-                  onChangeText={(value) => {
-                    const digits = value.replace(/\D/g, "");
-                    setTelefono(digits.slice(0, 15));
-                    setError("");
-                    markTouched("telefono");
-                  }}
-                  onBlur={() => markTouched("telefono")}
-                  keyboardType="phone-pad"
-                  returnKeyType="done"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={15}
-                />
-              </View>
-              {touched.telefono && fieldErrors.telefono ? <Text style={inlineErrorStyle}>{fieldErrors.telefono}</Text> : null}
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowRegionPicker(true);
-                  markTouched("region");
-                }}
-                style={[
-                  globalStyles.input,
-                  { justifyContent: "center", paddingVertical: 12 },
-                ]}
-              >
-                <Text style={{ color: region ? "#000" : "#777" }}>
-                  {region || "Selecciona región"}
-                </Text>
-              </TouchableOpacity>
-              {touched.region && fieldErrors.region ? <Text style={inlineErrorStyle}>{fieldErrors.region}</Text> : null}
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <TextInput
-                style={globalStyles.input}
-                placeholder="Comuna"
-                value={ciudad}
-                placeholderTextColor="#607d8b"
-                onChangeText={(value) => {
-                  setCiudad(value);
-                  setError("");
-                  markTouched("ciudad");
-                }}
-                onBlur={() => markTouched("ciudad")}
-                returnKeyType="done"
-                autoCapitalize="words"
-                autoCorrect={false}
-              />
-              {touched.ciudad && fieldErrors.ciudad ? <Text style={inlineErrorStyle}>{fieldErrors.ciudad}</Text> : null}
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <TextInput
-                style={globalStyles.input}
-                placeholder="Dirección"
-                value={direccion}
-                placeholderTextColor="#607d8b"
-                onChangeText={(value) => {
-                  setDireccion(value);
-                  setError("");
-                  markTouched("direccion");
-                }}
-                onBlur={() => markTouched("direccion")}
-                returnKeyType="done"
-                autoCapitalize="sentences"
-                autoCorrect={false}
-              />
-              {touched.direccion && fieldErrors.direccion ? <Text style={inlineErrorStyle}>{fieldErrors.direccion}</Text> : null}
-            </View>
-          </View>
-
-          {hasTouchedField && !isValid ? (
-            <Text style={[globalStyles.error, { marginTop: -4 }]}>
-              Revisa los campos marcados para continuar.
-            </Text>
-          ) : null}
-
-          <TouchableOpacity
-            style={[
-              globalStyles.primaryButton,
-              (!isValid || loading) && { opacity: 0.6 },
-            ]}
-            onPress={handleRegister}
-            disabled={!isValid || loading}
-          >
-            <Text style={globalStyles.buttonText}>
-              {loading ? "Registrando..." : "Registrar"}
-            </Text>
-          </TouchableOpacity>
-
-          {error ? <Text style={globalStyles.error}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={globalStyles.secondaryButton}
-            onPress={() => navigation.navigate("Login")}
-          >
-            <Text style={globalStyles.buttonTextSecondary}>Ya tengo cuenta</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <Modal visible={showRegionPicker} transparent animationType="fade">
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-          }}
+        <ScrollView
+          contentContainerStyle={[
+            authStyles.scrollContent,
+            { paddingHorizontal: isCompact ? 16 : 28, paddingVertical: isCompact ? 28 : 48 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View
-            style={{
-              backgroundColor: "#fff",
-              borderRadius: 12,
-              padding: 16,
-              width: "100%",
-              maxWidth: 380,
-              maxHeight: "70%",
-            }}
-          >
-            <Text style={{ fontWeight: "700", fontSize: 16, marginBottom: 10 }}>
-              Selecciona tu región
-            </Text>
-            <RNScrollView>
-              {REGIONES_CHILE.map((regionItem) => (
-                <TouchableOpacity
-                  key={regionItem}
-                  onPress={() => {
-                    setRegion(regionItem);
-                    setError("");
-                    markTouched("region");
-                    setShowRegionPicker(false);
-                  }}
-                  style={{
-                    paddingVertical: 10,
-                    paddingHorizontal: 8,
-                    borderBottomWidth: 1,
-                    borderBottomColor: "#eee",
-                  }}
-                >
-                  <Text style={{ color: "#023047" }}>{regionItem}</Text>
-                </TouchableOpacity>
-              ))}
-            </RNScrollView>
-            <TouchableOpacity
-              onPress={() => setShowRegionPicker(false)}
-              style={{
-                marginTop: 10,
-                alignSelf: "flex-end",
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-              }}
-            >
-              <Text style={{ color: "#023047" }}>Cerrar</Text>
-            </TouchableOpacity>
+          <View style={authStyles.brandWrap}>
+            <Text style={[authStyles.brand, { fontSize: isCompact ? 34 : 44 }]}>Passio</Text>
           </View>
-        </View>
-      </Modal>
-    </ScrollView>
+
+          <View
+            style={[
+              authStyles.card,
+              {
+                maxWidth: 760,
+                paddingHorizontal: isCompact ? 20 : 30,
+                paddingVertical: isCompact ? 24 : 30,
+                borderRadius: isCompact ? 24 : 28,
+              },
+            ]}
+          >
+            <View style={authStyles.headerBlock}>
+              <Text style={[authStyles.title, { fontSize: isCompact ? 18 : 22 }]}>
+                Registrar empresa
+              </Text>
+              <Text style={authStyles.subtitle}>
+                Crea tu cuenta, configura tu empresa y comienza a usar Passio.
+              </Text>
+            </View>
+
+            <View style={authStyles.formBlock}>
+              <View style={authStyles.fieldBlock}>
+                <Text style={authStyles.label}>Nombre de la empresa</Text>
+                <View
+                  style={[
+                    authStyles.inputShell,
+                    focusedField === "empresa" && authStyles.inputShellFocused,
+                  ]}
+                >
+                  <Ionicons
+                    name="business-outline"
+                    size={20}
+                    color="#A5B3BE"
+                    style={authStyles.inputIcon}
+                  />
+                  <TextInput
+                    style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                    placeholder="Nombre de la empresa"
+                    value={empresa}
+                    placeholderTextColor="#A5B3BE"
+                    onChangeText={(value) => {
+                      setEmpresa(value);
+                      setError("");
+                      markTouched("empresa");
+                    }}
+                    onBlur={() => {
+                      markTouched("empresa");
+                      setFocusedField((prev) => (prev === "empresa" ? null : prev));
+                    }}
+                    onFocus={() => setFocusedField("empresa")}
+                    returnKeyType="done"
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    underlineColorAndroid="transparent"
+                  />
+                </View>
+                {touched.empresa && fieldErrors.empresa ? (
+                  <Text style={inlineErrorStyle}>{fieldErrors.empresa}</Text>
+                ) : null}
+              </View>
+
+              <View style={authStyles.fieldBlock}>
+                <Text style={authStyles.label}>Correo electrónico</Text>
+                <View
+                  style={[
+                    authStyles.inputShell,
+                    focusedField === "email" && authStyles.inputShellFocused,
+                  ]}
+                >
+                  <Ionicons
+                    name="mail-outline"
+                    size={20}
+                    color="#A5B3BE"
+                    style={authStyles.inputIcon}
+                  />
+                  <TextInput
+                    style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                    placeholder="ejemplo@empresa.com"
+                    value={email}
+                    placeholderTextColor="#A5B3BE"
+                    onChangeText={(value) => {
+                      setEmail(value);
+                      setError("");
+                      markTouched("email");
+                    }}
+                    onBlur={() => {
+                      markTouched("email");
+                      setFocusedField((prev) => (prev === "email" ? null : prev));
+                    }}
+                    onFocus={() => setFocusedField("email")}
+                    keyboardType="email-address"
+                    returnKeyType="done"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    underlineColorAndroid="transparent"
+                  />
+                </View>
+                {touched.email && fieldErrors.email ? (
+                  <Text style={inlineErrorStyle}>{fieldErrors.email}</Text>
+                ) : null}
+              </View>
+
+              <View style={authStyles.fieldBlock}>
+                <Text style={authStyles.label}>Contraseña</Text>
+                <View
+                  style={[
+                    authStyles.inputShell,
+                    focusedField === "password" && authStyles.inputShellFocused,
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#A5B3BE"
+                    style={authStyles.inputIcon}
+                  />
+                  <TextInput
+                    style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                    placeholder="........"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    placeholderTextColor="#A5B3BE"
+                    onChangeText={(value) => {
+                      setPassword(value);
+                      setError("");
+                      markTouched("password");
+                    }}
+                    onBlur={() => {
+                      markTouched("password");
+                      setFocusedField((prev) => (prev === "password" ? null : prev));
+                    }}
+                    onFocus={() => setFocusedField("password")}
+                    returnKeyType="done"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    underlineColorAndroid="transparent"
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowPassword((prev) => !prev)}
+                    style={authStyles.visibilityButton}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color="#7D8F9A"
+                    />
+                  </TouchableOpacity>
+                </View>
+                {passwordHint ? (
+                  <Text
+                    style={
+                      fieldErrors.password ? authStyles.warningText : authStyles.successText
+                    }
+                  >
+                    {passwordHint}
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={rowStyle as any}>
+                <View style={authStyles.rowItem}>
+                  <View style={authStyles.fieldBlock}>
+                    <Text style={authStyles.label}>Teléfono</Text>
+                    <View
+                      style={[
+                        authStyles.inputShell,
+                        focusedField === "telefono" && authStyles.inputShellFocused,
+                      ]}
+                    >
+                      <Ionicons
+                        name="call-outline"
+                        size={20}
+                        color="#A5B3BE"
+                        style={authStyles.inputIcon}
+                      />
+                      <TextInput
+                        style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                        placeholder="9 123456789"
+                        placeholderTextColor="#A5B3BE"
+                        value={telefono}
+                        onChangeText={(value) => {
+                          const digits = value.replace(/\D/g, "");
+                          setTelefono(digits.slice(0, 15));
+                          setError("");
+                          markTouched("telefono");
+                        }}
+                        onBlur={() => {
+                          markTouched("telefono");
+                          setFocusedField((prev) => (prev === "telefono" ? null : prev));
+                        }}
+                        onFocus={() => setFocusedField("telefono")}
+                        keyboardType="phone-pad"
+                        returnKeyType="done"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        maxLength={15}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+                    {touched.telefono && fieldErrors.telefono ? (
+                      <Text style={inlineErrorStyle}>{fieldErrors.telefono}</Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View style={authStyles.rowItem}>
+                  <View style={authStyles.fieldBlock}>
+                    <Text style={authStyles.label}>Región</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowRegionPicker(true);
+                        markTouched("region");
+                      }}
+                      style={authStyles.inputShell}
+                    >
+                      <Ionicons
+                        name="map-outline"
+                        size={20}
+                        color="#A5B3BE"
+                        style={authStyles.inputIcon}
+                      />
+                      <Text style={[authStyles.input, { color: region ? "#102A43" : "#A5B3BE", paddingVertical: 0 }]}>
+                        {region || "Selecciona región"}
+                      </Text>
+                      <Ionicons name="chevron-down" size={18} color="#7D8F9A" />
+                    </TouchableOpacity>
+                    {touched.region && fieldErrors.region ? (
+                      <Text style={inlineErrorStyle}>{fieldErrors.region}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              <View style={rowStyle as any}>
+                <View style={authStyles.rowItem}>
+                  <View style={authStyles.fieldBlock}>
+                    <Text style={authStyles.label}>Comuna</Text>
+                    <View
+                      style={[
+                        authStyles.inputShell,
+                        focusedField === "ciudad" && authStyles.inputShellFocused,
+                      ]}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={20}
+                        color="#A5B3BE"
+                        style={authStyles.inputIcon}
+                      />
+                      <TextInput
+                        style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                        placeholder="Comuna"
+                        value={ciudad}
+                        placeholderTextColor="#A5B3BE"
+                        onChangeText={(value) => {
+                          setCiudad(value);
+                          setError("");
+                          markTouched("ciudad");
+                        }}
+                        onBlur={() => {
+                          markTouched("ciudad");
+                          setFocusedField((prev) => (prev === "ciudad" ? null : prev));
+                        }}
+                        onFocus={() => setFocusedField("ciudad")}
+                        returnKeyType="done"
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+                    {touched.ciudad && fieldErrors.ciudad ? (
+                      <Text style={inlineErrorStyle}>{fieldErrors.ciudad}</Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View style={authStyles.rowItem}>
+                  <View style={authStyles.fieldBlock}>
+                    <Text style={authStyles.label}>Dirección</Text>
+                    <View
+                      style={[
+                        authStyles.inputShell,
+                        focusedField === "direccion" && authStyles.inputShellFocused,
+                      ]}
+                    >
+                      <Ionicons
+                        name="home-outline"
+                        size={20}
+                        color="#A5B3BE"
+                        style={authStyles.inputIcon}
+                      />
+                      <TextInput
+                        style={[authStyles.input, AUTH_WEB_INPUT_RESET]}
+                        placeholder="Dirección"
+                        value={direccion}
+                        placeholderTextColor="#A5B3BE"
+                        onChangeText={(value) => {
+                          setDireccion(value);
+                          setError("");
+                          markTouched("direccion");
+                        }}
+                        onBlur={() => {
+                          markTouched("direccion");
+                          setFocusedField((prev) => (prev === "direccion" ? null : prev));
+                        }}
+                        onFocus={() => setFocusedField("direccion")}
+                        returnKeyType="done"
+                        autoCapitalize="sentences"
+                        autoCorrect={false}
+                        underlineColorAndroid="transparent"
+                      />
+                    </View>
+                    {touched.direccion && fieldErrors.direccion ? (
+                      <Text style={inlineErrorStyle}>{fieldErrors.direccion}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+
+              {hasTouchedField && !isValid ? (
+                <Text style={authStyles.errorText}>Revisa los campos marcados para continuar.</Text>
+              ) : null}
+
+              <TouchableOpacity
+                style={[authStyles.primaryButton, (!isValid || loading) && authStyles.buttonDisabled]}
+                onPress={handleRegister}
+                disabled={!isValid || loading}
+              >
+                <Text style={authStyles.primaryButtonText}>
+                  {loading ? "Registrando..." : "Registrar empresa"}
+                </Text>
+                <Ionicons name="arrow-forward-outline" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {error ? <Text style={authStyles.errorText}>{error}</Text> : null}
+
+              <View style={authStyles.dividerRow}>
+                <View style={authStyles.dividerLine} />
+                <Text style={authStyles.dividerText}>o</Text>
+                <View style={authStyles.dividerLine} />
+              </View>
+
+              <TouchableOpacity
+                style={authStyles.secondaryButton}
+                onPress={() => navigation.navigate("Login")}
+              >
+                <Text style={authStyles.secondaryButtonText}>Ya tengo cuenta</Text>
+                <Ionicons name="log-in-outline" size={20} color="#6C4B00" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <Text style={authStyles.footer}>© {year} Passio. Todos los derechos reservados.</Text>
+        </ScrollView>
+
+        <Modal visible={showRegionPicker} transparent animationType="fade">
+          <View style={authStyles.modalBackdrop}>
+            <View style={authStyles.modalCard}>
+              <Text style={authStyles.modalTitle}>Selecciona tu región</Text>
+              <RNScrollView>
+                {REGIONES_CHILE.map((regionItem) => (
+                  <TouchableOpacity
+                    key={regionItem}
+                    onPress={() => {
+                      setRegion(regionItem);
+                      setError("");
+                      markTouched("region");
+                      setShowRegionPicker(false);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#EEF3F6",
+                    }}
+                  >
+                    <Text style={{ color: "#102A43" }}>{regionItem}</Text>
+                  </TouchableOpacity>
+                ))}
+              </RNScrollView>
+              <TouchableOpacity
+                onPress={() => setShowRegionPicker(false)}
+                style={[authStyles.ghostButton, { marginTop: 16 }]}
+              >
+                <Text style={authStyles.ghostButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 }

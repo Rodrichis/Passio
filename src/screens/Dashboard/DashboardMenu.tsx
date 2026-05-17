@@ -9,9 +9,16 @@ type Props = {
   setSelected: (val: string) => void;
   isMobile?: boolean;
   isAdmin?: boolean;
+  onLogout?: () => void;
 };
 
-export default function DashboardMenu({ selected, setSelected, isMobile, isAdmin = false }: Props) {
+export default function DashboardMenu({
+  selected,
+  setSelected,
+  isMobile,
+  isAdmin = false,
+  onLogout,
+}: Props) {
   const menuItems = [
     { name: "Principal", icon: "home-outline" },
     { name: "Clientes", icon: "people-outline" },
@@ -56,27 +63,43 @@ export default function DashboardMenu({ selected, setSelected, isMobile, isAdmin
 
   return (
     <View style={styles.sidebar}>
-      <Text style={styles.sidebarTitle}>Dashboard</Text>
-      {menuItems.map((item) => {
-        const isActive = activeKey === item.name;
-        const { backgroundColor, contentColor } = getItemColors(isActive);
+      <View>
+        <View style={styles.sidebarBrand}>
+          <Text style={styles.sidebarTitle}>Passio</Text>
+          <Text style={styles.sidebarSubtitle}>Gestion Empresarial</Text>
+        </View>
 
-        return (
-          <TouchableOpacity
-            key={item.name}
-            onPress={() => setSelected(item.name)}
-            style={[styles.menuButton, { backgroundColor }]}
-          >
-            <Ionicons
-              name={item.icon as any}
-              size={20}
-              color={contentColor}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={[styles.menuText, { color: contentColor }]}>{item.name}</Text>
-          </TouchableOpacity>
-        );
-      })}
+        <View style={styles.menuList}>
+          {menuItems.map((item) => {
+            const isActive = activeKey === item.name;
+            const { backgroundColor, contentColor } = getItemColors(isActive);
+
+            return (
+              <TouchableOpacity
+                key={item.name}
+                onPress={() => setSelected(item.name)}
+                style={[styles.menuButton, { backgroundColor, position: "relative", overflow: "hidden" }]}
+              >
+                {isActive ? <View style={styles.activeMenuMarker} /> : null}
+                <Ionicons
+                  name={item.icon as any}
+                  size={24}
+                  color={contentColor}
+                  style={{ marginRight: 14 }}
+                />
+                <Text style={[styles.menuText, { color: contentColor }]}>{item.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={styles.sidebarFooter}>
+        <TouchableOpacity style={styles.smallLogoutButton} onPress={onLogout}>
+          <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 10 }} />
+          <Text style={styles.logoutText}>Cerrar sesión</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
