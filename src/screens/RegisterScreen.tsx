@@ -16,6 +16,8 @@ import { doc, setDoc, Timestamp } from "firebase/firestore";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 
+import LegalDocumentModal from "../components/legal/LegalDocumentModal";
+import { LEGAL_DOCUMENT_VERSION } from "../content/legalDocument";
 import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../constants/empresa";
 import { auth, db } from "../services/firebaseConfig";
 import { RootStackParamList } from "../types/navigation";
@@ -70,6 +72,9 @@ export default function RegisterScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [touched, setTouched] = useState(EMPTY_TOUCHED);
   const [focusedField, setFocusedField] = useState<keyof typeof EMPTY_TOUCHED | null>(null);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [legalTouched, setLegalTouched] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
   const { width } = useWindowDimensions();
   const isCompact = width < 640;
   const isWideForm = width >= 760;
@@ -125,7 +130,9 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   const isValid = Object.values(fieldErrors).every((value) => !value);
+  const canSubmit = isValid && acceptedLegal;
   const hasTouchedField = Object.values(touched).some(Boolean);
+  const showLegalRequirement = !acceptedLegal && (legalTouched || (hasTouchedField && isValid));
   const passwordHint = !passwordTrim
     ? ""
     : fieldErrors.password
@@ -136,6 +143,12 @@ export default function RegisterScreen({ navigation }: Props) {
     if (!isValid) {
       markAllTouched();
       setError("Revisa los campos marcados para continuar.");
+      return;
+    }
+
+    if (!acceptedLegal) {
+      setLegalTouched(true);
+      setError("Debes aceptar este documento para continuar.");
       return;
     }
 
@@ -174,6 +187,9 @@ export default function RegisterScreen({ navigation }: Props) {
         plan: PLAN.FREE,
         estadoSuscripcion: ESTADO_SUSCRIPCION.PRUEBA,
         expiraEl: Timestamp.fromDate(expira),
+        aceptoTerminos: true,
+        versionTerminos: LEGAL_DOCUMENT_VERSION,
+        aceptoTerminosEl: Timestamp.fromDate(now),
         walletConfigurado: false,
         estadoWallet: ESTADO_WALLET.PENDIENTE,
         colorWallet: "#A99985",
@@ -543,10 +559,46 @@ export default function RegisterScreen({ navigation }: Props) {
                 <Text style={authStyles.errorText}>Revisa los campos marcados para continuar.</Text>
               ) : null}
 
+              <View style={authStyles.checkboxRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setAcceptedLegal((prev) => !prev);
+                    setLegalTouched(true);
+                    setError("");
+                  }}
+                  style={[
+                    authStyles.checkboxButton,
+                    acceptedLegal && authStyles.checkboxButtonActive,
+                  ]}
+                >
+                  {acceptedLegal ? (
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  ) : null}
+                </TouchableOpacity>
+
+                <View style={authStyles.checkboxLabelWrap}>
+                  <Text style={authStyles.checkboxLabel}>
+                    {"Acepto los "}
+                    <Text
+                      style={authStyles.checkboxLink}
+                      onPress={() => setShowLegalModal(true)}
+                    >
+                      {"T\u00E9rminos, Condiciones y Pol\u00EDtica de Privacidad"}
+                    </Text>
+                    {" de Passio."}
+                  </Text>
+                  {showLegalRequirement ? (
+                    <Text style={authStyles.warningText}>
+                      {"Debes aceptar este documento para continuar."}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
               <TouchableOpacity
-                style={[authStyles.primaryButton, (!isValid || loading) && authStyles.buttonDisabled]}
+                style={[authStyles.primaryButton, (!canSubmit || loading) && authStyles.buttonDisabled]}
                 onPress={handleRegister}
-                disabled={!isValid || loading}
+                disabled={!canSubmit || loading}
               >
                 <Text style={authStyles.primaryButtonText}>
                   {loading ? "Registrando..." : "Registrar empresa"}
@@ -609,6 +661,17 @@ export default function RegisterScreen({ navigation }: Props) {
             </View>
           </View>
         </Modal>
+
+        <LegalDocumentModal
+          visible={showLegalModal}
+          onClose={() => setShowLegalModal(false)}
+          showAcceptButton
+          onAccept={() => {
+            setAcceptedLegal(true);
+            setLegalTouched(true);
+            setError("");
+          }}
+        />
       </View>
     </KeyboardAvoidingView>
   );

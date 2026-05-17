@@ -15,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { EXPO_PUBLIC_WALLET_APPLE_API_BASE_URL } from "@env";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import LegalDocumentModal from "../components/legal/LegalDocumentModal";
 import { RootStackParamList } from "../types/navigation";
 import { auth, db } from "../services/firebaseConfig";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
@@ -106,6 +107,7 @@ export default function RegisterClientScreen({ route }: Props) {
   const [birthDate, setBirthDate] = useState<Date | null>(null);
   const [birthInputWeb, setBirthInputWeb] = useState("");
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showLegalModal, setShowLegalModal] = useState(false);
   const openedWalletRef = useRef(false);
 
   const inputFontSize = 16;
@@ -765,9 +767,18 @@ export default function RegisterClientScreen({ route }: Props) {
                 </TouchableOpacity>
 
                 <Text style={styles.footerText}>
+                  {"Al registrarte, aceptas los "}
+                  <Text style={styles.footerLinkText} onPress={() => setShowLegalModal(true)}>
+                    {"T\u00E9rminos, Condiciones y Pol\u00EDtica de Privacidad"}
+                  </Text>
+                  {" de Passio."}
+                </Text>
+                {false ? (
+                <Text style={styles.footerText}>
                   Al registrarte, aceptas nuestros términos y condiciones.
                 </Text>
 
+                ) : null}
                 {formError && formError !== "Ingresa un correo válido." ? (
                   <Text style={styles.inlineErrorText}>{formError}</Text>
                 ) : null}
@@ -843,6 +854,11 @@ export default function RegisterClientScreen({ route }: Props) {
           </View>
         </View>
       </Modal>
+
+      <LegalDocumentModal
+        visible={showLegalModal}
+        onClose={() => setShowLegalModal(false)}
+      />
     </View>
   );
 }
@@ -1095,6 +1111,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     textAlign: "center",
+  },
+  footerLinkText: {
+    color: "#0A6F88",
+    fontWeight: "700",
   },
   inlineErrorText: {
     color: "#C62828",
