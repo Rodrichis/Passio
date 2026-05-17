@@ -510,7 +510,7 @@ export default function RegisterClientScreen({ route }: Props) {
     );
   }
 
-  const companyColor = empresa?.ColorPrincipal || "#219EBC";
+  const companyColor = "#219EBC";
 
   return (
     <View style={styles.screen}>
