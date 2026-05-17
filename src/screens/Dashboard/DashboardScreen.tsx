@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Animated,
+  ActivityIndicator,
   ScrollView,
   Platform,
   View,
@@ -12,7 +13,7 @@ import {
   Text,
   TouchableOpacity,
 } from "react-native";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 import { dashboardStyles as styles } from "../../styles/DashboardStyles";
 import DashboardMenu from "./DashboardMenu";
@@ -27,6 +28,7 @@ import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
 import NotificationHistoryScreen from "../notifications/NotificationHistoryScreen";
 import { auth, db } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
+import { ESTADO_SUSCRIPCION } from "../../constants/empresa";
 
 type RootStackParamList = {
   Login: undefined;
@@ -61,10 +63,83 @@ const FAQ_ITEMS = [
   },
 ];
 
+type SubscriptionBlockReason = "caducada" | "prueba_vencida" | null;
+
+type SubscriptionBlockState = {
+  blocked: boolean;
+  reason: SubscriptionBlockReason;
+  expiresAt: Date | null;
+};
+
+const EMPTY_SUBSCRIPTION_BLOCK: SubscriptionBlockState = {
+  blocked: false,
+  reason: null,
+  expiresAt: null,
+};
+
+function normalizeEmpresaDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === "function") {
+    const parsed = value.toDate();
+    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
+  const estado = String(data?.estadoSuscripcion || "")
+    .trim()
+    .toLowerCase();
+  const expiresAt = normalizeEmpresaDate(data?.expiraEl);
+
+  if (estado === ESTADO_SUSCRIPCION.CADUCADA) {
+    return {
+      blocked: true,
+      reason: "caducada",
+      expiresAt,
+    };
+  }
+
+  if (
+    estado === ESTADO_SUSCRIPCION.PRUEBA &&
+    expiresAt &&
+    expiresAt.getTime() < Date.now()
+  ) {
+    return {
+      blocked: true,
+      reason: "prueba_vencida",
+      expiresAt,
+    };
+  }
+
+  return EMPTY_SUBSCRIPTION_BLOCK;
+}
+
+function formatBlockDate(value: Date | null) {
+  if (!value) return null;
+  try {
+    return value.toLocaleDateString("es-CL");
+  } catch {
+    const day = String(value.getDate()).padStart(2, "0");
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const year = value.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+}
+
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
   const [isAdmin, setIsAdmin] = useState(false);
   const [companyName, setCompanyName] = useState("");
+  const [companyReady, setCompanyReady] = useState(false);
+  const [subscriptionBlock, setSubscriptionBlock] = useState<SubscriptionBlockState>(
+    EMPTY_SUBSCRIPTION_BLOCK
+  );
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [faqModalOpen, setFaqModalOpen] = useState(false);
   const [faqExpandedIndex, setFaqExpandedIndex] = useState<number | null>(null);
@@ -100,6 +175,7 @@ export default function Dashboard({ navigation }: any) {
 
   useEffect(() => {
     let active = true;
+    let unsubscribeEmpresa: (() => void) | null = null;
     const user = auth.currentUser;
 
     if (user && !user.emailVerified) {
@@ -113,14 +189,37 @@ export default function Dashboard({ navigation }: any) {
       if (!user || !user.emailVerified) return;
 
       try {
-        const empresaSnap = await getDoc(doc(db, "Empresas", user.uid));
-        if (active && empresaSnap.exists()) {
-          const data = empresaSnap.data() as any;
-          setIsAdmin(data?.esAdmin === true);
-          setCompanyName(typeof data?.nombre === "string" ? data.nombre.trim() : "");
-        }
+        unsubscribeEmpresa = onSnapshot(
+          doc(db, "Empresas", user.uid),
+          (empresaSnap) => {
+            if (!active) return;
+
+            if (!empresaSnap.exists()) {
+              setIsAdmin(false);
+              setCompanyName("");
+              setSubscriptionBlock(EMPTY_SUBSCRIPTION_BLOCK);
+              setCompanyReady(true);
+              return;
+            }
+
+            const data = empresaSnap.data() as any;
+            const adminEnabled = data?.esAdmin === true;
+
+            setIsAdmin(adminEnabled);
+            setCompanyName(typeof data?.nombre === "string" ? data.nombre.trim() : "");
+            setSubscriptionBlock(adminEnabled ? EMPTY_SUBSCRIPTION_BLOCK : resolveSubscriptionBlock(data));
+            setCompanyReady(true);
+          },
+          (accessError) => {
+            console.error("Error verificando acceso admin:", accessError);
+            if (!active) return;
+            setCompanyReady(true);
+          }
+        );
       } catch (accessError) {
         console.error("Error verificando acceso admin:", accessError);
+        if (!active) return;
+        setCompanyReady(true);
       }
     };
 
@@ -143,14 +242,37 @@ export default function Dashboard({ navigation }: any) {
     ensureWalletConfigured();
     return () => {
       active = false;
+      unsubscribeEmpresa?.();
     };
   }, [navigation]);
+
+  const subscriptionBlockDate = formatBlockDate(subscriptionBlock.expiresAt);
+  const subscriptionBlockTitle =
+    subscriptionBlock.reason === "prueba_vencida"
+      ? "Tu prueba finaliz\u00F3"
+      : "Tu suscripci\u00F3n est\u00E1 caducada";
+  const subscriptionBlockDescription =
+    subscriptionBlock.reason === "prueba_vencida"
+      ? subscriptionBlockDate
+        ? `Tu acceso termin\u00F3 el ${subscriptionBlockDate}. Para seguir usando Passio, necesitamos reactivar tu cuenta.`
+        : "Tu periodo de prueba termin\u00F3. Para seguir usando Passio, necesitamos reactivar tu cuenta."
+      : subscriptionBlockDate
+        ? `Tu cuenta figura como caducada desde el ${subscriptionBlockDate}. Escr\u00EDbenos para ayudarte a reactivarla.`
+        : "Tu cuenta figura como caducada. Escr\u00EDbenos para ayudarte a reactivarla.";
 
   const handleLogout = async () => {
     try {
       await auth.signOut();
     } catch (err) {
       console.log("Error al cerrar sesión:", err);
+    }
+  };
+
+  const handleOpenSupportEmail = async () => {
+    try {
+      await Linking.openURL("mailto:hola@passio.cl");
+    } catch (err) {
+      console.log("No se pudo abrir soporte:", err);
     }
   };
 
@@ -238,6 +360,80 @@ export default function Dashboard({ navigation }: any) {
     selected === "HistorialNotificaciones" ||
     selected === "EmpresasAdmin";
   const usesEmbeddedTopBar = selected === "Clientes";
+
+  if (!companyReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+            gap: 12,
+          }}
+        >
+          <ActivityIndicator size="large" color="#2196F3" />
+          <Text style={{ color: "#123042", fontSize: 16, fontWeight: "700" }}>
+            Cargando tu empresa...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (subscriptionBlock.blocked) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+            paddingVertical: 32,
+            backgroundColor: "#F6FAFF",
+          }}
+        >
+          <View style={[overlayStyles.card, { maxWidth: 520 }]}>
+            <View style={[overlayStyles.infoBox, { gap: 10 }]}>
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 18,
+                  backgroundColor: "#FFF4E5",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="alert-circle-outline" size={28} color="#D97706" />
+              </View>
+              <Text style={overlayStyles.title}>{subscriptionBlockTitle}</Text>
+              <Text style={overlayStyles.description}>{subscriptionBlockDescription}</Text>
+            </View>
+
+            <View style={overlayStyles.infoBox}>
+              <Text style={overlayStyles.infoLabel}>Estado de suscripción</Text>
+              <Text style={overlayStyles.infoValue}>
+                {subscriptionBlock.reason === "prueba_vencida" ? "Prueba vencida" : "Caducada"}
+              </Text>
+            </View>
+
+            <View style={overlayStyles.actions}>
+              <TouchableOpacity onPress={handleLogout} style={overlayStyles.secondaryButton}>
+                <Text style={overlayStyles.secondaryButtonText}>Cerrar sesión</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleOpenSupportEmail} style={overlayStyles.primaryButton}>
+                <Text style={overlayStyles.primaryButtonText}>Contactar soporte</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
@@ -409,6 +605,7 @@ export default function Dashboard({ navigation }: any) {
           </View>
         </View>
       </Modal>
+
     </SafeAreaView>
   );
 }
