@@ -4,8 +4,10 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   Platform,
   Linking,
+  Modal,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,22 +44,39 @@ type HighlightClient = {
 
 type LatestNotification = {
   date: Date | null;
+  totalRecipients: number;
+  messagePreview: string;
 };
 
 type ClientWithBirthday = ReturnType<typeof mapDoc> & {
   fechaNacimiento: Date | null;
 };
 
+type BirthdayClient = {
+  id: string;
+  name: string;
+};
+
 type Props = {
   goToClientes?: () => void;
   companyName?: string;
+  onOpenBirthdayGreeting?: (clientIds: string[], message: string) => void;
+  onOpenNotificationHistory?: () => void;
+  onOpenNotificationComposer?: () => void;
 };
 
-export default function DashboardContentPrincipal({ goToClientes, companyName }: Props) {
+export default function DashboardContentPrincipal({
+  goToClientes,
+  companyName,
+  onOpenBirthdayGreeting,
+  onOpenNotificationHistory,
+  onOpenNotificationComposer,
+}: Props) {
   const uid = auth.currentUser?.uid;
   const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const isCompactLayout = width < 900;
+  const isCompactWeb = Platform.OS === "web" && isCompactLayout;
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [totalClientes, setTotalClientes] = React.useState<number | null>(null);
@@ -70,9 +89,11 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
   const [atUserLimit, setAtUserLimit] = React.useState(false);
   const [registrationUrl, setRegistrationUrl] = React.useState("");
   const [showQrModal, setShowQrModal] = React.useState(false);
-  const [birthdayNames, setBirthdayNames] = React.useState<string[]>([]);
+  const [birthdayClients, setBirthdayClients] = React.useState<BirthdayClient[]>([]);
   const [topVisitedClient, setTopVisitedClient] = React.useState<HighlightClient | null>(null);
   const [lastNotification, setLastNotification] = React.useState<LatestNotification | null>(null);
+  const [showBirthdayModal, setShowBirthdayModal] = React.useState(false);
+  const [showLastNotificationModal, setShowLastNotificationModal] = React.useState(false);
 
   const registroURL = registrationUrl || buildRegistrationUrl(uid);
 
@@ -128,7 +149,11 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
           const rawBirthday = data.fechaNacimiento;
           const fechaNacimiento =
             rawBirthday?.toDate?.() ||
-            (rawBirthday instanceof Timestamp ? rawBirthday.toDate() : rawBirthday instanceof Date ? rawBirthday : null);
+            (rawBirthday instanceof Timestamp
+              ? rawBirthday.toDate()
+              : rawBirthday instanceof Date
+                ? rawBirthday
+                : null);
 
           return {
             ...cliente,
@@ -148,8 +173,12 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
         const hasLimit = limitNum != null && !isNaN(limitNum);
         setAtUserLimit(hasLimit ? totalCount >= limitNum : false);
 
-        const androidTotal = allClients.filter((client) => String(client.so || "").toLowerCase() === "android").length;
-        const iosTotal = allClients.filter((client) => String(client.so || "").toLowerCase() === "ios").length;
+        const androidTotal = allClients.filter(
+          (client) => String(client.so || "").toLowerCase() === "android"
+        ).length;
+        const iosTotal = allClients.filter(
+          (client) => String(client.so || "").toLowerCase() === "ios"
+        ).length;
         setAndroidCount(androidTotal);
         setIosCount(iosTotal);
 
@@ -175,9 +204,11 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
               client.fechaNacimiento.getDate() === startOfDay.getDate()
             );
           })
-          .map((client) => client.nombreCompleto)
-          .filter(Boolean);
-        setBirthdayNames(birthdaysToday);
+          .map((client) => ({
+            id: client.id,
+            name: client.nombreCompleto || "Cliente sin nombre",
+          }));
+        setBirthdayClients(birthdaysToday);
 
         const topVisited = allClients.reduce<HighlightClient | null>((best, client) => {
           const visits = Number(client.visitasTotales ?? 0);
@@ -224,15 +255,27 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
             const rawDate = notificationData.fechaEnvio;
             const date =
               rawDate?.toDate?.() ||
-              (rawDate instanceof Timestamp ? rawDate.toDate() : rawDate instanceof Date ? rawDate : null);
-            setLastNotification({ date });
+              (rawDate instanceof Timestamp
+                ? rawDate.toDate()
+                : rawDate instanceof Date
+                  ? rawDate
+                  : null);
+            const totalRecipients = Number(notificationData.totalClientes ?? 0);
+            const messagePreview =
+              typeof notificationData.mensaje === "string" ? notificationData.mensaje.trim() : "";
+
+            setLastNotification({
+              date,
+              totalRecipients: Number.isFinite(totalRecipients) ? totalRecipients : 0,
+              messagePreview,
+            });
           }
         } catch {
           setLastNotification(null);
         }
       } catch (e) {
         console.error(e);
-        setError("No se pudieron cargar las métricas.");
+        setError("No se pudieron cargar las metricas.");
       } finally {
         setLoading(false);
       }
@@ -273,8 +316,28 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
     }
   };
 
+  const handleOpenBirthdayGreeting = () => {
+    const ids = birthdayClients.map((client) => client.id).filter(Boolean);
+    if (!ids.length) return;
+
+    setShowBirthdayModal(false);
+    onOpenBirthdayGreeting?.(ids, "¡Feliz cumpleaños! Te deseamos un gran día.");
+  };
+
+  const handleOpenNotificationHistory = () => {
+    setShowLastNotificationModal(false);
+    onOpenNotificationHistory?.();
+  };
+
+  const handleOpenNotificationComposer = () => {
+    setShowLastNotificationModal(false);
+    onOpenNotificationComposer?.();
+  };
+
+  const birthdayNames = birthdayClients.map((client) => client.name);
+
   const highlightCards = [
-    birthdayNames.length > 0
+    birthdayClients.length > 0
       ? {
           key: "birthday",
           title: "Cumpleaños hoy",
@@ -284,17 +347,18 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
           iconColor: "#7C3AED",
           iconBg: "#F3E8FF",
           primaryColor: "#6D28D9",
+          onPress: () => setShowBirthdayModal(true),
         }
       : null,
     {
       key: "top",
-      title: "Cliente con más visitas",
+      title: "Cliente con mas visitas",
       primary: loading ? "..." : topVisitedClient?.name || "Sin clientes",
       secondary: loading
         ? "Cargando..."
         : topVisitedClient
           ? `${topVisitedClient.visits} visitas en total`
-          : "Aún no hay clientes registrados",
+          : "Aun no hay clientes registrados",
       icon: "trophy-outline" as const,
       iconColor: "#16A34A",
       iconBg: "#E8F7EE",
@@ -302,7 +366,7 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
     },
     {
       key: "notification",
-      title: "Última notificación",
+      title: "Ultima notificación",
       primary: loading
         ? "..."
         : lastNotification?.date
@@ -312,11 +376,12 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
         ? "Cargando..."
         : lastNotification?.date
           ? formatTimeOnly(lastNotification.date)
-          : "Aún no envías notificaciones",
+          : "Aun no envias notificaciones",
       icon: "notifications-outline" as const,
       iconColor: "#2563EB",
       iconBg: "#E8F1FF",
       primaryColor: "#2563EB",
+      onPress: () => setShowLastNotificationModal(true),
     },
   ].filter(Boolean) as Array<{
     key: string;
@@ -327,6 +392,7 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
     iconColor: string;
     iconBg: string;
     primaryColor: string;
+    onPress?: () => void;
   }>;
 
   const highlightCardBasis = isCompactLayout ? "48%" : highlightCards.length === 2 ? "48%" : "31%";
@@ -419,6 +485,128 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
         onClose={() => setShowQrModal(false)}
       />
 
+      <Modal visible={showBirthdayModal} transparent animationType="fade" onRequestClose={() => setShowBirthdayModal(false)}>
+        <View style={modalStyles.backdrop}>
+          <Pressable style={modalStyles.dismissLayer} onPress={() => setShowBirthdayModal(false)} />
+          <View style={modalStyles.card}>
+            <View style={modalStyles.headerRow}>
+              <Text style={modalStyles.title}>Cumpleaños de hoy</Text>
+              <TouchableOpacity onPress={() => setShowBirthdayModal(false)} style={modalStyles.closeButton}>
+                <Ionicons name="close" size={20} color="#51616F" />
+              </TouchableOpacity>
+            </View>
+            <Text style={modalStyles.text}>
+              Estas personas estan de cumpleaños hoy. Puedes enviarles un saludo.
+            </Text>
+
+            <View style={modalStyles.listBox}>
+              {birthdayClients.map((client) => (
+                <Text key={client.id} style={modalStyles.listItem}>
+                  {client.name}
+                </Text>
+              ))}
+            </View>
+
+            <View style={modalStyles.actions}>
+              <TouchableOpacity onPress={() => setShowBirthdayModal(false)} style={modalStyles.secondaryButton}>
+                <Text style={modalStyles.secondaryButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleOpenBirthdayGreeting} style={modalStyles.primaryButton}>
+                <Text style={modalStyles.primaryButtonText}>Enviar saludo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showLastNotificationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLastNotificationModal(false)}
+      >
+        <View style={modalStyles.backdrop}>
+          <Pressable style={modalStyles.dismissLayer} onPress={() => setShowLastNotificationModal(false)} />
+          <View style={modalStyles.card}>
+            <View style={modalStyles.headerRow}>
+              <Text style={modalStyles.title}>Ultima notificación</Text>
+              <TouchableOpacity onPress={() => setShowLastNotificationModal(false)} style={modalStyles.closeButton}>
+                <Ionicons name="close" size={20} color="#51616F" />
+              </TouchableOpacity>
+            </View>
+            {isCompactWeb ? (
+              <>
+                <View>
+                  <Text style={modalStyles.detailLabel}>Fecha</Text>
+                  <Text style={modalStyles.detailValue}>
+                    {lastNotification?.date ? formatDateOnly(lastNotification.date) : "Sin notificaciones"}
+                  </Text>
+                  <Text style={modalStyles.detailLabel}>Destinatarios</Text>
+                  <Text style={modalStyles.detailValue}>
+                    {lastNotification?.date ? String(lastNotification.totalRecipients) : "0"}
+                  </Text>
+                </View>
+
+                <View style={[modalStyles.previewBox, { marginTop: 16 }]}>
+                  <Text style={modalStyles.previewLabel}>Vista previa</Text>
+                  <Text numberOfLines={4} ellipsizeMode="tail" style={modalStyles.previewText}>
+                    {lastNotification?.messagePreview
+                      ? lastNotification.messagePreview
+                      : "Sin mensaje disponible."}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View
+                style={{
+                  flexDirection: isCompactLayout ? "column" : "row",
+                  alignItems: isCompactLayout ? "stretch" : "flex-start",
+                  gap: 14,
+                }}
+              >
+                <View style={{ flex: isCompactLayout ? 0 : 1 }}>
+                  <Text style={modalStyles.detailLabel}>Fecha</Text>
+                  <Text style={modalStyles.detailValue}>
+                    {lastNotification?.date ? formatDateOnly(lastNotification.date) : "Sin notificaciones"}
+                  </Text>
+                  <Text style={modalStyles.detailLabel}>Destinatarios</Text>
+                  <Text style={modalStyles.detailValue}>
+                    {lastNotification?.date ? String(lastNotification.totalRecipients) : "0"}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    modalStyles.previewBox,
+                    !isCompactLayout && { flex: 1.2, minWidth: 0, marginTop: 10 },
+                  ]}
+                >
+                  <Text style={modalStyles.previewLabel}>Vista previa</Text>
+                  <Text
+                    numberOfLines={isCompactLayout ? 4 : 5}
+                    ellipsizeMode="tail"
+                    style={modalStyles.previewText}
+                  >
+                    {lastNotification?.messagePreview
+                      ? lastNotification.messagePreview
+                      : "Sin mensaje disponible."}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View style={modalStyles.actions}>
+              <TouchableOpacity onPress={handleOpenNotificationHistory} style={modalStyles.secondaryButton}>
+                <Text style={modalStyles.secondaryButtonText}>Ver historial</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleOpenNotificationComposer} style={modalStyles.primaryButton}>
+                <Text style={modalStyles.primaryButtonText}>Nueva notificacion</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
 
       <Text style={styles.sectionTitle}>Actividad destacada</Text>
@@ -435,6 +623,7 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
             primaryColor={card.primaryColor}
             basis={highlightCardBasis}
             compact={isCompactLayout}
+            onPress={card.onPress}
           />
         ))}
       </View>
@@ -446,14 +635,14 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
           value={totalClientes}
           loading={loading}
           note={`Android: ${androidCount ?? 0} · iOS: ${iosCount ?? 0}`}
-          warning={atUserLimit ? "Alcanzaste el límite." : undefined}
+          warning={atUserLimit ? "Alcanzaste el limite." : undefined}
         />
-        <MetricCard label="Nuevos 7 días" value={nuevosSemana} loading={loading} />
+        <MetricCard label="Nuevos 7 dias" value={nuevosSemana} loading={loading} />
         <MetricCard
           label="Visitas registradas hoy"
           value={puntosHoy ?? 0}
           loading={loading}
-          note="Clientes con última visita marcada hoy"
+          note="Clientes con ultima visita marcada hoy"
         />
       </View>
 
@@ -475,7 +664,7 @@ export default function DashboardContentPrincipal({ goToClientes, companyName }:
 
       <Text style={styles.sectionTitle}>Actividad reciente</Text>
       {actividad.length === 0 && !loading ? (
-        <Text style={{ color: "#555", marginBottom: 16 }}>Sin actividad aún.</Text>
+        <Text style={{ color: "#555", marginBottom: 16 }}>Sin actividad aun.</Text>
       ) : (
         actividad.map((item, idx) => (
           <View
@@ -533,7 +722,7 @@ function MetricCard({
         {warning ? <Text style={{ fontSize: 11, color: "#c62828" }}>{warning}</Text> : null}
       </View>
       <Text style={{ fontSize: 22, fontWeight: "700", color: "#023047" }}>
-        {loading ? "…" : value ?? "0"}
+        {loading ? "..." : value ?? "0"}
       </Text>
       {note ? <Text style={{ fontSize: 11, color: "#888" }}>{note}</Text> : null}
     </View>
@@ -550,6 +739,7 @@ function HighlightCard({
   primaryColor,
   basis,
   compact,
+  onPress,
 }: {
   title: string;
   primary: string;
@@ -560,10 +750,16 @@ function HighlightCard({
   primaryColor: string;
   basis: string;
   compact?: boolean;
+  onPress?: () => void;
 }) {
+  const showChevron = typeof onPress === "function";
+  const Container = showChevron ? TouchableOpacity : View;
+  const containerProps = showChevron ? { activeOpacity: 0.92, onPress } : {};
+
   if (compact) {
     return (
-      <View
+      <Container
+        {...containerProps}
         style={{
           flexBasis: basis as any,
           flexGrow: 1,
@@ -583,7 +779,7 @@ function HighlightCard({
           >
             {title}
           </Text>
-          <Ionicons name="chevron-forward-outline" size={16} color="#A3B1BA" />
+          {showChevron ? <Ionicons name="chevron-forward-outline" size={16} color="#A3B1BA" /> : null}
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
@@ -617,12 +813,13 @@ function HighlightCard({
             </Text>
           </View>
         </View>
-      </View>
+      </Container>
     );
   }
 
   return (
-    <View
+    <Container
+      {...containerProps}
       style={{
         flexBasis: basis as any,
         flexGrow: 1,
@@ -666,8 +863,135 @@ function HighlightCard({
           </Text>
         </View>
 
-        <Ionicons name="chevron-forward-outline" size={18} color="#A3B1BA" />
+        {showChevron ? <Ionicons name="chevron-forward-outline" size={18} color="#A3B1BA" /> : null}
       </View>
-    </View>
+    </Container>
   );
 }
+
+const modalStyles = {
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.35)",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    padding: 20,
+  },
+  dismissLayer: {
+    position: "absolute" as const,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  card: {
+    width: "100%" as const,
+    maxWidth: 460,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E7EDF1",
+  },
+  title: {
+    color: "#023047",
+    fontSize: 20,
+    fontWeight: "800" as const,
+  },
+  headerRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    marginBottom: 10,
+    gap: 12,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E7EDF1",
+  },
+  text: {
+    color: "#51616F",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  listBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E7EDF1",
+    gap: 8,
+  },
+  listItem: {
+    color: "#023047",
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  detailLabel: {
+    color: "#51616F",
+    fontSize: 14,
+    fontWeight: "700" as const,
+    marginTop: 10,
+  },
+  detailValue: {
+    color: "#023047",
+    fontSize: 16,
+    fontWeight: "800" as const,
+    marginTop: 4,
+    lineHeight: 22,
+  },
+  previewBox: {
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E7EDF1",
+    padding: 14,
+  },
+  previewLabel: {
+    color: "#51616F",
+    fontSize: 14,
+    fontWeight: "700" as const,
+    marginBottom: 8,
+  },
+  previewText: {
+    color: "#023047",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  actions: {
+    flexDirection: "row" as const,
+    justifyContent: "flex-end" as const,
+    gap: 10,
+    marginTop: 18,
+    flexWrap: "wrap" as const,
+  },
+  secondaryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#CFD8DC",
+    backgroundColor: "#fff",
+  },
+  secondaryButtonText: {
+    color: "#023047",
+    fontWeight: "700" as const,
+  },
+  primaryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: "#2196F3",
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontWeight: "700" as const,
+  },
+};

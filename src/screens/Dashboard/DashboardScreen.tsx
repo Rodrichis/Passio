@@ -24,10 +24,18 @@ type RootStackParamList = {
   VerifyEmail: { email?: string };
 };
 
+type ClientesNotificationDraft = {
+  clientIds: string[];
+  message?: string;
+  key: number;
+};
+
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
   const [isAdmin, setIsAdmin] = useState(false);
   const [companyName, setCompanyName] = useState("");
+  const [clientesNotificationDraft, setClientesNotificationDraft] =
+    useState<ClientesNotificationDraft | null>(null);
   const { width } = useWindowDimensions();
   const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
   const isCompactWeb = Platform.OS === "web" && width < 900;
@@ -84,9 +92,31 @@ export default function Dashboard({ navigation }: any) {
   const renderContent = () => {
     switch (selected) {
       case "Principal":
-        return <DashboardContentPrincipal goToClientes={() => setSelected("Clientes")} companyName={companyName} />;
+        return (
+          <DashboardContentPrincipal
+            goToClientes={() => setSelected("Clientes")}
+            companyName={companyName}
+            onOpenBirthdayGreeting={(clientIds, message) => {
+              setClientesNotificationDraft({
+                clientIds,
+                message,
+                key: Date.now(),
+              });
+              setSelected("Clientes");
+            }}
+            onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")}
+            onOpenNotificationComposer={() => setSelected("Clientes")}
+          />
+        );
       case "Clientes":
-        return <DashboardContentClientes onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")} companyName={companyName} />;
+        return (
+          <DashboardContentClientes
+            onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")}
+            companyName={companyName}
+            notificationDraft={clientesNotificationDraft}
+            onConsumeNotificationDraft={() => setClientesNotificationDraft(null)}
+          />
+        );
       case "Escanear":
         return <DashboardContentEscanear companyName={companyName} />;
       case "HistorialNotificaciones":

@@ -67,9 +67,20 @@ function formatDate(d?: Date | null) {
 type Props = {
   onOpenNotificationHistory: () => void;
   companyName?: string;
+  notificationDraft?: {
+    clientIds: string[];
+    message?: string;
+    key: number;
+  } | null;
+  onConsumeNotificationDraft?: () => void;
 };
 
-export default function DashboardContentClientes({ onOpenNotificationHistory, companyName }: Props) {
+export default function DashboardContentClientes({
+  onOpenNotificationHistory,
+  companyName,
+  notificationDraft,
+  onConsumeNotificationDraft,
+}: Props) {
   const uid = auth.currentUser?.uid;
   const { width } = useWindowDimensions();
   const useDesktopWebLayout = IS_WEB && width >= 900;
@@ -185,6 +196,20 @@ export default function DashboardContentClientes({ onOpenNotificationHistory, co
   useEffect(() => {
     loadFirstPage();
   }, [loadFirstPage]);
+
+  useEffect(() => {
+    if (!notificationDraft) return;
+
+    setSelectedIds(new Set(notificationDraft.clientIds.filter(Boolean)));
+    setPushMode("bulk");
+    setPushTarget(null);
+    setPushStatus("");
+    setPushBody(notificationDraft.message || "");
+    setPushSent(false);
+    setSendingPush(false);
+    setShowPushModal(true);
+    onConsumeNotificationDraft?.();
+  }, [notificationDraft, onConsumeNotificationDraft]);
 
   // Helper: actualiza contador de notificaciones con reset mensual y limite.
   // Cada envio cuenta como 1, independiente de cuántos destinatarios tenga.
@@ -1320,7 +1345,6 @@ export default function DashboardContentClientes({ onOpenNotificationHistory, co
     </View>
   );
 }
-
 
 
 
