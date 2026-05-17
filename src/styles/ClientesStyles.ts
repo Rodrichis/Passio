@@ -831,6 +831,11 @@ export const clientesStyles = StyleSheet.create({
     marginTop: -4,
     marginBottom: 10,
   },
+  inlineStatusBoxHidden: {
+    opacity: 0,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+  },
   inlineStatus: {
     color: "#023047",
     fontWeight: "600",

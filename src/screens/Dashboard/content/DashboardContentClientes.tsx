@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -100,6 +100,7 @@ export default function DashboardContentClientes({
   const useCompactWebLayout = IS_WEB && width < 900;
   const isIOSWeb =
     IS_WEB && typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent || "");
+  const useStaticSendingStatus = isIOSWeb && useCompactWebLayout;
   const contentPadding = useCompactLayout ? 16 : 28;
 
   const [items, setItems] = useState<Cliente[]>([]);
@@ -144,6 +145,8 @@ export default function DashboardContentClientes({
   const [limitePush, setLimitePush] = useState<number | null>(null);
   const [empresaNombre, setEmpresaNombre] = useState("");
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const pushInputRef = useRef<TextInput | null>(null);
+  const pushStatusRef = useRef<any>(null);
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [deactivateDone, setDeactivateDone] = useState(false);
@@ -157,6 +160,76 @@ export default function DashboardContentClientes({
     setPushSent(false);
     setPushMode("single");
   };
+
+  const blurPushInputBeforeSend = useCallback(async () => {
+    if (!useStaticSendingStatus) return;
+
+    pushInputRef.current?.blur();
+
+    if (typeof document !== "undefined") {
+      const activeElement = document.activeElement as HTMLElement | null;
+      activeElement?.blur?.();
+    }
+
+    // Wait until iOS Safari finishes resizing the visual viewport after the keyboard closes.
+    // If the status appears during that resize, Safari can leave stale paint fragments behind.
+    await new Promise<void>((resolve) => {
+      if (typeof window === "undefined") {
+        resolve();
+        return;
+      }
+
+      const visualViewport = window.visualViewport;
+      let settledTimer = window.setTimeout(finish, 220);
+
+      function finish() {
+        window.clearTimeout(settledTimer);
+        visualViewport?.removeEventListener("resize", scheduleFinish);
+        visualViewport?.removeEventListener("scroll", scheduleFinish);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve());
+        });
+      }
+
+      function scheduleFinish() {
+        window.clearTimeout(settledTimer);
+        settledTimer = window.setTimeout(finish, 120);
+      }
+
+      visualViewport?.addEventListener("resize", scheduleFinish);
+      visualViewport?.addEventListener("scroll", scheduleFinish);
+    });
+  }, [useStaticSendingStatus]);
+
+  useEffect(() => {
+    if (
+      !useStaticSendingStatus ||
+      !pushStatus ||
+      sendingPush ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const node = pushStatusRef.current as HTMLElement | null;
+      if (!node || typeof node.getBoundingClientRect !== "function") return;
+
+      const previousTransform = node.style.transform;
+      const previousWebkitTransform = node.style.webkitTransform;
+
+      node.style.transform = "translateZ(0)";
+      node.style.webkitTransform = "translateZ(0)";
+      node.getBoundingClientRect();
+
+      window.requestAnimationFrame(() => {
+        node.style.transform = previousTransform;
+        node.style.webkitTransform = previousWebkitTransform;
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [pushStatus, sendingPush, useStaticSendingStatus]);
 
   const loadFirstPage = useCallback(async () => {
     if (!uid) return;
@@ -335,8 +408,8 @@ export default function DashboardContentClientes({
         if (mesConteo !== mesKey) {
           current = 0;
         }
-        const nuevoTotal = current + sendCount;
-        if (limitePush != null && nuevoTotal > limitePush) {
+        const nuevoTotal = Math.max(0, current + sendCount);
+        if (sendCount > 0 && limitePush != null && nuevoTotal > limitePush) {
           throw new Error("LIMIT_PUSH");
         }
         tx.set(
@@ -437,6 +510,12 @@ export default function DashboardContentClientes({
   const sendPushNotifications = useCallback(
     async (targets: Cliente[], message: string) => {
       let okCount = 0;
+      const failures: Array<{
+        id: string;
+        so?: string;
+        status: number;
+        errorText?: string;
+      }> = [];
 
       for (let index = 0; index < targets.length; index += PUSH_BATCH_SIZE) {
         const batch = targets.slice(index, index + PUSH_BATCH_SIZE);
@@ -454,16 +533,29 @@ export default function DashboardContentClientes({
         );
 
         okCount += batchResults.filter((response) => response.ok).length;
+        batchResults.forEach((response, responseIndex) => {
+          if (!response.ok) {
+            const target = batch[responseIndex];
+            failures.push({
+              id: target.id,
+              so: target.so,
+              status: response.status,
+              errorText: response.errorText,
+            });
+          }
+        });
 
         if (targets.length > PUSH_BATCH_SIZE) {
           const processed = Math.min(index + batch.length, targets.length);
-          setPushStatus(`Enviando ${processed}/${targets.length}...`);
+          if (!useStaticSendingStatus) {
+            setPushStatus(`Enviando ${processed}/${targets.length}...`);
+          }
         }
       }
 
-      return okCount;
+      return { okCount, failures };
     },
-    [androidNotificationHeader]
+    [androidNotificationHeader, useStaticSendingStatus]
   );
 
   const sortedItems = useMemo(
@@ -1341,105 +1433,165 @@ export default function DashboardContentClientes({
                 {pushMode === "single" ? pushTarget?.nombreCompleto || "--" : `${selectedCount}`}
               </Text>
             </View>
-            {pushSent ? (
-              <>
+            {pushSent && !useStaticSendingStatus ? (
+              <View>
                 <Text style={cStyles.successText}>Notificación enviada.</Text>
                 <View style={cStyles.modalActions}>
                   <TouchableOpacity onPress={closePushModal} style={cStyles.modalGhostButton}>
                     <Text style={cStyles.modalGhostButtonText}>Cerrar</Text>
                   </TouchableOpacity>
                 </View>
-              </>
+              </View>
             ) : (
-              <>
+              <View>
                 <Text style={cStyles.fieldLabel}>Mensaje</Text>
                 <TextInput
+                  ref={pushInputRef}
                   placeholder="Escribe la notificación que enviarás"
                   placeholderTextColor="#607d8b"
                   value={pushBody}
                   onChangeText={setPushBody}
+                  autoCorrect={false}
+                  spellCheck={false}
+                  editable={!pushSent && !sendingPush}
                   multiline
                   numberOfLines={4}
                   style={[cStyles.input, cStyles.textareaInput]}
                 />
-                {pushStatus ? (
-                  <View style={cStyles.inlineStatusBox}>
-                    <Text style={cStyles.inlineStatus}>{pushStatus}</Text>
+                {pushSent ? (
+                  <Text style={cStyles.successText}>Notificación enviada.</Text>
+                ) : !sendingPush && (pushStatus || useStaticSendingStatus) ? (
+                  <View
+                    ref={pushStatusRef}
+                    style={[
+                      cStyles.inlineStatusBox,
+                      !pushStatus && useStaticSendingStatus && cStyles.inlineStatusBoxHidden,
+                    ]}
+                    pointerEvents={pushStatus ? "auto" : "none"}
+                  >
+                    <Text style={cStyles.inlineStatus}>{pushStatus || " "}</Text>
                   </View>
                 ) : null}
                 <View style={cStyles.modalActions}>
                   <TouchableOpacity onPress={closePushModal} style={cStyles.modalGhostButton}>
                     <Text style={cStyles.modalGhostButtonText}>Cerrar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      const targets =
-                        pushMode === "single" && pushTarget
-                          ? [pushTarget]
-                          : items.filter((it) => selectedIds.has(it.id));
-                      if (targets.length === 0) {
-                        setPushStatus("No hay destinatarios.");
-                        return;
-                      }
+                  {!pushSent ? (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const targets =
+                          pushMode === "single" && pushTarget
+                            ? [pushTarget]
+                            : items.filter((it) => selectedIds.has(it.id));
+                        if (targets.length === 0) {
+                          setPushStatus("No hay destinatarios.");
+                          return;
+                        }
 
-                      const message = pushBody.trim();
-                      if (!message) {
-                        setPushStatus("Ingresa un mensaje.");
-                        return;
-                      }
+                        const message = pushBody.trim();
+                        if (!message) {
+                          setPushStatus("Ingresa un mensaje.");
+                          return;
+                        }
 
-                      try {
-                        setSendingPush(true);
-                        setPushStatus(
-                          targets.length > PUSH_BATCH_SIZE ? `Enviando 0/${targets.length}...` : "Enviando..."
-                        );
+                        let counterIncremented = false;
 
                         try {
-                          await updatePushCounter(1);
-                        } catch (e: any) {
-                          if (String(e?.message).includes("LIMIT_PUSH")) {
-                            setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
-                            setSendingPush(false);
+                          await blurPushInputBeforeSend();
+                          setSendingPush(true);
+                          setPushStatus(
+                            useStaticSendingStatus
+                              ? ""
+                              : targets.length > PUSH_BATCH_SIZE
+                                ? `Enviando 0/${targets.length}...`
+                                : "Enviando..."
+                          );
+
+                          try {
+                            await updatePushCounter(1);
+                            counterIncremented = true;
+                          } catch (e: any) {
+                            if (String(e?.message).includes("LIMIT_PUSH")) {
+                              setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
+                              setSendingPush(false);
+                              return;
+                            }
+                            throw e;
+                          }
+
+                          const { okCount, failures } = await sendPushNotifications(targets, message);
+                          const networkLikeFailures = failures.filter(
+                            (failure) =>
+                              failure.status === 0 ||
+                              /failed to fetch|network request failed/i.test(String(failure.errorText || ""))
+                          );
+
+                          if (failures.length > 0) {
+                            console.warn("[PushNotifications] Fallos al enviar:", {
+                              origin:
+                                IS_WEB && typeof window !== "undefined"
+                                  ? window.location.origin
+                                  : Platform.OS,
+                              totalTargets: targets.length,
+                              okCount,
+                              failures,
+                            });
+                          }
+
+                          let historyResult:
+                            | { ok: true; id: string; estado: "completada" | "parcial" | "erronea" }
+                            | { ok: false; reason: "invalid_payload" | "write_failed"; errorMessage?: string }
+                            | null = null;
+
+                          const failCount = Math.max(0, targets.length - okCount);
+
+                          if (targets.length > 0) {
+                            historyResult = await saveNotificationHistory(message, targets.length, okCount, failCount);
+                          }
+
+                          if (okCount === targets.length) {
+                            if (!useStaticSendingStatus) {
+                              setPushBody("");
+                            }
+                            setPushStatus("");
+                            setPushSent(true);
                             return;
                           }
-                          throw e;
+
+                          if (okCount === 0 && counterIncremented) {
+                            try {
+                              await updatePushCounter(-1);
+                            } catch (rollbackError) {
+                              console.warn("[PushNotifications] No se pudo revertir el contador:", rollbackError);
+                            }
+                          }
+
+                          if (okCount > 0) {
+                            setPushStatus(`Enviadas ${okCount}/${targets.length}. Algunas no pudieron enviarse.`);
+                            return;
+                          }
+
+                          if (networkLikeFailures.length === failures.length && failures.length > 0) {
+                            setPushStatus(
+                              "No se pudo enviar la notificación desde este navegador. Revisa la conexión o el acceso permitido del sitio."
+                            );
+                          } else {
+                            setPushStatus("No se pudo enviar la notificación. Intenta nuevamente.");
+                          }
+                        } catch (err) {
+                          setPushStatus(`Error: ${String(err)}`);
+                        } finally {
+                          setSendingPush(false);
                         }
-
-                        const okCount = await sendPushNotifications(targets, message);
-
-                        let historyResult:
-                          | { ok: true; id: string; estado: "completada" | "parcial" | "erronea" }
-                          | { ok: false; reason: "invalid_payload" | "write_failed"; errorMessage?: string }
-                          | null = null;
-
-                        const failCount = Math.max(0, targets.length - okCount);
-
-                        if (targets.length > 0) {
-                          historyResult = await saveNotificationHistory(message, targets.length, okCount, failCount);
-                        }
-
-                        if (historyResult?.ok) {
-                          setPushStatus(`Enviadas ${okCount}/${targets.length}.`);
-                        } else if (okCount > 0) {
-                          setPushStatus(`Enviadas ${okCount}/${targets.length}.`);
-                        } else {
-                          setPushStatus(`Enviadas ${okCount}/${targets.length}`);
-                        }
-                        setPushBody("");
-                        setPushSent(true);
-                      } catch (err) {
-                        setPushStatus(`Error: ${String(err)}`);
-                      } finally {
-                        setSendingPush(false);
-                      }
-                    }}
-                    style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
-                    disabled={sendingPush}
-                  >
-                    <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
-                  </TouchableOpacity>
+                      }}
+                      style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
+                      disabled={sendingPush}
+                    >
+                      <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
-              </>
+              </View>
             )}
           </View>
           </View>
