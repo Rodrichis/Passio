@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Animated,
@@ -62,6 +63,32 @@ const FAQ_ITEMS = [
       "En Ajustes de Empresa encontrar\u00E1s la configuraci\u00F3n actual de tu wallet y sus recursos.",
   },
 ];
+
+const DASHBOARD_NEWS_VERSION = "2026-05-17-ui-refresh";
+const DASHBOARD_NEWS_STORAGE_PREFIX = "passio_dashboard_news_seen";
+const DASHBOARD_NEWS_ITEMS = [
+  {
+    id: "principal-refresh",
+    title: "Mejoramos visualmente Passio",
+    description:
+      "Renovamos la estética general del dashboard para que la experiencia se sienta más clara y moderna.",
+    tag: "Nuevo",
+  },
+  {
+    id: "scanner-updates",
+    title: "Mejoramos el escaneo",
+    description:
+      "Compactamos la vista, ordenamos los modos y controlamos mejor los errores y permisos en móvil.",
+    tag: "Escanear",
+  },
+  {
+    id: "forms-updates",
+    title: "Mejoramos los formularios",
+    description:
+      "Ajustamos validaciones, mensajes informativos y comportamiento en iPhone para evitar zoom molesto al escribir.",
+    tag: "Formularios",
+  },
+] as const;
 
 type SubscriptionBlockReason = "caducada" | "prueba_vencida" | null;
 
@@ -140,6 +167,7 @@ export default function Dashboard({ navigation }: any) {
   const [subscriptionBlock, setSubscriptionBlock] = useState<SubscriptionBlockState>(
     EMPTY_SUBSCRIPTION_BLOCK
   );
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [faqModalOpen, setFaqModalOpen] = useState(false);
   const [faqExpandedIndex, setFaqExpandedIndex] = useState<number | null>(null);
@@ -149,6 +177,7 @@ export default function Dashboard({ navigation }: any) {
   const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
   const isCompactWeb = Platform.OS === "web" && width < 900;
   const isMobileLayout = isNativeMobile || isCompactWeb;
+  const uid = auth.currentUser?.uid || "";
 
   const getPageTitle = () => {
     switch (selected) {
@@ -246,6 +275,33 @@ export default function Dashboard({ navigation }: any) {
     };
   }, [navigation]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadSeenNews = async () => {
+      if (!uid) {
+        if (active) setHasUnreadNotifications(false);
+        return;
+      }
+
+      try {
+        const storageKey = `${DASHBOARD_NEWS_STORAGE_PREFIX}:${uid}`;
+        const seenVersion = await AsyncStorage.getItem(storageKey);
+        if (!active) return;
+        setHasUnreadNotifications(seenVersion !== DASHBOARD_NEWS_VERSION);
+      } catch (storageError) {
+        console.log("No se pudo leer estado de novedades:", storageError);
+        if (!active) return;
+        setHasUnreadNotifications(true);
+      }
+    };
+
+    loadSeenNews();
+    return () => {
+      active = false;
+    };
+  }, [uid]);
+
   const subscriptionBlockDate = formatBlockDate(subscriptionBlock.expiresAt);
   const subscriptionBlockTitle =
     subscriptionBlock.reason === "prueba_vencida"
@@ -290,9 +346,14 @@ export default function Dashboard({ navigation }: any) {
   };
 
   const handleOpenNotifications = () => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      window.alert("Pronto verás aquí las novedades y mejoras de Passio.");
-    }
+    setHasUnreadNotifications(false);
+
+    if (!uid) return;
+
+    const storageKey = `${DASHBOARD_NEWS_STORAGE_PREFIX}:${uid}`;
+    AsyncStorage.setItem(storageKey, DASHBOARD_NEWS_VERSION).catch((storageError) => {
+      console.log("No se pudo guardar estado de novedades:", storageError);
+    });
   };
 
   const renderContent = () => {
@@ -326,6 +387,8 @@ export default function Dashboard({ navigation }: any) {
               onOpenSupport: handleOpenSupport,
               onOpenFaq: handleOpenFaq,
               onOpenNotifications: handleOpenNotifications,
+              notificationItems: [...DASHBOARD_NEWS_ITEMS],
+              hasUnreadNotifications,
             }}
             notificationDraft={clientesNotificationDraft}
             onConsumeNotificationDraft={() => setClientesNotificationDraft(null)}
@@ -458,6 +521,8 @@ export default function Dashboard({ navigation }: any) {
                   onOpenSupport={handleOpenSupport}
                   onOpenFaq={handleOpenFaq}
                   onOpenNotifications={handleOpenNotifications}
+                  notificationItems={[...DASHBOARD_NEWS_ITEMS]}
+                  hasUnreadNotifications={hasUnreadNotifications}
                 />
               ) : null}
               <View
@@ -485,6 +550,8 @@ export default function Dashboard({ navigation }: any) {
                 onOpenSupport={handleOpenSupport}
                 onOpenFaq={handleOpenFaq}
                 onOpenNotifications={handleOpenNotifications}
+                notificationItems={[...DASHBOARD_NEWS_ITEMS]}
+                hasUnreadNotifications={hasUnreadNotifications}
               />
               <View style={isMobileLayout ? styles.contentContainerMobile : styles.contentContainer}>
                 {renderContent()}

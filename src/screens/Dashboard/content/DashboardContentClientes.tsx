@@ -77,6 +77,13 @@ type Props = {
     onOpenSupport?: () => void;
     onOpenFaq?: () => void;
     onOpenNotifications?: () => void;
+    notificationItems?: Array<{
+      id: string;
+      title: string;
+      description: string;
+      tag?: string;
+    }>;
+    hasUnreadNotifications?: boolean;
   };
   notificationDraft?: {
     clientIds: string[];
@@ -1003,8 +1010,12 @@ export default function DashboardContentClientes({
   );
 
   const listHeader = (
-    <View>
-      {topBarProps ? <DashboardTopBar {...topBarProps} /> : null}
+    <View style={{ zIndex: 80, elevation: 80, overflow: "visible" }}>
+      {topBarProps ? (
+        <View style={{ zIndex: 90, elevation: 90, overflow: "visible" }}>
+          <DashboardTopBar {...topBarProps} />
+        </View>
+      ) : null}
 
       <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding, paddingTop: 16 }]}>
         <View style={cStyles.toolbarCard}>
