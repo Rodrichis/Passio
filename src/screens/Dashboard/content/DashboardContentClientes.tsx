@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,12 @@ import {
   Modal,
   ScrollView,
   useWindowDimensions,
+  KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "../../../services/firebaseConfig";
 import { notifyApplePass, notifyAndroidPass } from "../../../services/apiWallet";
-import DashboardViewHeader from "../../../components/dashboard/DashboardViewHeader";
+import DashboardTopBar from "../../../components/dashboard/DashboardTopBar";
 import {
   addDoc,
   collection,
@@ -33,7 +34,6 @@ import {
   serverTimestamp,
   where,
 } from "firebase/firestore";
-import { dashboardStyles as styles } from "../../../styles/DashboardStyles";
 import { clientesStyles as cStyles } from "../../../styles/ClientesStyles";
 import { mapDoc, filterItems, sortItems, Cliente } from "../../../utils/clientesHelpers";
 
@@ -58,7 +58,10 @@ function formatSO(so?: string) {
 function formatDate(d?: Date | null) {
   if (!d) return "--";
   try {
-    return d.toLocaleDateString();
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
   } catch {
     return "--";
   }
@@ -67,6 +70,14 @@ function formatDate(d?: Date | null) {
 type Props = {
   onOpenNotificationHistory: () => void;
   companyName?: string;
+  topBarProps?: {
+    pageTitle?: string;
+    companyName?: string;
+    isAdmin?: boolean;
+    onOpenSupport?: () => void;
+    onOpenFaq?: () => void;
+    onOpenNotifications?: () => void;
+  };
   notificationDraft?: {
     clientIds: string[];
     message?: string;
@@ -78,12 +89,18 @@ type Props = {
 export default function DashboardContentClientes({
   onOpenNotificationHistory,
   companyName,
+  topBarProps,
   notificationDraft,
   onConsumeNotificationDraft,
 }: Props) {
   const uid = auth.currentUser?.uid;
   const { width } = useWindowDimensions();
-  const useDesktopWebLayout = IS_WEB && width >= 900;
+  const useDesktopWebLayout = IS_WEB && width >= 980;
+  const useCompactLayout = width < 560;
+  const useCompactWebLayout = IS_WEB && width < 900;
+  const isIOSWeb =
+    IS_WEB && typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent || "");
+  const contentPadding = useCompactLayout ? 16 : 28;
 
   const [items, setItems] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,7 +124,6 @@ export default function DashboardContentClientes({
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Placeholder email modal (kept)
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
@@ -128,6 +144,9 @@ export default function DashboardContentClientes({
   const [limitePush, setLimitePush] = useState<number | null>(null);
   const [empresaNombre, setEmpresaNombre] = useState("");
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [deactivateDone, setDeactivateDone] = useState(false);
 
   const closePushModal = () => {
     setShowPushModal(false);
@@ -138,9 +157,6 @@ export default function DashboardContentClientes({
     setPushSent(false);
     setPushMode("single");
   };
-  const [deactivating, setDeactivating] = useState(false);
-  const [deactivateError, setDeactivateError] = useState<string | null>(null);
-  const [deactivateDone, setDeactivateDone] = useState(false);
 
   const loadFirstPage = useCallback(async () => {
     if (!uid) return;
@@ -211,8 +227,95 @@ export default function DashboardContentClientes({
     onConsumeNotificationDraft?.();
   }, [notificationDraft, onConsumeNotificationDraft]);
 
-  // Helper: actualiza contador de notificaciones con reset mensual y limite.
-  // Cada envio cuenta como 1, independiente de cuántos destinatarios tenga.
+  useEffect(() => {
+    if (!IS_WEB || !useCompactWebLayout || !isIOSWeb || !showPushModal || typeof document === "undefined") {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    const bodyStyle = document.body.style;
+    const htmlStyle = document.documentElement.style;
+    const previousBodyPosition = bodyStyle.position;
+    const previousBodyTop = bodyStyle.top;
+    const previousBodyWidth = bodyStyle.width;
+    const previousBodyOverflow = bodyStyle.overflow;
+    const previousHtmlOverflow = htmlStyle.overflow;
+
+    bodyStyle.position = "fixed";
+    bodyStyle.top = `-${scrollY}px`;
+    bodyStyle.width = "100%";
+    bodyStyle.overflow = "hidden";
+    htmlStyle.overflow = "hidden";
+
+    return () => {
+      bodyStyle.position = previousBodyPosition;
+      bodyStyle.top = previousBodyTop;
+      bodyStyle.width = previousBodyWidth;
+      bodyStyle.overflow = previousBodyOverflow;
+      htmlStyle.overflow = previousHtmlOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [showPushModal, useCompactWebLayout, isIOSWeb]);
+
+  useEffect(() => {
+    if (
+      Platform.OS !== "web" ||
+      !useCompactWebLayout ||
+      typeof document === "undefined" ||
+      !isIOSWeb
+    ) {
+      return;
+    }
+
+    const styleId = "passio-clientes-no-zoom";
+    let styleTag = document.getElementById(styleId) as HTMLStyleElement | null;
+    const viewportMeta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
+    const previousViewport = viewportMeta?.getAttribute("content") ?? null;
+    const previousHtmlTextSizeAdjust = document.documentElement.style.webkitTextSizeAdjust;
+    const previousBodyTextSizeAdjust = document.body.style.webkitTextSizeAdjust;
+
+    if (!styleTag) {
+      styleTag = document.createElement("style");
+      styleTag.id = styleId;
+      styleTag.textContent = `
+        html,
+        body {
+          -webkit-text-size-adjust: 100%;
+        }
+
+        input,
+        textarea,
+        select {
+          font-size: 16px !important;
+        }
+      `;
+      document.head.appendChild(styleTag);
+    }
+
+    if (viewportMeta) {
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+      );
+    }
+
+    document.documentElement.style.webkitTextSizeAdjust = "100%";
+    document.body.style.webkitTextSizeAdjust = "100%";
+
+    return () => {
+      styleTag?.remove();
+      if (viewportMeta) {
+        if (previousViewport) {
+          viewportMeta.setAttribute("content", previousViewport);
+        } else {
+          viewportMeta.removeAttribute("content");
+        }
+      }
+      document.documentElement.style.webkitTextSizeAdjust = previousHtmlTextSizeAdjust;
+      document.body.style.webkitTextSizeAdjust = previousBodyTextSizeAdjust;
+    };
+  }, [useCompactWebLayout, isIOSWeb]);
+
   const updatePushCounter = useCallback(
     async (sendCount: number) => {
       if (!uid) throw new Error("NO_UID");
@@ -250,7 +353,6 @@ export default function DashboardContentClientes({
     [uid, limitePush]
   );
 
-  // Carga limite de notificaciones desde el plan de la empresa
   useEffect(() => {
     const loadLimitePush = async () => {
       if (!uid) return;
@@ -261,7 +363,6 @@ export default function DashboardContentClientes({
         const nombreEmpresa = String(empresaData?.nombre || "").trim();
         setEmpresaNombre(nombreEmpresa);
         if (planName) {
-          // Primero intento exacto
           let planData: any = null;
           let planSnap = await getDocs(
             query(collection(db, "Planes"), where("nombrePlan", "==", planName))
@@ -269,7 +370,6 @@ export default function DashboardContentClientes({
           if (planSnap.docs[0]) {
             planData = planSnap.docs[0].data();
           } else {
-            // Fallback insensible a mayusculas
             planSnap = await getDocs(collection(db, "Planes"));
             const lower = String(planName).toLowerCase();
             const match = planSnap.docs.find(
@@ -370,7 +470,6 @@ export default function DashboardContentClientes({
     () => sortItems(filteredItems, sortOrder),
     [filteredItems, sortOrder]
   );
-
   const toggleSort = useCallback(
     () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc")),
     []
@@ -408,15 +507,6 @@ export default function DashboardContentClientes({
     setDeactivateDone(false);
   }, []);
 
-  const openSingleEmail = useCallback((client: Cliente) => {
-    setEmailMode("single");
-    setEmailTarget(client);
-    setEmailStatus("");
-    setEmailSubject("");
-    setEmailBody("");
-    setShowEmailModal(true);
-  }, []);
-
   const openPush = useCallback((client: Cliente) => {
     setPushTarget(client);
     setPushMode("single");
@@ -446,7 +536,7 @@ export default function DashboardContentClientes({
       const ref = doc(db, "Empresas", uid, "Clientes", detailClient.id);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
-        setDeactivateError("No se encontro el cliente. Refresca e intenta nuevamente.");
+        setDeactivateError("No se encontró el cliente. Refresca e intenta nuevamente.");
         return;
       }
       await updateDoc(ref, {
@@ -489,9 +579,7 @@ export default function DashboardContentClientes({
 
   const Checkbox = ({ checked }: { checked: boolean }) => (
     <View style={[cStyles.checkbox, checked && cStyles.checkboxChecked]}>
-      {checked ? (
-        <Ionicons name="checkmark" size={14} color="#2e7d32" />
-      ) : null}
+      {checked ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
     </View>
   );
 
@@ -502,7 +590,7 @@ export default function DashboardContentClientes({
     disabled,
     tooltipText,
   }: {
-    icon: any;
+    icon: keyof typeof Ionicons.glyphMap;
     label: string;
     onPress: () => void;
     disabled?: boolean;
@@ -534,7 +622,7 @@ export default function DashboardContentClientes({
     label,
     value,
   }: {
-    icon: any;
+    icon: keyof typeof Ionicons.glyphMap;
     label: string;
     value: number;
   }) => {
@@ -555,22 +643,50 @@ export default function DashboardContentClientes({
     );
   };
 
+  const ModalHeader = ({
+    icon,
+    title,
+    subtitle,
+    onClose,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    subtitle?: string | null;
+    onClose: () => void;
+  }) => (
+    <View style={cStyles.modalHeader}>
+      <View style={cStyles.modalTitleRow}>
+        <View style={cStyles.modalIconBadge}>
+          <Ionicons name={icon} size={18} color="#023047" />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={cStyles.modalTitle}>{title}</Text>
+          {subtitle ? (
+            <Text style={cStyles.modalSubtitle} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <TouchableOpacity onPress={onClose} style={cStyles.modalCloseIcon}>
+        <Ionicons name="close" size={18} color="#023047" />
+      </TouchableOpacity>
+    </View>
+  );
+
   const HeaderWeb = () => (
     <View style={cStyles.headerRow}>
       <TouchableOpacity onPress={toggleSelectAll} style={cStyles.checkboxHitbox}>
         <Checkbox checked={allVisibleSelected} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={{ flex: 2.8 }} onPress={toggleSort}>
+      <TouchableOpacity style={cStyles.headerNameCell} onPress={toggleSort}>
         <Text style={cStyles.headerText}>Cliente</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={{ flex: 1.4, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}
-        onPress={toggleSort}
-      >
+      <TouchableOpacity style={cStyles.headerDateCell} onPress={toggleSort}>
         <Ionicons name="calendar-outline" size={16} color="#023047" />
-        <Text style={[cStyles.headerText, { textAlign: "center" }]}>Ultima visita</Text>
+        <Text style={[cStyles.headerText, { textAlign: "center" }]}>Última visita</Text>
         <Ionicons
           name={sortOrder === "desc" ? "chevron-down" : "chevron-up"}
           size={16}
@@ -579,14 +695,12 @@ export default function DashboardContentClientes({
       </TouchableOpacity>
 
       {useDesktopWebLayout ? (
-        <View style={{ width: 160, alignItems: "center", paddingRight: 8 }}>
-          <Text style={[cStyles.headerText, { textAlign: "center" }]}>Estadisticas</Text>
+        <View style={cStyles.headerStatsCell}>
+          <Text style={[cStyles.headerText, { textAlign: "center" }]}>Estadísticas</Text>
         </View>
       ) : null}
 
-      <Text style={[cStyles.headerText, { width: 170, textAlign: "center" }]}>
-        Acciones
-      </Text>
+      <Text style={[cStyles.headerText, cStyles.headerActionsCell]}>Acciones</Text>
     </View>
   );
 
@@ -616,25 +730,35 @@ export default function DashboardContentClientes({
           <Checkbox checked={selected} />
         </View>
 
-        <View style={[cStyles.nameCell, { flex: 2.8 }]}>
-          <Ionicons
-            name={icon as any}
-            size={16}
-            color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
-          />
-          <Text style={cStyles.nameText} numberOfLines={1} ellipsizeMode="tail">
-            {item.nombreCompleto || "--"}
-          </Text>
+        <View style={cStyles.rowIdentityCell}>
+          <View style={cStyles.rowAvatar}>
+            <Ionicons
+              name={icon}
+              size={16}
+              color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
+            />
+          </View>
+          <View style={cStyles.rowIdentityText}>
+            <Text style={cStyles.nameText} numberOfLines={1} ellipsizeMode="tail">
+              {item.nombreCompleto || "--"}
+            </Text>
+            <Text style={cStyles.subtleRowText} numberOfLines={1} ellipsizeMode="tail">
+              {item.email || item.id}
+            </Text>
+          </View>
         </View>
 
-        <Text style={{ flex: 1.4, textAlign: "center" }}>{formatDate(fecha)}</Text>
+        <View style={cStyles.rowDateCell}>
+          <Text style={cStyles.subtleLabel}>Última visita</Text>
+          <Text style={cStyles.rowDateText}>{formatDate(fecha)}</Text>
+        </View>
 
         {useDesktopWebLayout ? (
-          <View style={{ width: 160, alignItems: "center", paddingRight: 8 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="gift-outline" size={16} color="#023047" />
-                <Text style={{ color: "#023047", fontWeight: "700" }}>{premiosDisponibles}</Text>
+          <View style={cStyles.rowStatsCell}>
+            <View style={cStyles.rowStatsWrap}>
+              <View style={cStyles.rowStatPill}>
+                <Ionicons name="gift-outline" size={15} color="#FB8500" />
+                <Text style={cStyles.rowStatPillText}>{premiosDisponibles}</Text>
               </View>
               <StatBadge label="Ciclo visitas" value={cicloVisitas} icon="repeat-outline" />
               <StatBadge label="Visitas totales" value={visitasTotales} icon="footsteps-outline" />
@@ -642,9 +766,13 @@ export default function DashboardContentClientes({
           </View>
         ) : null}
 
-        <View style={{ width: 170, alignItems: "flex-end", paddingLeft: 12 }}>
+        <View style={cStyles.rowActionsCell}>
           <View style={cStyles.rowActions}>
-            <ActionIconButton icon="notifications-outline" label="Enviar notificación" onPress={() => openPush(item)} />
+            <ActionIconButton
+              icon="notifications-outline"
+              label="Enviar notificación"
+              onPress={() => openPush(item)}
+            />
             <ActionIconButton
               icon="mail-outline"
               label="Enviar correo"
@@ -653,7 +781,7 @@ export default function DashboardContentClientes({
               disabled
             />
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
-              <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
+              <Text style={cStyles.detailsButtonText}>Ver detalle</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -682,36 +810,66 @@ export default function DashboardContentClientes({
         style={[cStyles.card, selected && cStyles.cardSelected]}
       >
         <View style={cStyles.cardHeader}>
-          <Checkbox checked={selected} />
-          <Ionicons
-            name={icon as any}
-            size={18}
-            color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
-          />
-          <Text style={{ fontWeight: "bold", flex: 1, color: "#000" }} numberOfLines={1}>
-            {item.nombreCompleto || "--"}
-          </Text>
+          <View style={cStyles.cardHeaderLeft}>
+            <Checkbox checked={selected} />
+            <View style={cStyles.rowAvatar}>
+              <Ionicons
+                name={icon}
+                size={18}
+                color={soText === "Android" ? "#2e7d32" : soText === "iOS" ? "#111" : "#607d8b"}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={cStyles.cardName} numberOfLines={1}>
+                {item.nombreCompleto || "--"}
+              </Text>
+              <Text style={cStyles.cardSub} numberOfLines={1}>
+                {item.email || item.id}
+              </Text>
+            </View>
+          </View>
+          <View style={cStyles.mobileStatusChip}>
+            <Text style={cStyles.mobileStatusChipText}>
+              {item.activo === false ? "Inactivo" : "Activo"}
+            </Text>
+          </View>
         </View>
 
-        <View style={cStyles.cardFooter}>
-          <Text style={cStyles.cardFooterText}>Ultima visita: {formatDate(fecha)}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <Ionicons name="gift-outline" size={16} color="#023047" />
-            <Text style={{ color: "#023047", fontWeight: "700" }}>{premiosDisponibles}</Text>
+        <View style={cStyles.mobileStatsStrip}>
+          <View style={cStyles.mobileStatPill}>
+            <Ionicons name="calendar-outline" size={15} color="#023047" />
+            <Text style={cStyles.mobileStatPillText}>{`Visita: ${formatDate(fecha)}`}</Text>
           </View>
-          <View style={cStyles.rowActions}>
-            <ActionIconButton icon="notifications-outline" label="Enviar notificación" onPress={() => openPush(item)} />
-            <ActionIconButton
-              icon="mail-outline"
-              label="Enviar correo"
-              tooltipText="Próximamente"
-              onPress={() => {}}
-              disabled
-            />
-            <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
-              <Text style={cStyles.detailsButtonText}>Ver detalles</Text>
-            </TouchableOpacity>
+          <View style={cStyles.mobileStatPill}>
+            <Ionicons name="gift-outline" size={15} color="#FB8500" />
+            <Text style={cStyles.mobileStatPillText}>{premiosDisponibles}</Text>
           </View>
+          <View style={cStyles.mobileStatPill}>
+            <Ionicons name="repeat-outline" size={15} color="#219EBC" />
+            <Text style={cStyles.mobileStatPillText}>{cicloVisitas}</Text>
+          </View>
+          <View style={cStyles.mobileStatPill}>
+            <Ionicons name="footsteps-outline" size={15} color="#2E7D32" />
+            <Text style={cStyles.mobileStatPillText}>{visitasTotales}</Text>
+          </View>
+        </View>
+
+        <View style={cStyles.cardActionsRow}>
+          <ActionIconButton
+            icon="notifications-outline"
+            label="Enviar notificación"
+            onPress={() => openPush(item)}
+          />
+          <ActionIconButton
+            icon="mail-outline"
+            label="Enviar correo"
+            tooltipText="Próximamente"
+            onPress={() => {}}
+            disabled
+          />
+          <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
+            <Text style={cStyles.detailsButtonText}>Ver detalle</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -724,7 +882,7 @@ export default function DashboardContentClientes({
         (prev, next) =>
           prev.item === next.item && prev.selected === next.selected && prev.index === next.index
       ),
-    [openDetail, openPush, openSingleEmail, toggleSelect]
+    [openDetail, openPush, toggleSelect]
   );
 
   const CardMobile = useMemo(
@@ -733,152 +891,183 @@ export default function DashboardContentClientes({
         CardMobileBase,
         (prev, next) => prev.item === next.item && prev.selected === next.selected
       ),
-    [openDetail, openPush, openSingleEmail, toggleSelect]
+    [openDetail, openPush, toggleSelect]
   );
 
   const renderItem = useCallback(
     ({ item, index }: { item: Cliente; index: number }) => {
       const selected = selectedIds.has(item.id);
-      return useDesktopWebLayout ? (
-        <RowWeb item={item} index={index} selected={selected} />
-      ) : (
-        <CardMobile item={item} selected={selected} />
+      return (
+        <View style={{ paddingHorizontal: contentPadding }}>
+          {useDesktopWebLayout ? (
+            <RowWeb item={item} index={index} selected={selected} />
+          ) : (
+            <CardMobile item={item} selected={selected} />
+          )}
+        </View>
       );
     },
-    [selectedIds, RowWeb, CardMobile]
+    [selectedIds, RowWeb, CardMobile, useDesktopWebLayout, contentPadding]
+  );
+
+  const listHeader = (
+    <View>
+      {topBarProps ? <DashboardTopBar {...topBarProps} /> : null}
+
+      <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding, paddingTop: 16 }]}>
+        <View style={cStyles.toolbarCard}>
+          <View style={[cStyles.searchRow, useCompactLayout && cStyles.searchRowCompact]}>
+            <View style={cStyles.searchInputWrap}>
+              <Ionicons name="search-outline" size={18} color="#607d8b" />
+              <TextInput
+                placeholder="Buscar por nombre, correo o ID"
+                placeholderTextColor="#607d8b"
+                value={search}
+                onChangeText={setSearch}
+                style={cStyles.searchInput}
+              />
+            </View>
+
+            <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
+              <Ionicons name="options-outline" size={18} color="#023047" />
+              <Text style={cStyles.filterButtonText}>Filtros</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(search.trim() || filterOS !== "all" || filterPremios !== "all") && (
+            <View style={cStyles.chipsRow}>
+              <Text style={cStyles.chipsLabel}>Filtros aplicados:</Text>
+
+              {search.trim() ? (
+                <View style={cStyles.chip}>
+                  <Text style={cStyles.chipText}>{`Busca "${search.trim()}"`}</Text>
+                </View>
+              ) : null}
+
+              {filterOS !== "all" ? (
+                <View style={[cStyles.chip, cStyles.chipGreen]}>
+                  <Text style={cStyles.chipGreenText}>
+                    {`SO: ${filterOS === "ios" ? "Apple (iOS)" : "Android"}`}
+                  </Text>
+                </View>
+              ) : null}
+
+              {filterPremios !== "all" ? (
+                <View style={[cStyles.chip, cStyles.chipGreen]}>
+                  <Text style={cStyles.chipGreenText}>
+                    {filterPremios === "with" ? "Con premios" : "Sin premios"}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
+          <View style={cStyles.toolbarFooter}>
+            <View style={cStyles.selectionMetaWrap}>
+              <Text style={cStyles.metaText}>{`Total cargados: ${items.length}`}</Text>
+              <Text style={cStyles.metaDivider}>{"\u2022"}</Text>
+              <Text style={cStyles.metaText}>
+                {selectedCount ? `${selectedCount} seleccionados` : "Sin selección activa"}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
+              <Text style={cStyles.selectAllButtonText}>
+                {allVisibleSelected ? "Quitar selección" : "Seleccionar todo"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={cStyles.bulkActionsRow}>
+            <Text style={cStyles.bulkActionsLabel}>Acción masiva</Text>
+            <TouchableOpacity
+              onPress={() => {}}
+              disabled
+              style={[cStyles.massActionButton, cStyles.massActionButtonMuted]}
+              accessibilityLabel={`Correo próximamente (${selectedCount})`}
+            >
+              <Ionicons name="mail-outline" size={18} color="#607d8b" />
+              <View style={[cStyles.massActionCount, cStyles.massActionCountMuted]}>
+                <Text style={cStyles.massActionCountTextMuted}>{selectedCount}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                setPushMode("bulk");
+                setPushTarget(null);
+                setPushStatus("");
+                setPushBody("");
+                setPushSent(false);
+                setSendingPush(false);
+                setShowPushModal(true);
+              }}
+              disabled={selectedCount === 0}
+              style={[
+                cStyles.massActionButton,
+                selectedCount === 0 && cStyles.massActionButtonDisabled,
+              ]}
+              accessibilityLabel={`Enviar notificación (${selectedCount})`}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={18}
+                color={selectedCount === 0 ? "#8AA0AE" : "#fff"}
+              />
+              <View
+                style={[
+                  cStyles.massActionCount,
+                  selectedCount === 0 && cStyles.massActionCountDisabled,
+                ]}
+              >
+                <Text
+                  style={[
+                    cStyles.massActionCountText,
+                    selectedCount === 0 && cStyles.massActionCountTextDisabled,
+                  ]}
+                >
+                  {selectedCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onOpenNotificationHistory}
+              style={cStyles.historyInlineButton}
+            >
+              <Ionicons name="time-outline" size={18} color="#023047" />
+              <Text style={cStyles.historyInlineButtonText}>Historial</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {useDesktopWebLayout && sortedItems.length > 0 ? <HeaderWeb /> : null}
+      </View>
+    </View>
   );
 
   if (!uid) {
     return (
-      <View>
-        <DashboardViewHeader title="Clientes" companyName={companyName} />
-        <Text>Debes iniciar sesión para ver tus clientes.</Text>
+      <View style={{ flex: 1 }}>
+        {topBarProps ? <DashboardTopBar {...topBarProps} /> : null}
+        <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding, paddingTop: 16 }]}>
+          <Text>Debes iniciar sesión para ver tus clientes.</Text>
+        </View>
       </View>
     );
   }
 
   if (loading) {
     return (
-      <View>
-        <DashboardViewHeader title="Clientes" companyName={companyName} />
-        <ActivityIndicator size="large" color="#8ecae6" />
-        <Text>Cargando clientes...</Text>
+      <View style={{ flex: 1 }}>
+        {topBarProps ? <DashboardTopBar {...topBarProps} /> : null}
+        <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding, paddingTop: 16 }]}>
+          <ActivityIndicator size="large" color="#8ecae6" />
+          <Text style={{ marginTop: 10 }}>Cargando clientes...</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={{ flex: 1, minHeight: 0 }}>
-      <DashboardViewHeader title="Clientes" companyName={companyName} />
-
-      <View style={cStyles.searchRow}>
-           <TextInput
-             placeholder="Buscar por nombre, email o ID"
-             placeholderTextColor="#607d8b"
-             value={search}
-             onChangeText={setSearch}
-             style={cStyles.searchInput}
-           />
-
-        <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
-          <Text style={cStyles.filterButtonText}>Filtro</Text>
-        </TouchableOpacity>
-      </View>
-
-      {(search.trim() || filterOS !== "all" || filterPremios !== "all") && (
-        <View style={cStyles.chipsRow}>
-          <Text style={cStyles.chipsLabel}>Filtros aplicados:</Text>
-
-          {search.trim() ? (
-            <View style={cStyles.chip}>
-              <Text style={cStyles.chipText}>Busca "{search.trim()}"</Text>
-            </View>
-          ) : null}
-
-          {filterOS !== "all" ? (
-            <View style={[cStyles.chip, cStyles.chipGreen]}>
-              <Text style={cStyles.chipGreenText}>
-                SO: {filterOS === "ios" ? "Apple (iOS)" : "Android"}
-              </Text>
-            </View>
-          ) : null}
-
-          {filterPremios !== "all" ? (
-            <View style={[cStyles.chip, cStyles.chipGreen]}>
-              <Text style={cStyles.chipGreenText}>
-                {filterPremios === "with" ? "Con premios" : "Sin premios"}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      )}
-
-      <View style={cStyles.metaRow}>
-        <Text style={cStyles.metaText}>
-          Total: {sortedItems.length}
-          {selectedCount ? ` | Seleccionados: ${selectedCount}` : ""}
-        </Text>
-        <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
-          <Text style={cStyles.selectAllButtonText}>
-            {allVisibleSelected ? "Quitar seleccion" : "Seleccionar todo"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-        <View style={{ flexDirection: "row", gap: 10, alignItems: "center", flexWrap: "wrap", flex: 1 }}>
-          <TouchableOpacity
-          onPress={() => {}}
-          disabled
-          style={[
-            cStyles.sendButton,
-            cStyles.sendButtonDisabled,
-          ]}
-        >
-          <Text
-            style={[
-              cStyles.sendButtonTextDisabled,
-            ]}
-          >
-            Enviar correo (próximamente)
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            setPushMode("bulk");
-            setPushTarget(null);
-            setPushStatus("");
-            setPushBody("");
-            setPushSent(false);
-            setSendingPush(false);
-            setShowPushModal(true);
-          }}
-          disabled={selectedCount === 0}
-          style={[
-            cStyles.sendButton,
-            selectedCount === 0 && cStyles.sendButtonDisabled,
-          ]}
-        >
-          <Text
-            style={[
-              cStyles.sendButtonText,
-              selectedCount === 0 && cStyles.sendButtonTextDisabled,
-            ]}
-          >
-            Enviar notificación ({selectedCount})
-          </Text>
-        </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          onPress={onOpenNotificationHistory}
-          style={[cStyles.sendButton, { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#cfd8dc", marginBottom: 10 }]}
-        >
-          <Text style={[cStyles.sendButtonText, { color: "#023047" }]}>Historial notificaciones</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Modal de filtros */}
       <Modal visible={showFilter} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
           {(showOSDropdown || showPremiosDropdown) && (
@@ -887,20 +1076,17 @@ export default function DashboardContentClientes({
               style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
             />
           )}
-          <View style={[cStyles.modalCard, { minWidth: 320 }]}>
-            <Text style={cStyles.modalTitle}>Filtros</Text>
+          <View style={[cStyles.modalCard, cStyles.filterModalCard]}>
+            <ModalHeader
+              icon="options-outline"
+              title="Filtros"
+              subtitle="Ajusta la vista de clientes sin perder tu selección actual."
+              onClose={() => setShowFilter(false)}
+            />
 
             <Text style={cStyles.optionLabel}>Sistema operativo</Text>
-            <View
-              style={[
-                cStyles.dropdownContainer,
-                showOSDropdown && { zIndex: 50 },
-              ]}
-            >
-              <TouchableOpacity
-                onPress={() => setShowOSDropdown((v) => !v)}
-                style={cStyles.dropdown}
-              >
+            <View style={[cStyles.dropdownContainer, showOSDropdown && { zIndex: 50 }]}>
+              <TouchableOpacity onPress={() => setShowOSDropdown((v) => !v)} style={cStyles.dropdown}>
                 <Text style={cStyles.dropdownText}>
                   {filterOS === "all" ? "Todos" : filterOS === "ios" ? "Apple (iOS)" : "Android"}
                 </Text>
@@ -943,12 +1129,7 @@ export default function DashboardContentClientes({
             </View>
 
             <Text style={cStyles.optionLabel}>Premios</Text>
-            <View
-              style={[
-                cStyles.dropdownContainer,
-                showPremiosDropdown && { zIndex: 45 },
-              ]}
-            >
+            <View style={[cStyles.dropdownContainer, showPremiosDropdown && { zIndex: 45 }]}>
               <TouchableOpacity
                 onPress={() => setShowPremiosDropdown((v) => !v)}
                 style={cStyles.dropdown}
@@ -957,8 +1138,8 @@ export default function DashboardContentClientes({
                   {filterPremios === "all"
                     ? "Todos"
                     : filterPremios === "with"
-                    ? "Con premios disponibles"
-                    : "Sin premios disponibles"}
+                      ? "Con premios disponibles"
+                      : "Sin premios disponibles"}
                 </Text>
                 <Ionicons
                   name={showPremiosDropdown ? "chevron-up" : "chevron-down"}
@@ -998,100 +1179,107 @@ export default function DashboardContentClientes({
               )}
             </View>
 
-            <TouchableOpacity
-              onPress={() => setShowFilter(false)}
-              style={cStyles.modalClose}
-            >
-              <Text style={{ color: "#555" }}>Cerrar</Text>
-            </TouchableOpacity>
+            <View style={cStyles.modalFooterActions}>
+              <TouchableOpacity
+                onPress={() => {
+                  setFilterOS("all");
+                  setFilterPremios("all");
+                  closeDropdowns();
+                }}
+                style={cStyles.modalGhostButton}
+              >
+                <Text style={cStyles.modalGhostButtonText}>Restablecer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowFilter(false)} style={cStyles.modalPrimaryButton}>
+                <Text style={cStyles.modalPrimaryText}>Listo</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal: Detalle cliente */}
       <Modal visible={showDetail} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
-          <View style={[cStyles.modalCard, { maxWidth: 480 }]}>
-            <Text style={cStyles.modalTitle}>Detalle del cliente</Text>
+          <View style={[cStyles.modalCard, cStyles.detailModalCard]}>
+            <ModalHeader
+              icon="person-circle-outline"
+              title="Detalle del cliente"
+              subtitle={detailClient?.nombreCompleto || null}
+              onClose={() => setShowDetail(false)}
+            />
             <ScrollView style={{ maxHeight: 480 }}>
-              <Text style={cStyles.detailTitle}>
-                {detailClient?.nombreCompleto || "--"}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Email: {detailClient?.email || "--"}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Teléfono: {detailClient?.telefono || "--"}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                SO: {formatSO(detailClient?.so)}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Creado: {formatDate(detailClient?.creadoEn || null)}
-              </Text>
+              <View style={cStyles.detailInfoCard}>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Correo</Text>
+                  <Text style={cStyles.detailValue}>{detailClient?.email || "--"}</Text>
+                </View>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Teléfono</Text>
+                  <Text style={cStyles.detailValue}>{detailClient?.telefono || "--"}</Text>
+                </View>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Sistema</Text>
+                  <Text style={cStyles.detailValue}>{formatSO(detailClient?.so)}</Text>
+                </View>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Creado</Text>
+                  <Text style={cStyles.detailValue}>{formatDate(detailClient?.creadoEn || null)}</Text>
+                </View>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Estado</Text>
+                  <Text style={cStyles.detailValue}>
+                    {detailClient?.activo === false ? "Desactivado" : "Activo"}
+                  </Text>
+                </View>
+              </View>
 
-              <View style={cStyles.detailDivider} />
+              <Text style={cStyles.detailSectionTitle}>Actividad</Text>
+              <View style={cStyles.detailStatsGrid}>
+                <View style={cStyles.detailStatCard}>
+                  <Text style={cStyles.detailStatLabel}>Ciclo</Text>
+                  <Text style={cStyles.detailStatValue}>{Number(detailClient?.cicloVisitas ?? 0)}</Text>
+                </View>
+                <View style={cStyles.detailStatCard}>
+                  <Text style={cStyles.detailStatLabel}>Premios disponibles</Text>
+                  <Text style={cStyles.detailStatValue}>{Number(detailClient?.premiosDisponibles ?? 0)}</Text>
+                </View>
+                <View style={cStyles.detailStatCard}>
+                  <Text style={cStyles.detailStatLabel}>Premios canjeados</Text>
+                  <Text style={cStyles.detailStatValue}>{Number(detailClient?.premiosCanjeados ?? 0)}</Text>
+                </View>
+                <View style={cStyles.detailStatCard}>
+                  <Text style={cStyles.detailStatLabel}>Visitas totales</Text>
+                  <Text style={cStyles.detailStatValue}>{Number(detailClient?.visitasTotales ?? 0)}</Text>
+                </View>
+              </View>
 
-              <Text style={cStyles.detailTitle}>Visitas</Text>
-              <Text style={cStyles.detailRow}>
-                Ciclo visitas: {Number(detailClient?.cicloVisitas ?? 0)}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Premios disponibles: {Number(detailClient?.premiosDisponibles ?? 0)}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Premios canjeados: {Number(detailClient?.premiosCanjeados ?? 0)}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Visitas totales: {Number(detailClient?.visitasTotales ?? 0)}
-              </Text>
-              <Text style={cStyles.detailRow}>
-                Ultima visita: {formatDate(detailClient?.ultimaVisita || null)}
-              </Text>
+              <View style={cStyles.detailInfoCard}>
+                <View style={cStyles.detailRowInline}>
+                  <Text style={cStyles.detailKey}>Última visita</Text>
+                  <Text style={cStyles.detailValue}>{formatDate(detailClient?.ultimaVisita || null)}</Text>
+                </View>
+              </View>
 
-              <View style={cStyles.detailDivider} />
+              {deactivateDone ? <Text style={cStyles.successText}>Usuario desactivado.</Text> : null}
 
-              {deactivateDone ? (
-                <Text style={cStyles.successText}>Usuario desactivado.</Text>
-              ) : null}
-
-              <Text style={cStyles.detailRow}>
-                Estado: {detailClient?.activo === false ? "Desactivado" : "Activo"}
-              </Text>
-
-              {deactivateError ? (
-                <Text style={cStyles.errorText}>{deactivateError}</Text>
-              ) : null}
+              {deactivateError ? <Text style={cStyles.errorText}>{deactivateError}</Text> : null}
 
               {detailClient?.activo !== false && !confirmDeactivate ? (
                 <TouchableOpacity
                   onPress={requestDeactivate}
-                  style={[
-                    cStyles.dangerButton,
-                    {
-                      alignSelf: "flex-start",
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      minWidth: 0,
-                    },
-                    deactivating && { opacity: 0.7 },
-                  ]}
+                  style={[cStyles.dangerButton, deactivating && { opacity: 0.7 }]}
                   disabled={deactivating}
                 >
-                  <Text style={cStyles.dangerButtonText}>
-                    Desactivar usuario
-                  </Text>
+                  <Text style={cStyles.dangerButtonText}>Desactivar usuario</Text>
                 </TouchableOpacity>
               ) : null}
 
               {confirmDeactivate ? (
                 <View style={cStyles.confirmBox}>
-                  <Text style={cStyles.confirmText}>
-                    Confirmas desactivar este usuario?
-                  </Text>
+                  <Text style={cStyles.confirmText}>¿Confirmas desactivar este usuario?</Text>
                   <View style={cStyles.confirmActions}>
                     <TouchableOpacity onPress={cancelDeactivate} disabled={deactivating}>
-                      <Text style={{ color: "#555" }}>Cancelar</Text>
+                      <Text style={cStyles.confirmCancelText}>Cancelar</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={confirmDeactivateUser}
@@ -1107,80 +1295,81 @@ export default function DashboardContentClientes({
               ) : null}
             </ScrollView>
             <View style={[cStyles.modalActions, { justifyContent: "center", marginTop: 8 }]}>
-              <TouchableOpacity
-                onPress={() => setShowDetail(false)}
-                style={{
-                  paddingVertical: 12,
-                  paddingHorizontal: 18,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: "#cfd8dc",
-                  backgroundColor: "#fff",
-                }}
-              >
-                <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+              <TouchableOpacity onPress={() => setShowDetail(false)} style={cStyles.modalGhostButton}>
+                <Text style={cStyles.modalGhostButtonText}>Cerrar</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {/* Modal: Notificacion push individual (placeholder) */}
       <Modal visible={showPushModal} transparent animationType="fade">
-        <View style={cStyles.modalBackdrop}>
-          <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
-            <Text style={cStyles.modalTitle}>Notificación push</Text>
-            <Text style={cStyles.detailRow}>
-              {pushMode === "single"
-                ? `Cliente: ${pushTarget?.nombreCompleto || "--"}`
-                : `Destinatarios: ${selectedCount}`}
-            </Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 0}
+        >
+          <View
+            style={[
+              cStyles.modalBackdrop,
+              (Platform.OS === "ios" || (useCompactWebLayout && isIOSWeb)) &&
+                cStyles.modalBackdropTopAligned,
+            ]}
+          >
+          <View
+            style={[
+              cStyles.modalCard,
+              cStyles.pushModalCard,
+              IS_WEB && !useCompactWebLayout && cStyles.pushModalCardWide,
+            ]}
+          >
+            <ModalHeader
+              icon="notifications-outline"
+              title="Enviar notificación"
+              subtitle={
+                pushMode === "single"
+                  ? pushTarget?.nombreCompleto || null
+                  : `${selectedCount} destinatarios seleccionados`
+              }
+              onClose={closePushModal}
+            />
+            <View style={cStyles.targetSummaryCard}>
+              <Text style={cStyles.targetSummaryLabel}>
+                {pushMode === "single" ? "Cliente" : "Destinatarios"}
+              </Text>
+              <Text style={cStyles.targetSummaryValue}>
+                {pushMode === "single" ? pushTarget?.nombreCompleto || "--" : `${selectedCount}`}
+              </Text>
+            </View>
             {pushSent ? (
               <>
-                <Text style={{ color: "#2e7d32", fontWeight: "700", marginTop: 8 }}>Notificación enviada.</Text>
+                <Text style={cStyles.successText}>Notificación enviada.</Text>
                 <View style={cStyles.modalActions}>
-                  <TouchableOpacity
-                    onPress={closePushModal}
-                    style={{
-                      alignSelf: "center",
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#023047",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+                  <TouchableOpacity onPress={closePushModal} style={cStyles.modalGhostButton}>
+                    <Text style={cStyles.modalGhostButtonText}>Cerrar</Text>
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
               <>
-          <TextInput
-            placeholder="Mensaje de la notificación"
-            placeholderTextColor="#607d8b"
-            value={pushBody}
-            onChangeText={setPushBody}
-            multiline
-            numberOfLines={3}
-            style={[cStyles.input, { minHeight: 80, textAlignVertical: "top" }]}
-          />
-                {pushStatus ? <Text style={{ color: "#023047", marginTop: 4 }}>{pushStatus}</Text> : null}
+                <Text style={cStyles.fieldLabel}>Mensaje</Text>
+                <TextInput
+                  placeholder="Escribe la notificación que enviarás"
+                  placeholderTextColor="#607d8b"
+                  value={pushBody}
+                  onChangeText={setPushBody}
+                  multiline
+                  numberOfLines={4}
+                  style={[cStyles.input, cStyles.textareaInput]}
+                />
+                {pushStatus ? (
+                  <View style={cStyles.inlineStatusBox}>
+                    <Text style={cStyles.inlineStatus}>{pushStatus}</Text>
+                  </View>
+                ) : null}
                 <View style={cStyles.modalActions}>
-                  <TouchableOpacity
-                    onPress={closePushModal}
-                    style={{
-                      alignSelf: "center",
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: "#023047",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    <Text style={{ color: "#023047", fontWeight: "700" }}>Cerrar</Text>
+                  <TouchableOpacity onPress={closePushModal} style={cStyles.modalGhostButton}>
+                    <Text style={cStyles.modalGhostButtonText}>Cerrar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={async () => {
@@ -1209,7 +1398,7 @@ export default function DashboardContentClientes({
                           await updatePushCounter(1);
                         } catch (e: any) {
                           if (String(e?.message).includes("LIMIT_PUSH")) {
-                            setPushStatus("Alcanzaste el limite de notificaciones de tu plan.");
+                            setPushStatus("Alcanzaste el límite de notificaciones de tu plan.");
                             setSendingPush(false);
                             return;
                           }
@@ -1232,9 +1421,7 @@ export default function DashboardContentClientes({
                         if (historyResult?.ok) {
                           setPushStatus(`Enviadas ${okCount}/${targets.length}.`);
                         } else if (okCount > 0) {
-                          setPushStatus(
-                            `Enviadas ${okCount}/${targets.length}.`
-                          );
+                          setPushStatus(`Enviadas ${okCount}/${targets.length}.`);
                         } else {
                           setPushStatus(`Enviadas ${okCount}/${targets.length}`);
                         }
@@ -1246,32 +1433,32 @@ export default function DashboardContentClientes({
                         setSendingPush(false);
                       }
                     }}
-                      style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
-                      disabled={sendingPush}
-                    >
+                    style={[cStyles.modalPrimaryButton, sendingPush && { opacity: 0.7 }]}
+                    disabled={sendingPush}
+                  >
                     <Text style={cStyles.modalPrimaryText}>{sendingPush ? "Enviando..." : "Enviar"}</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
           </View>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Modal de enviar correo */}
       <Modal visible={showEmailModal} transparent animationType="fade">
         <View style={cStyles.modalBackdrop}>
-          <View style={[cStyles.modalCard, { maxWidth: 420 }]}>
-            <Text style={cStyles.modalTitle}>
-              {emailMode === "single"
-                ? "Enviar correo (1 destinatario)"
-                : `Enviar correo (${selectedCount} destinatarios)`}
-            </Text>
-            {emailMode === "single" && emailTarget ? (
-              <Text style={{ color: "#555" }}>
-                Para: {emailTarget.nombreCompleto || "--"}
-              </Text>
-            ) : null}
+          <View style={[cStyles.modalCard, cStyles.pushModalCard]}>
+            <ModalHeader
+              icon="mail-outline"
+              title="Enviar correo"
+              subtitle={
+                emailMode === "single"
+                  ? emailTarget?.nombreCompleto || null
+                  : `${selectedCount} destinatarios seleccionados`
+              }
+              onClose={() => setShowEmailModal(false)}
+            />
             <TextInput
               placeholder="Asunto"
               placeholderTextColor="#607d8b"
@@ -1286,65 +1473,73 @@ export default function DashboardContentClientes({
               onChangeText={setEmailBody}
               multiline
               numberOfLines={4}
-              style={[cStyles.input, { minHeight: 100, textAlignVertical: "top" }]}
+              style={[cStyles.input, cStyles.textareaInput]}
             />
-            {emailStatus ? <Text style={{ color: "#023047" }}>{emailStatus}</Text> : null}
+            {emailStatus ? <Text style={cStyles.inlineStatus}>{emailStatus}</Text> : null}
             <View style={cStyles.modalActions}>
-              <TouchableOpacity onPress={() => setShowEmailModal(false)}>
-                <Text style={{ color: "#555" }}>Cancelar</Text>
+              <TouchableOpacity onPress={() => setShowEmailModal(false)} style={cStyles.modalGhostButton}>
+                <Text style={cStyles.modalGhostButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSendEmail}
                 disabled={sending}
                 style={[cStyles.modalPrimaryButton, sending && { opacity: 0.7 }]}
               >
-                <Text style={cStyles.modalPrimaryText}>
-                  {sending ? "Enviando..." : "Enviar"}
-                </Text>
+                <Text style={cStyles.modalPrimaryText}>{sending ? "Enviando..." : "Enviar"}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      {error ? <Text style={{ color: "red", marginBottom: 8 }}>{error}</Text> : null}
+      {error ? <Text style={cStyles.errorBanner}>{error}</Text> : null}
 
-      {sortedItems.length === 0 ? (
-        <Text>
-          {items.length === 0 ? "No hay clientes registrados aun." : "No se encontraron coincidencias."}
-        </Text>
-      ) : (
-        <FlatList
-          style={{ flex: 1 }}
-          data={sortedItems}
-          keyExtractor={(it) => it.id}
-          ListHeaderComponent={useDesktopWebLayout ? <HeaderWeb /> : null}
-          renderItem={renderItem as any}
-          extraData={selectedIds}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={7}
-          updateCellsBatchingPeriod={50}
-          removeClippedSubviews={Platform.OS === "android"}
-          keyboardShouldPersistTaps="handled"
-          ListFooterComponent={
-            hasMore ? (
-              <TouchableOpacity onPress={loadMore} style={cStyles.loadMoreButton}>
-                <Text style={cStyles.loadMoreText}>
-                  {loadingMore ? "Cargando..." : "Cargar mas"}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={{ textAlign: "center", color: "#777", marginTop: 8 }}>
-                Fin de la lista
+      <FlatList
+        style={{ flex: 1 }}
+        contentContainerStyle={cStyles.listContent}
+        data={sortedItems}
+        keyExtractor={(it) => it.id}
+        ListHeaderComponent={listHeader}
+        renderItem={renderItem as any}
+        extraData={selectedIds}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={Platform.OS === "android"}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={
+          <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding }]}>
+            <View style={cStyles.emptyStateCard}>
+              <View style={cStyles.emptyStateIcon}>
+                <Ionicons name="people-outline" size={28} color="#023047" />
+              </View>
+              <Text style={cStyles.emptyStateTitle}>
+                {items.length === 0 ? "Todavía no tienes clientes registrados" : "No encontramos coincidencias"}
               </Text>
-            )
-          }
-        />
-      )}
+              <Text style={cStyles.emptyStateDescription}>
+                {items.length === 0
+                  ? "Cuando una persona complete el registro aparecerá aquí para que puedas gestionarla."
+                  : "Prueba con otra búsqueda o ajusta los filtros para volver a ver resultados."}
+              </Text>
+            </View>
+          </View>
+        }
+        ListFooterComponent={
+          sortedItems.length > 0 ? (
+            <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding }]}>
+              {hasMore ? (
+                <TouchableOpacity onPress={loadMore} style={cStyles.loadMoreButton}>
+                  <Text style={cStyles.loadMoreText}>{loadingMore ? "Cargando..." : "Cargar más"}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={cStyles.endOfListText}>Fin de la lista</Text>
+              )}
+            </View>
+          ) : null
+        }
+      />
     </View>
   );
 }
-
-

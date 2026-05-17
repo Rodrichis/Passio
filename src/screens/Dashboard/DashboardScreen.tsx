@@ -197,6 +197,14 @@ export default function Dashboard({ navigation }: any) {
           <DashboardContentClientes
             onOpenNotificationHistory={() => setSelected("HistorialNotificaciones")}
             companyName={companyName}
+            topBarProps={{
+              pageTitle: getPageTitle(),
+              companyName,
+              isAdmin,
+              onOpenSupport: handleOpenSupport,
+              onOpenFaq: handleOpenFaq,
+              onOpenNotifications: handleOpenNotifications,
+            }}
             notificationDraft={clientesNotificationDraft}
             onConsumeNotificationDraft={() => setClientesNotificationDraft(null)}
           />
@@ -229,6 +237,7 @@ export default function Dashboard({ navigation }: any) {
     selected === "Logs" ||
     selected === "HistorialNotificaciones" ||
     selected === "EmpresasAdmin";
+  const usesEmbeddedTopBar = selected === "Clientes";
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
@@ -245,19 +254,25 @@ export default function Dashboard({ navigation }: any) {
         <View style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
           {isListScreen ? (
             <View style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
-              <DashboardTopBar
-                pageTitle={getPageTitle()}
-                companyName={companyName}
-                isAdmin={isAdmin}
-                onOpenSupport={handleOpenSupport}
-                onOpenFaq={handleOpenFaq}
-                onOpenNotifications={handleOpenNotifications}
-              />
+              {!usesEmbeddedTopBar ? (
+                <DashboardTopBar
+                  pageTitle={getPageTitle()}
+                  companyName={companyName}
+                  isAdmin={isAdmin}
+                  onOpenSupport={handleOpenSupport}
+                  onOpenFaq={handleOpenFaq}
+                  onOpenNotifications={handleOpenNotifications}
+                />
+              ) : null}
               <View
-                style={[
-                  isMobileLayout ? styles.contentContainerMobile : styles.contentContainer,
-                  { flex: 1, minHeight: 0 },
-                ]}
+                style={
+                  usesEmbeddedTopBar
+                    ? { flex: 1, minHeight: 0 }
+                    : [
+                        isMobileLayout ? styles.contentContainerMobile : styles.contentContainer,
+                        { flex: 1, minHeight: 0 },
+                      ]
+                }
               >
                 {renderContent()}
               </View>
