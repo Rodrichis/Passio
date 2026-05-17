@@ -29,7 +29,12 @@ import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
 import NotificationHistoryScreen from "../notifications/NotificationHistoryScreen";
 import { auth, db } from "../../services/firebaseConfig";
 import { getWalletConfig } from "../../services/walletOnboarding/getWalletConfig";
-import { ESTADO_SUSCRIPCION } from "../../constants/empresa";
+import {
+  EMPTY_SUBSCRIPTION_BLOCK,
+  getSubscriptionBlockCopy,
+  resolveSubscriptionBlock,
+  SubscriptionBlockState,
+} from "../../utils/subscriptionGate";
 
 type RootStackParamList = {
   Login: undefined;
@@ -89,75 +94,6 @@ const DASHBOARD_NEWS_ITEMS = [
     tag: "Formularios",
   },
 ] as const;
-
-type SubscriptionBlockReason = "caducada" | "prueba_vencida" | null;
-
-type SubscriptionBlockState = {
-  blocked: boolean;
-  reason: SubscriptionBlockReason;
-  expiresAt: Date | null;
-};
-
-const EMPTY_SUBSCRIPTION_BLOCK: SubscriptionBlockState = {
-  blocked: false,
-  reason: null,
-  expiresAt: null,
-};
-
-function normalizeEmpresaDate(value: any): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof value?.toDate === "function") {
-    const parsed = value.toDate();
-    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
-  }
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  return null;
-}
-
-function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
-  const estado = String(data?.estadoSuscripcion || "")
-    .trim()
-    .toLowerCase();
-  const expiresAt = normalizeEmpresaDate(data?.expiraEl);
-
-  if (estado === ESTADO_SUSCRIPCION.CADUCADA) {
-    return {
-      blocked: true,
-      reason: "caducada",
-      expiresAt,
-    };
-  }
-
-  if (
-    estado === ESTADO_SUSCRIPCION.PRUEBA &&
-    expiresAt &&
-    expiresAt.getTime() < Date.now()
-  ) {
-    return {
-      blocked: true,
-      reason: "prueba_vencida",
-      expiresAt,
-    };
-  }
-
-  return EMPTY_SUBSCRIPTION_BLOCK;
-}
-
-function formatBlockDate(value: Date | null) {
-  if (!value) return null;
-  try {
-    return value.toLocaleDateString("es-CL");
-  } catch {
-    const day = String(value.getDate()).padStart(2, "0");
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const year = value.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-}
 
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
@@ -302,19 +238,7 @@ export default function Dashboard({ navigation }: any) {
     };
   }, [uid]);
 
-  const subscriptionBlockDate = formatBlockDate(subscriptionBlock.expiresAt);
-  const subscriptionBlockTitle =
-    subscriptionBlock.reason === "prueba_vencida"
-      ? "Tu prueba finaliz\u00F3"
-      : "Tu suscripci\u00F3n est\u00E1 caducada";
-  const subscriptionBlockDescription =
-    subscriptionBlock.reason === "prueba_vencida"
-      ? subscriptionBlockDate
-        ? `Tu acceso termin\u00F3 el ${subscriptionBlockDate}. Para seguir usando Passio, necesitamos reactivar tu cuenta.`
-        : "Tu periodo de prueba termin\u00F3. Para seguir usando Passio, necesitamos reactivar tu cuenta."
-      : subscriptionBlockDate
-        ? `Tu cuenta figura como caducada desde el ${subscriptionBlockDate}. Escr\u00EDbenos para ayudarte a reactivarla.`
-        : "Tu cuenta figura como caducada. Escr\u00EDbenos para ayudarte a reactivarla.";
+  const subscriptionBlockCopy = getSubscriptionBlockCopy(subscriptionBlock);
 
   const handleLogout = async () => {
     try {
@@ -472,15 +396,13 @@ export default function Dashboard({ navigation }: any) {
               >
                 <Ionicons name="alert-circle-outline" size={28} color="#D97706" />
               </View>
-              <Text style={overlayStyles.title}>{subscriptionBlockTitle}</Text>
-              <Text style={overlayStyles.description}>{subscriptionBlockDescription}</Text>
+              <Text style={overlayStyles.title}>{subscriptionBlockCopy.title}</Text>
+              <Text style={overlayStyles.description}>{subscriptionBlockCopy.description}</Text>
             </View>
 
             <View style={overlayStyles.infoBox}>
               <Text style={overlayStyles.infoLabel}>Estado de suscripción</Text>
-              <Text style={overlayStyles.infoValue}>
-                {subscriptionBlock.reason === "prueba_vencida" ? "Prueba vencida" : "Caducada"}
-              </Text>
+              <Text style={overlayStyles.infoValue}>{subscriptionBlockCopy.statusLabel}</Text>
             </View>
 
             <View style={overlayStyles.actions}>
