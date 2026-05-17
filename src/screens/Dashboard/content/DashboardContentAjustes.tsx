@@ -62,6 +62,30 @@ type PlanInfo = {
   precio?: number;
 };
 
+function formatExpiryDate(value: any) {
+  if (!value) return "--";
+
+  try {
+    const date =
+      typeof value?.toDate === "function"
+        ? value.toDate()
+        : value instanceof Date
+          ? value
+          : new Date(value);
+
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+      return "--";
+    }
+
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return "--";
+  }
+}
+
 export default function DashboardContentAjustes({ navigation, onOpenSupport }: Props) {
   const [empresa, setEmpresa] = useState<any>(null);
   const [planData, setPlanData] = useState<PlanInfo | null>(null);
@@ -76,6 +100,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
   const uid = auth.currentUser?.uid;
   const registroURL = empresa?.LinkRegistro || buildRegistrationUrl(uid);
   const isDesktop = Platform.OS === "web" && width >= 900;
+  const showExpiryInline = Platform.OS === "web" && width >= 1180;
   const showInlineSupport = !isDesktop;
   const showInlineLogout = !isDesktop;
   const compactMetricLayout = !isDesktop;
@@ -433,6 +458,14 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
                     ? ESTADO_SUSCRIPCION.ACTIVA
                   : ESTADO_SUSCRIPCION.INACTIVA)}
               </Text>
+              <Text
+                style={[
+                  ajustesStyles.planSubtitle,
+                  showExpiryInline && ajustesStyles.planSubtitleRight,
+                ]}
+              >
+                Expira el: {formatExpiryDate(empresa?.expiraEl)}
+              </Text>
             </View>
 
             {showInlineSupport ? (
@@ -760,6 +793,12 @@ const ajustesStyles = StyleSheet.create({
     color: "#5F6F7A",
     fontSize: 15,
     marginTop: 2,
+  },
+  planSubtitleRight: {
+    position: "absolute",
+    right: 0,
+    top: 24,
+    textAlign: "right",
   },
   divider: {
     height: 1,
