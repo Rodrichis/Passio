@@ -246,7 +246,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
         : "REVENUECAT_API_KEY no se cargó en runtime.";
 
       alert(
-        `${reason}\n\nChecks:\n1) Recompila APK release después de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android (prefijo goog_) en RevenueCat`
+        `${reason}\n\nChecks:\n1) Recompila APK release despu\u00E9s de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android de tu app en RevenueCat`
       );
       return;
     }
@@ -1044,3 +1044,4 @@ const ajustesStyles = StyleSheet.create({
     fontWeight: "800",
   },
 });
+

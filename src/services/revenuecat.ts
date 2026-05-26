@@ -1,14 +1,29 @@
 ﻿// RevenueCat integration helpers
 import { Platform } from "react-native";
-import { REVENUECAT_API_KEY } from "@env";
+import {
+  REVENUECAT_API_KEY,
+  REVENUECAT_ANDROID_API_KEY,
+  REVENUECAT_IOS_API_KEY,
+} from "@env";
 import type {
   PurchasesOffering,
   PurchasesPackage,
   CustomerInfo,
 } from "react-native-purchases";
 
-const API_KEY = (REVENUECAT_API_KEY || "").trim();
 export const ENTITLEMENT_PRO = "Pro";
+
+function getRevenueCatApiKey() {
+  if (Platform.OS === "android") {
+    return String(REVENUECAT_ANDROID_API_KEY || REVENUECAT_API_KEY || "").trim();
+  }
+
+  if (Platform.OS === "ios") {
+    return String(REVENUECAT_IOS_API_KEY || REVENUECAT_API_KEY || "").trim();
+  }
+
+  return String(REVENUECAT_API_KEY || "").trim();
+}
 
 // Safe, platform-aware loading to avoid breaking web bundle
 let Purchases: any = null;
@@ -48,14 +63,15 @@ export function isRevenueCatCustomerCenterAvailable() {
 }
 
 export function hasRevenueCatApiKey() {
-  return API_KEY.length > 0;
+  return getRevenueCatApiKey().length > 0;
 }
 
 export async function configureRevenueCat(appUserId?: string | null) {
   if (!isRevenueCatAvailable() || !hasRevenueCatApiKey() || didConfigure) return;
   try {
+    const apiKey = getRevenueCatApiKey();
     await Purchases.configure({
-      apiKey: API_KEY,
+      apiKey,
       appUserID: appUserId || undefined,
       useAmazon: false,
     });
