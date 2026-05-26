@@ -119,6 +119,7 @@ export default function DashboardContentClientes({
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<"lastVisit" | "visits">("lastVisit");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterOS, setFilterOS] = useState<"all" | "ios" | "android">("all");
   const [filterPremios, setFilterPremios] = useState<"all" | "with" | "without">("all");
@@ -566,11 +567,15 @@ export default function DashboardContentClientes({
   );
 
   const sortedItems = useMemo(
-    () => sortItems(filteredItems, sortOrder),
-    [filteredItems, sortOrder]
+    () => sortItems(filteredItems, sortField, sortOrder),
+    [filteredItems, sortField, sortOrder]
   );
-  const toggleSort = useCallback(
+  const toggleSortOrder = useCallback(
     () => setSortOrder((prev) => (prev === "desc" ? "asc" : "desc")),
+    []
+  );
+  const toggleSortField = useCallback(
+    () => setSortField((prev) => (prev === "lastVisit" ? "visits" : "lastVisit")),
     []
   );
 
@@ -779,13 +784,19 @@ export default function DashboardContentClientes({
         <Checkbox checked={allVisibleSelected} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={cStyles.headerNameCell} onPress={toggleSort}>
+      <View style={cStyles.headerNameCell}>
         <Text style={cStyles.headerText}>Cliente</Text>
-      </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity style={cStyles.headerDateCell} onPress={toggleSort}>
-        <Ionicons name="calendar-outline" size={16} color="#023047" />
-        <Text style={[cStyles.headerText, { textAlign: "center" }]}>Última visita</Text>
+      <TouchableOpacity style={cStyles.headerDateCell} onPress={toggleSortOrder}>
+        <Ionicons
+          name={sortField === "lastVisit" ? "calendar-outline" : "footsteps-outline"}
+          size={16}
+          color="#023047"
+        />
+        <Text style={[cStyles.headerText, { textAlign: "center" }]}>
+          {sortField === "lastVisit" ? "\u00DAltima visita" : "Visitas"}
+        </Text>
         <Ionicons
           name={sortOrder === "desc" ? "chevron-down" : "chevron-up"}
           size={16}
@@ -1073,6 +1084,22 @@ export default function DashboardContentClientes({
                 {selectedCount ? `${selectedCount} seleccionados` : "Sin selección activa"}
               </Text>
             </View>
+            <TouchableOpacity onPress={toggleSortField} style={cStyles.selectAllButton}>
+              <Text style={cStyles.selectAllButtonText}>
+                {sortField === "lastVisit" ? "Orden: \u00FAltima visita" : "Orden: visitas"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleSortOrder} style={cStyles.selectAllButton}>
+              <Text style={cStyles.selectAllButtonText}>
+                {sortField === "lastVisit"
+                  ? sortOrder === "desc"
+                    ? "M\u00E1s reciente"
+                    : "M\u00E1s antigua"
+                  : sortOrder === "desc"
+                    ? "Mayor"
+                    : "Menor"}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
               <Text style={cStyles.selectAllButtonText}>
                 {allVisibleSelected ? "Quitar selección" : "Seleccionar todo"}
@@ -1706,3 +1733,5 @@ export default function DashboardContentClientes({
     </View>
   );
 }
+
+

@@ -79,13 +79,29 @@ export function filterItems(
 
 export function sortItems(
   items: Cliente[],
+  sortField: "lastVisit" | "visits",
   sortOrder: "asc" | "desc"
 ): Cliente[] {
   const copy = items.slice();
   copy.sort((a, b) => {
-    const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;
-    const bTime = b.creadoEn instanceof Date ? b.creadoEn.getTime() : 0;
-    return sortOrder === "desc" ? bTime - aTime : aTime - bTime;
+    if (sortField === "visits") {
+      const aVisits = Number(a.visitasTotales ?? 0);
+      const bVisits = Number(b.visitasTotales ?? 0);
+
+      if (aVisits !== bVisits) {
+        return sortOrder === "desc" ? bVisits - aVisits : aVisits - bVisits;
+      }
+    } else {
+      const aVisitTime = a.ultimaVisita instanceof Date ? a.ultimaVisita.getTime() : 0;
+      const bVisitTime = b.ultimaVisita instanceof Date ? b.ultimaVisita.getTime() : 0;
+      if (aVisitTime !== bVisitTime) {
+        return sortOrder === "desc" ? bVisitTime - aVisitTime : aVisitTime - bVisitTime;
+      }
+    }
+
+    const aName = String(a.nombreCompleto ?? "").trim();
+    const bName = String(b.nombreCompleto ?? "").trim();
+    return aName.localeCompare(bName, "es", { sensitivity: "base" });
   });
   return copy;
 }

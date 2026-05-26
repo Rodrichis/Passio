@@ -43,6 +43,12 @@ type HighlightClient = {
   visits: number;
 };
 
+type TopVisitedClient = {
+  id: string;
+  name: string;
+  visits: number;
+};
+
 type LatestNotification = {
   date: Date | null;
   totalRecipients: number;
@@ -56,6 +62,11 @@ type ClientWithBirthday = ReturnType<typeof mapDoc> & {
 type BirthdayClient = {
   id: string;
   name: string;
+};
+
+type AgeRangeStat = {
+  label: string;
+  count: number;
 };
 
 type Props = {
@@ -104,8 +115,13 @@ export default function DashboardContentPrincipal({
   const [showQrModal, setShowQrModal] = React.useState(false);
   const [birthdayClients, setBirthdayClients] = React.useState<BirthdayClient[]>([]);
   const [topVisitedClient, setTopVisitedClient] = React.useState<HighlightClient | null>(null);
+  const [topVisitedClients, setTopVisitedClients] = React.useState<TopVisitedClient[]>([]);
+  const [ageRanges, setAgeRanges] = React.useState<AgeRangeStat[]>([]);
+  const [clientsWithRewardsCount, setClientsWithRewardsCount] = React.useState(0);
+  const [clientsWithoutRewardsCount, setClientsWithoutRewardsCount] = React.useState(0);
   const [lastNotification, setLastNotification] = React.useState<LatestNotification | null>(null);
   const [showBirthdayModal, setShowBirthdayModal] = React.useState(false);
+  const [showTopVisitedModal, setShowTopVisitedModal] = React.useState(false);
   const [showLastNotificationModal, setShowLastNotificationModal] = React.useState(false);
   const [copiedLink, setCopiedLink] = React.useState(false);
 
@@ -230,17 +246,82 @@ export default function DashboardContentPrincipal({
           }));
         setBirthdayClients(birthdaysToday);
 
-        const topVisited = allClients.reduce<HighlightClient | null>((best, client) => {
-          const visits = Number(client.visitasTotales ?? 0);
-          if (!best || visits > best.visits) {
-            return {
-              name: client.nombreCompleto || "Cliente sin nombre",
-              visits,
-            };
+        const rankedTopVisited = allClients
+          .map((client) => ({
+            id: client.id,
+            name: client.nombreCompleto || "Cliente sin nombre",
+            visits: Number(client.visitasTotales ?? 0),
+          }))
+          .sort((a, b) => {
+            if (b.visits !== a.visits) {
+              return b.visits - a.visits;
+            }
+            return a.name.localeCompare(b.name, "es", { sensitivity: "base" });
+          })
+          .slice(0, 5);
+        setTopVisitedClients(rankedTopVisited);
+        setTopVisitedClient(
+          rankedTopVisited[0]
+            ? {
+                name: rankedTopVisited[0].name,
+                visits: rankedTopVisited[0].visits,
+              }
+            : null
+        );
+
+        const ageRangesBase: AgeRangeStat[] = [
+          { label: "Menores de 18", count: 0 },
+          { label: "18-24", count: 0 },
+          { label: "25-34", count: 0 },
+          { label: "35-44", count: 0 },
+          { label: "45-54", count: 0 },
+          { label: "55+", count: 0 },
+        ];
+
+        const getAge = (birthDate: Date | null) => {
+          if (!(birthDate instanceof Date) || Number.isNaN(birthDate.getTime())) {
+            return null;
           }
-          return best;
-        }, null);
-        setTopVisitedClient(topVisited);
+
+          const today = new Date();
+          let age = today.getFullYear() - birthDate.getFullYear();
+          const monthDiff = today.getMonth() - birthDate.getMonth();
+          const hasNotHadBirthdayYet =
+            monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate());
+
+          if (hasNotHadBirthdayYet) {
+            age -= 1;
+          }
+
+          return age >= 0 ? age : null;
+        };
+
+        allClients.forEach((client) => {
+          const age = getAge(client.fechaNacimiento);
+          if (age == null) return;
+
+          if (age < 18) ageRangesBase[0].count += 1;
+          else if (age <= 24) ageRangesBase[1].count += 1;
+          else if (age <= 34) ageRangesBase[2].count += 1;
+          else if (age <= 44) ageRangesBase[3].count += 1;
+          else if (age <= 54) ageRangesBase[4].count += 1;
+          else ageRangesBase[5].count += 1;
+        });
+
+        setAgeRanges(
+          ageRangesBase
+            .filter((item) => item.count > 0)
+            .sort((a, b) => {
+              if (b.count !== a.count) {
+                return b.count - a.count;
+              }
+              return a.label.localeCompare(b.label, "es", { sensitivity: "base" });
+            })
+        );
+
+        const withRewards = allClients.filter((client) => Number(client.premiosDisponibles ?? 0) > 0).length;
+        setClientsWithRewardsCount(withRewards);
+        setClientsWithoutRewardsCount(Math.max(0, totalCount - withRewards));
 
         const recent = allClients
           .slice()
@@ -296,6 +377,11 @@ export default function DashboardContentPrincipal({
       } catch (e) {
         console.error(e);
         setError("No se pudieron cargar las metricas.");
+        setTopVisitedClients([]);
+        setTopVisitedClient(null);
+        setAgeRanges([]);
+        setClientsWithRewardsCount(0);
+        setClientsWithoutRewardsCount(0);
       } finally {
         setLoading(false);
       }
@@ -385,6 +471,47 @@ export default function DashboardContentPrincipal({
   };
 
   const birthdayNames = birthdayClients.map((client) => client.name);
+  const topAgeRanges = ageRanges.slice(0, 3);
+  const analyticsCards = [
+    {
+      key: "ages",
+      title: "Rangos etarios",
+      primary: loading ? "..." : topAgeRanges[0]?.label || "Sin datos",
+      secondary: loading
+        ? "Cargando..."
+        : topAgeRanges[0]
+          ? `${topAgeRanges[0].count} clientes en el rango principal`
+          : "A\u00FAn no hay edades registradas",
+      icon: "bar-chart-outline" as const,
+      iconColor: "#8B5CF6",
+      iconBg: "#F3E8FF",
+      rows: loading
+        ? []
+        : topAgeRanges.map((item) => ({
+            label: item.label,
+            value: String(item.count),
+          })),
+    },
+    {
+      key: "rewards",
+      title: "Clientes con premios",
+      primary: loading ? "..." : String(clientsWithRewardsCount),
+      secondary: loading
+        ? "Cargando..."
+        : clientsWithRewardsCount > 0
+          ? "Con premios disponibles"
+          : "A\u00FAn no hay premios disponibles",
+      icon: "gift-outline" as const,
+      iconColor: "#D97706",
+      iconBg: "#FFF4DB",
+      rows: loading
+        ? []
+        : [
+            { label: "Con premios", value: String(clientsWithRewardsCount) },
+            { label: "Sin premios", value: String(clientsWithoutRewardsCount) },
+          ],
+    },
+  ];
 
   const highlightCards = [
     birthdayClients.length > 0
@@ -413,6 +540,7 @@ export default function DashboardContentPrincipal({
       iconColor: "#16A34A",
       iconBg: "#E8F7EE",
       primaryColor: "#16A34A",
+      onPress: topVisitedClients.length > 0 ? () => setShowTopVisitedModal(true) : undefined,
     },
     {
       key: "notification",
@@ -608,6 +736,54 @@ export default function DashboardContentPrincipal({
         </View>
       </Modal>
 
+      <Modal visible={showTopVisitedModal} transparent animationType="fade" onRequestClose={() => setShowTopVisitedModal(false)}>
+        <View style={modalStyles.backdrop}>
+          <Pressable style={modalStyles.dismissLayer} onPress={() => setShowTopVisitedModal(false)} />
+          <View style={modalStyles.card}>
+            <View style={modalStyles.headerRow}>
+              <View style={modalStyles.headerTitleWrap}>
+                <View style={[modalStyles.headerBadge, { backgroundColor: "#E8F7EE" }]}>
+                  <Ionicons name="trophy-outline" size={24} color="#16A34A" />
+                </View>
+                <Text style={modalStyles.title}>Top 5 clientes</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowTopVisitedModal(false)} style={modalStyles.closeButton}>
+                <Ionicons name="close" size={20} color="#51616F" />
+              </TouchableOpacity>
+            </View>
+            <Text style={modalStyles.text}>
+              {"Estos son tus clientes con m\u00E1s visitas acumuladas hasta ahora."}
+            </Text>
+            <View style={modalStyles.statBox}>
+              <Text style={modalStyles.statLabel}>Cliente destacado</Text>
+              <Text style={modalStyles.statValueSmall}>
+                {topVisitedClients[0] ? `${topVisitedClients[0].name} (${topVisitedClients[0].visits})` : "Sin clientes"}
+              </Text>
+            </View>
+            <View style={modalStyles.listBox}>
+              {topVisitedClients.length === 0 ? (
+                <Text style={modalStyles.text}>A\u00FAn no hay clientes registrados.</Text>
+              ) : (
+                topVisitedClients.map((client, index) => (
+                  <View key={client.id} style={modalStyles.personRow}>
+                    <View style={modalStyles.rankBadge}>
+                      <Text style={modalStyles.rankBadgeText}>{index + 1}</Text>
+                    </View>
+                    <Text style={modalStyles.listItem}>{client.name}</Text>
+                    <Text style={modalStyles.rankValue}>{client.visits}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+            <View style={modalStyles.actions}>
+              <TouchableOpacity onPress={() => setShowTopVisitedModal(false)} style={modalStyles.secondaryButton}>
+                <Text style={modalStyles.secondaryButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={showLastNotificationModal}
         transparent
@@ -704,6 +880,27 @@ export default function DashboardContentPrincipal({
           />
         ))}
       </View>
+
+      {false ? (
+        <>
+          <Text style={styles.sectionTitle}>{"Anal\u00EDtica r\u00E1pida"}</Text>
+          <View style={{ flexDirection: "row", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+            {analyticsCards.map((card) => (
+              <AnalyticsCard
+                key={card.key}
+                title={card.title}
+                primary={card.primary}
+                secondary={card.secondary}
+                icon={card.icon}
+                iconColor={card.iconColor}
+                iconBg={card.iconBg}
+                rows={card.rows}
+                compact={isCompactLayout}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <View
         style={{
@@ -1044,6 +1241,93 @@ function HighlightCard({
   );
 }
 
+function AnalyticsCard({
+  title,
+  primary,
+  secondary,
+  icon,
+  iconColor,
+  iconBg,
+  rows,
+  compact,
+}: {
+  title: string;
+  primary: string;
+  secondary: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  iconColor: string;
+  iconBg: string;
+  rows: Array<{ label: string; value: string }>;
+  compact?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        flexBasis: compact ? "47%" : "30%",
+        flexGrow: 1,
+        minWidth: compact ? 0 : 220,
+        borderRadius: 20,
+        padding: compact ? 16 : 18,
+        ...ELEVATED_CARD,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: "#51616F", fontSize: 13, fontWeight: "700" }}>{title}</Text>
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ color: "#023047", fontSize: compact ? 18 : 20, fontWeight: "800", marginTop: 8 }}
+          >
+            {primary}
+          </Text>
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ color: "#617483", fontSize: 13, lineHeight: 19, marginTop: 4 }}
+          >
+            {secondary}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            width: compact ? 46 : 52,
+            height: compact ? 46 : 52,
+            borderRadius: 16,
+            backgroundColor: iconBg,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name={icon} size={compact ? 22 : 24} color={iconColor} />
+        </View>
+      </View>
+
+      <View style={{ marginTop: 16, gap: 8 }}>
+        {rows.length > 0 ? (
+          rows.map((row) => (
+            <View
+              key={`${title}-${row.label}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <Text style={{ color: "#607381", fontSize: 13 }}>{row.label}</Text>
+              <Text style={{ color: "#023047", fontSize: 13, fontWeight: "800" }}>{row.value}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={{ color: "#607381", fontSize: 13 }}>Sin datos disponibles.</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 const modalStyles = {
   backdrop: {
     flex: 1,
@@ -1173,12 +1457,32 @@ const modalStyles = {
     fontSize: 13,
     fontWeight: "800" as const,
   },
+  rankBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#E8F7EE",
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  rankBadgeText: {
+    color: "#16803C",
+    fontSize: 13,
+    fontWeight: "800" as const,
+  },
   listItem: {
     flex: 1,
     color: "#023047",
     fontSize: 14,
     fontWeight: "700" as const,
     lineHeight: 20,
+  },
+  rankValue: {
+    color: "#16A34A",
+    fontSize: 15,
+    fontWeight: "800" as const,
+    minWidth: 28,
+    textAlign: "right" as const,
   },
   detailsGrid: {
     flexDirection: "row" as const,
