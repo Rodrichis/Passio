@@ -881,26 +881,24 @@ export default function DashboardContentPrincipal({
         ))}
       </View>
 
-      {false ? (
-        <>
-          <Text style={styles.sectionTitle}>{"Anal\u00EDtica r\u00E1pida"}</Text>
-          <View style={{ flexDirection: "row", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-            {analyticsCards.map((card) => (
-              <AnalyticsCard
-                key={card.key}
-                title={card.title}
-                primary={card.primary}
-                secondary={card.secondary}
-                icon={card.icon}
-                iconColor={card.iconColor}
-                iconBg={card.iconBg}
-                rows={card.rows}
-                compact={isCompactLayout}
-              />
-            ))}
-          </View>
-        </>
-      ) : null}
+      <>
+        <Text style={styles.sectionTitle}>{"Anal\u00EDtica r\u00E1pida"}</Text>
+        <View style={{ flexDirection: "row", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+          {analyticsCards.map((card) => (
+            <AnalyticsCard
+              key={card.key}
+              title={card.title}
+              primary={card.primary}
+              secondary={card.secondary}
+              icon={card.icon}
+              iconColor={card.iconColor}
+              iconBg={card.iconBg}
+              rows={card.rows}
+              compact={isCompactLayout}
+            />
+          ))}
+        </View>
+      </>
 
       <View
         style={{
