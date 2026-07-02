@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   useWindowDimensions,
@@ -135,6 +136,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
   const isCompactLayout = width < 980;
   const isCompactWeb = Platform.OS === "web" && width < 900;
   const isAndroid = Platform.OS === "android";
+  const enableExternalReader = Platform.OS === "web" && !isCompactLayout;
 
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -145,8 +147,12 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
   const [walletConfig, setWalletConfig] = useState<Awaited<ReturnType<typeof getWalletConfig>> | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [readerInputValue, setReaderInputValue] = useState("");
   const [permission, requestPermission] = useCameraPermissions();
   const processingRef = useRef(false);
+  const readerInputRef = useRef<TextInput | null>(null);
+  const readerFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const modalKeyGuardInputRef = useRef<TextInput | null>(null);
 
   const getStatusForAction = useCallback((action: ScanAction | null) => {
     if (action === "premio") {
@@ -197,47 +203,60 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
     };
   }, []);
 
+  const clearReaderTimers = useCallback(() => {
+    if (readerFocusTimeoutRef.current) {
+      clearTimeout(readerFocusTimeoutRef.current);
+      readerFocusTimeoutRef.current = null;
+    }
+  }, []);
+
   const resetToChooser = useCallback(
     (nextFeedback: Feedback | null = null) => {
+      clearReaderTimers();
       processingRef.current = false;
       setLoading(false);
       setScanned(false);
+      setReaderInputValue("");
       setPendingConfirmation(null);
       setSelectedAction(null);
       setStatus(getStatusForAction(null));
       setFeedback(nextFeedback);
       setScanError(null);
     },
-    [getStatusForAction]
+    [clearReaderTimers, getStatusForAction]
   );
 
   const showRecoverableError = useCallback(
     (message: string) => {
+      clearReaderTimers();
       processingRef.current = false;
       setLoading(false);
       setScanned(false);
+      setReaderInputValue("");
       setPendingConfirmation(null);
       setFeedback(null);
       setScanError(message);
       setStatus(getStatusForAction(selectedAction));
     },
-    [getStatusForAction, selectedAction]
+    [clearReaderTimers, getStatusForAction, selectedAction]
   );
 
   const startAction = useCallback(
     (action: ScanAction) => {
+      clearReaderTimers();
       processingRef.current = false;
       setFeedback(null);
       setScanError(null);
       setPendingConfirmation(null);
       setScanned(false);
+      setReaderInputValue("");
       setSelectedAction(action);
       setStatus(getStatusForAction(action));
     },
-    [getStatusForAction]
+    [clearReaderTimers, getStatusForAction]
   );
 
-  const parseData = (raw: string): ParsedPayload => {
+  const parseData = useCallback((raw: string): ParsedPayload => {
     try {
       const parsed = JSON.parse(raw);
       return {
@@ -247,7 +266,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
     } catch {
       return { idUsuario: raw };
     }
-  };
+  }, []);
 
   const handleRequestCameraPermission = useCallback(async () => {
     try {
@@ -287,15 +306,57 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
     }
   }, [requestPermission]);
 
-  const handleBarCodeScanned = useCallback(
-    async ({ data }: { data: string }) => {
+  const focusExternalReader = useCallback(() => {
+    if (!enableExternalReader) return;
+    if (!selectedAction || loading || scanned || pendingConfirmation || scanError) return;
+
+    if (readerFocusTimeoutRef.current) {
+      clearTimeout(readerFocusTimeoutRef.current);
+    }
+
+    readerFocusTimeoutRef.current = setTimeout(() => {
+      readerInputRef.current?.focus();
+    }, 120);
+  }, [enableExternalReader, loading, pendingConfirmation, scanError, scanned, selectedAction]);
+
+  useEffect(() => {
+    if (!enableExternalReader) return;
+    focusExternalReader();
+  }, [enableExternalReader, focusExternalReader]);
+
+  useEffect(() => {
+    return () => {
+      clearReaderTimers();
+    };
+  }, [clearReaderTimers]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (!scanError && !pendingConfirmation) return;
+
+    const timeout = setTimeout(() => {
+      modalKeyGuardInputRef.current?.focus();
+    }, 80);
+
+    return () => clearTimeout(timeout);
+  }, [pendingConfirmation, scanError]);
+
+  const processScannedCode = useCallback(
+    async (rawData: string) => {
       if (!selectedAction || scanned || processingRef.current) return;
+
+      const normalizedRawData = String(rawData || "").replace(/[\r\n]+/g, "").trim();
+      if (!normalizedRawData) {
+        showRecoverableError("No recibimos ningún código válido. Inténtalo nuevamente.");
+        return;
+      }
 
       processingRef.current = true;
       setScanned(true);
       setLoading(true);
       setFeedback(null);
       setScanError(null);
+      setReaderInputValue("");
       setStatus("Validando cliente...");
 
       const empresaId = auth.currentUser?.uid;
@@ -310,11 +371,11 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
       }
 
       const visitasPorPremio = walletConfig.visitasPorPremio;
-      const payload = parseData(data);
+      const payload = parseData(normalizedRawData);
       const clientId = sanitizeClientId(payload.idUsuario);
 
       if (!clientId) {
-        showRecoverableError("El QR escaneado no corresponde a una tarjeta válida de Passio.");
+        showRecoverableError("El código leído no corresponde a una tarjeta válida de Passio.");
         return;
       }
 
@@ -399,7 +460,43 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
       });
       setStatus(selectedAction === "premio" ? "Confirma el canje del premio." : "Confirma la visita para continuar.");
     },
-    [scanned, selectedAction, showRecoverableError, walletConfig]
+    [parseData, scanned, selectedAction, showRecoverableError, walletConfig]
+  );
+
+  const handleBarCodeScanned = useCallback(
+    async ({ data }: { data: string }) => {
+      await processScannedCode(data);
+    },
+    [processScannedCode]
+  );
+
+  const handleReaderSubmit = useCallback(() => {
+    const normalizedValue = readerInputValue.replace(/[\r\n]+/g, "").trim();
+    if (!normalizedValue) {
+      focusExternalReader();
+      return;
+    }
+
+    void processScannedCode(normalizedValue);
+  }, [focusExternalReader, processScannedCode, readerInputValue]);
+
+  const handleReaderChangeText = useCallback(
+    (value: string) => {
+      setReaderInputValue(value);
+
+      if (value.includes("\n") || value.includes("\r")) {
+        const normalizedValue = value.replace(/[\r\n]+/g, "").trim();
+        setReaderInputValue("");
+
+        if (normalizedValue) {
+          void processScannedCode(normalizedValue);
+        } else {
+          focusExternalReader();
+        }
+        return;
+      }
+    },
+    [focusExternalReader, processScannedCode]
   );
 
   const handleConfirm = useCallback(async () => {
@@ -527,6 +624,18 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
                 <Text style={styles.singleMessageText}>{scanError}</Text>
               </View>
 
+              {Platform.OS === "web" ? (
+                <TextInput
+                  ref={modalKeyGuardInputRef}
+                  value=""
+                  onChangeText={() => undefined}
+                  onSubmitEditing={() => undefined}
+                  blurOnSubmit={false}
+                  caretHidden
+                  style={styles.hiddenModalKeyGuardInput}
+                />
+              ) : null}
+
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={() => setScanError(null)}>
                   <Text style={styles.modalConfirmText}>Entendido</Text>
@@ -616,6 +725,11 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
             <View style={[styles.scannerCard, ELEVATED_CARD]}>
               <View style={styles.scannerHeader}>
                 <Text style={styles.scannerTitle}>Apunta el QR dentro del marco</Text>
+                {enableExternalReader ? (
+                  <Text style={styles.readerSupportText}>
+                    También puedes usar un lector QR USB. Esta pantalla recibirá el código automáticamente.
+                  </Text>
+                ) : null}
                 <Text style={styles.scannerText}>Validaremos la tarjeta antes de mostrar la confirmación.</Text>
               </View>
 
@@ -654,6 +768,23 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
                   </View>
                 )}
               </View>
+
+              {enableExternalReader ? (
+                <TextInput
+                  ref={readerInputRef}
+                  value={readerInputValue}
+                  onChangeText={handleReaderChangeText}
+                  onSubmitEditing={handleReaderSubmit}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  blurOnSubmit={false}
+                  caretHidden
+                  editable={!loading && !scanned && !pendingConfirmation}
+                  importantForAutofill="no"
+                  returnKeyType="done"
+                  style={styles.hiddenReaderInput}
+                />
+              ) : null}
             </View>
 
             <View style={[styles.infoCard, ELEVATED_CARD, isCompactWeb && styles.infoCardCompactWeb]}>
@@ -743,6 +874,18 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
             <View style={styles.singleMessageBox}>
               <Text style={styles.singleMessageText}>{scanError}</Text>
             </View>
+
+            {Platform.OS === "web" ? (
+              <TextInput
+                ref={modalKeyGuardInputRef}
+                value=""
+                onChangeText={() => undefined}
+                onSubmitEditing={() => undefined}
+                blurOnSubmit={false}
+                caretHidden
+                style={styles.hiddenModalKeyGuardInput}
+              />
+            ) : null}
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={() => setScanError(null)}>
@@ -850,6 +993,18 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
                   )}
                 </View>
 
+                {Platform.OS === "web" ? (
+                  <TextInput
+                    ref={modalKeyGuardInputRef}
+                    value=""
+                    onChangeText={() => undefined}
+                    onSubmitEditing={() => undefined}
+                    blurOnSubmit={false}
+                    caretHidden
+                    style={styles.hiddenModalKeyGuardInput}
+                  />
+                ) : null}
+
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={styles.modalCancelButton}
@@ -933,6 +1088,22 @@ const styles = StyleSheet.create({
   actionGrid: {
     flexDirection: "column",
     gap: 12,
+  },
+  hiddenReaderInput: {
+    position: "absolute",
+    opacity: 0,
+    width: 1,
+    height: 1,
+    left: -1000,
+    top: -1000,
+  },
+  hiddenModalKeyGuardInput: {
+    position: "absolute",
+    opacity: 0,
+    width: 1,
+    height: 1,
+    left: 0,
+    top: 0,
   },
   actionCard: {
     width: "100%",
@@ -1048,6 +1219,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: "#526977",
+  },
+  readerSupportText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#5E7482",
+    marginBottom: 4,
   },
   scannerStage: {
     borderRadius: 22,
