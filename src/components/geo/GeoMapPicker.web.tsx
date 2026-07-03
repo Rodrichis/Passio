@@ -17,12 +17,15 @@ type Props = {
 const DEFAULT_CENTER: [number, number] = [-33.4489, -70.6693];
 
 function createMarkerIcon() {
+  const markerSize = 22;
+  const markerCenter = markerSize / 2;
+
   return L.divIcon({
     className: "",
     html:
-      '<div style="width:22px;height:22px;border-radius:999px;background:#2196F3;border:4px solid #fff;box-shadow:0 8px 18px rgba(2,48,71,.28);"></div>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+      '<div style="width:22px;height:22px;box-sizing:border-box;border-radius:999px;background:#2196F3;border:4px solid #fff;box-shadow:0 8px 18px rgba(2,48,71,.28);"></div>',
+    iconSize: [markerSize, markerSize],
+    iconAnchor: [markerCenter, markerCenter],
   });
 }
 
@@ -129,13 +132,23 @@ export default function GeoMapPicker({ value, onChange, disabled, height = 360 }
     }
   }, [disabled]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    window.setTimeout(() => map.invalidateSize(), 80);
+  }, [height]);
+
+  const resolvedHeight = typeof height === "number" ? height : "100%";
+  const minHeight = typeof height === "number" ? height : 180;
+
   return (
-    <div style={{ position: "relative", width: "100%", height }}>
+    <div style={{ position: "relative", width: "100%", height: resolvedHeight, minHeight }}>
       <div
         ref={containerRef}
         style={{
           width: "100%",
           height: "100%",
+          minHeight,
           borderRadius: 22,
           overflow: "hidden",
           border: "1px solid #D6E4ED",

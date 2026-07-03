@@ -284,14 +284,16 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
             style={[
               styles.mapPanel,
               compact && styles.mapPanelCompact,
-              compact ? { height: mapHeight } : { minHeight: mapHeight },
+              compact
+                ? { height: mapHeight, minHeight: mapHeight, flexBasis: mapHeight, flexShrink: 0 }
+                : { minHeight: mapHeight },
             ]}
           >
             <GeoMapPicker
               value={point}
               onChange={setPoint}
               disabled={sending}
-              height="100%"
+              height={compact ? mapHeight : "100%"}
             />
 
             <View style={styles.mapControls}>
