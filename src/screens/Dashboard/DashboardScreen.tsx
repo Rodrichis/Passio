@@ -23,6 +23,7 @@ import DashboardContentPrincipal from "./content/DashboardContentPrincipal";
 import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
+import DashboardContentGeoNotificacion from "./content/DashboardContentGeoNotificacion";
 import AdminHomeScreen from "../admin/AdminHomeScreen";
 import AdminLogsScreen from "../logs/AdminLogsScreen";
 import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
@@ -49,6 +50,10 @@ type ClientesNotificationDraft = {
   clientIds: string[];
   message?: string;
   key: number;
+};
+
+type ClientesGeoNotificationDraft = {
+  clientIds: string[];
 };
 
 const FAQ_ITEMS = [
@@ -109,6 +114,8 @@ export default function Dashboard({ navigation }: any) {
   const [faqExpandedIndex, setFaqExpandedIndex] = useState<number | null>(null);
   const [clientesNotificationDraft, setClientesNotificationDraft] =
     useState<ClientesNotificationDraft | null>(null);
+  const [clientesGeoNotificationDraft, setClientesGeoNotificationDraft] =
+    useState<ClientesGeoNotificationDraft | null>(null);
   const { width } = useWindowDimensions();
   const isNativeMobile = Platform.OS === "android" || Platform.OS === "ios";
   const isCompactWeb = Platform.OS === "web" && width < 900;
@@ -125,6 +132,8 @@ export default function Dashboard({ navigation }: any) {
         return "Escanear QR";
       case "HistorialNotificaciones":
         return isMobileLayout ? "Historial" : "Historial notificaciones";
+      case "GeoNotificacion":
+        return isMobileLayout ? "Georeferencia" : "Notificación georeferenciada";
       case "Ajustes":
         return "Ajustes de Empresa";
       case "Admin":
@@ -316,6 +325,19 @@ export default function Dashboard({ navigation }: any) {
             }}
             notificationDraft={clientesNotificationDraft}
             onConsumeNotificationDraft={() => setClientesNotificationDraft(null)}
+            onOpenGeoNotification={(clientIds) => {
+              setClientesGeoNotificationDraft({
+                clientIds,
+              });
+              setSelected("GeoNotificacion");
+            }}
+          />
+        );
+      case "GeoNotificacion":
+        return (
+          <DashboardContentGeoNotificacion
+            clientIds={clientesGeoNotificationDraft?.clientIds || []}
+            onBack={() => setSelected("Clientes")}
           />
         );
       case "Escanear":
@@ -343,6 +365,7 @@ export default function Dashboard({ navigation }: any) {
 
   const isListScreen =
     selected === "Clientes" ||
+    selected === "GeoNotificacion" ||
     selected === "Logs" ||
     selected === "HistorialNotificaciones" ||
     selected === "EmpresasAdmin";

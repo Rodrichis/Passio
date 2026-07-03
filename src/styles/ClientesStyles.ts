@@ -140,6 +140,10 @@ export const clientesStyles = StyleSheet.create({
     fontWeight: "700",
     marginRight: 2,
   },
+  bulkActionsLabelCompact: {
+    width: "100%",
+    marginRight: 0,
+  },
   massActionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -150,6 +154,12 @@ export const clientesStyles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#2196F3",
     minWidth: 54,
+  },
+  massActionButtonCompact: {
+    minWidth: 48,
+    paddingVertical: 9,
+    paddingHorizontal: 9,
+    gap: 5,
   },
   massActionButtonMuted: {
     backgroundColor: "#F1F6FA",
@@ -201,10 +211,18 @@ export const clientesStyles = StyleSheet.create({
     backgroundColor: "#F7FBFF",
     marginLeft: "auto",
   },
+  historyInlineButtonCompact: {
+    marginLeft: 0,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+  },
   historyInlineButtonText: {
     color: "#023047",
     fontWeight: "700",
     fontSize: 13,
+  },
+  historyInlineButtonTextCompact: {
+    fontSize: 12,
   },
 
   headerRow: {

@@ -28,7 +28,13 @@ export interface AndroidWalletStateConfig {
 }
 
 async function callWalletApi(
-  path: "/syncClass" | "/createObject" | "/firma" | "/actualizar" | "/actualizarEstado",
+  path:
+    | "/syncClass"
+    | "/createObject"
+    | "/firma"
+    | "/actualizar"
+    | "/actualizarEstado"
+    | "/actualizarGeoreferencia",
   body: any
 ): Promise<WalletApiResponse> {
   if (!ANDROID_PREFIX) {
@@ -218,7 +224,10 @@ type ApplePassResponse = WalletApiResponse & {
   contentType?: string;
 };
 
-async function callAppleApi(path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v1/notificacion", body: any): Promise<ApplePassResponse> {
+async function callAppleApi(
+  path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v1/notificacion" | "/v1/actualizarGeoreferencia",
+  body: any
+): Promise<ApplePassResponse> {
   if (!APPLE_BASE_URL) {
     return { ok: false, status: 0, data: null, errorText: "APPLE_BASE_URL no configurada" };
   }
@@ -386,4 +395,42 @@ export async function notifyAndroidPass(params: {
   } catch (e) {
     return { ok: false, status: 0, data: null, errorText: String(e) };
   }
+}
+
+export async function updateAndroidGeoReference(params: {
+  idUsuario: string;
+  latitude: number;
+  longitude: number;
+}): Promise<WalletApiResponse> {
+  const { idUsuario, latitude, longitude } = params;
+
+  return callWalletApi("/actualizarGeoreferencia", {
+    idUsuario,
+    direcciones: [
+      {
+        LATITUDE: latitude,
+        LONGITUDE: longitude,
+      },
+    ],
+  });
+}
+
+export async function updateAppleGeoReference(params: {
+  idUsuario: number | string;
+  latitude: number;
+  longitude: number;
+  mensaje: string;
+}): Promise<ApplePassResponse> {
+  const { idUsuario, latitude, longitude, mensaje } = params;
+
+  return callAppleApi("/v1/actualizarGeoreferencia", {
+    idUsuario,
+    mensajeGeoreferencia: [
+      {
+        latitude,
+        longitude,
+        mensaje,
+      },
+    ],
+  });
 }

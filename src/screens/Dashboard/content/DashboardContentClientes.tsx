@@ -91,6 +91,7 @@ type Props = {
     key: number;
   } | null;
   onConsumeNotificationDraft?: () => void;
+  onOpenGeoNotification?: (clientIds: string[]) => void;
 };
 
 export default function DashboardContentClientes({
@@ -99,6 +100,7 @@ export default function DashboardContentClientes({
   topBarProps,
   notificationDraft,
   onConsumeNotificationDraft,
+  onOpenGeoNotification,
 }: Props) {
   const uid = auth.currentUser?.uid;
   const { width } = useWindowDimensions();
@@ -1078,11 +1080,17 @@ export default function DashboardContentClientes({
 
           <View style={cStyles.toolbarFooter}>
             <View style={cStyles.selectionMetaWrap}>
-              <Text style={cStyles.metaText}>{`Total cargados: ${items.length}`}</Text>
-              <Text style={cStyles.metaDivider}>{"\u2022"}</Text>
               <Text style={cStyles.metaText}>
-                {selectedCount ? `${selectedCount} seleccionados` : "Sin selección activa"}
+                {`${useCompactWebLayout || useCompactLayout ? "Total" : "Total cargados"}: ${items.length}`}
               </Text>
+              {selectedCount || (!useCompactWebLayout && !useCompactLayout) ? (
+                <Text style={cStyles.metaDivider}>{"\u2022"}</Text>
+              ) : null}
+              {selectedCount ? (
+                <Text style={cStyles.metaText}>{`${selectedCount} seleccionados`}</Text>
+              ) : !useCompactWebLayout && !useCompactLayout ? (
+                <Text style={cStyles.metaText}>Sin selección activa</Text>
+              ) : null}
             </View>
             <TouchableOpacity onPress={toggleSortField} style={cStyles.selectAllButton}>
               <Text style={cStyles.selectAllButtonText}>
@@ -1108,11 +1116,17 @@ export default function DashboardContentClientes({
           </View>
 
           <View style={cStyles.bulkActionsRow}>
-            <Text style={cStyles.bulkActionsLabel}>Acción masiva</Text>
+            <Text style={[cStyles.bulkActionsLabel, (useCompactWebLayout || useCompactLayout) && cStyles.bulkActionsLabelCompact]}>
+              {useCompactWebLayout || useCompactLayout ? "Acción" : "Acción masiva"}
+            </Text>
             <TouchableOpacity
               onPress={() => {}}
               disabled
-              style={[cStyles.massActionButton, cStyles.massActionButtonMuted]}
+              style={[
+                cStyles.massActionButton,
+                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
+                cStyles.massActionButtonMuted,
+              ]}
               accessibilityLabel={`Correo próximamente (${selectedCount})`}
             >
               <Ionicons name="mail-outline" size={18} color="#607d8b" />
@@ -1133,6 +1147,7 @@ export default function DashboardContentClientes({
               disabled={selectedCount === 0}
               style={[
                 cStyles.massActionButton,
+                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
                 selectedCount === 0 && cStyles.massActionButtonDisabled,
               ]}
               accessibilityLabel={`Enviar notificación (${selectedCount})`}
@@ -1159,11 +1174,53 @@ export default function DashboardContentClientes({
               </View>
             </TouchableOpacity>
             <TouchableOpacity
+              onPress={() => onOpenGeoNotification?.(Array.from(selectedIds))}
+              disabled={selectedCount === 0 || !onOpenGeoNotification}
+              style={[
+                cStyles.massActionButton,
+                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
+                (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionButtonDisabled,
+              ]}
+              accessibilityLabel={`Notificaci\u00F3n georeferenciada (${selectedCount})`}
+            >
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={selectedCount === 0 || !onOpenGeoNotification ? "#8AA0AE" : "#fff"}
+              />
+              <View
+                style={[
+                  cStyles.massActionCount,
+                  (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionCountDisabled,
+                ]}
+              >
+                <Text
+                  style={[
+                    cStyles.massActionCountText,
+                    (selectedCount === 0 || !onOpenGeoNotification) &&
+                      cStyles.massActionCountTextDisabled,
+                  ]}
+                >
+                  {selectedCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={onOpenNotificationHistory}
-              style={cStyles.historyInlineButton}
+              style={[
+                cStyles.historyInlineButton,
+                (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonCompact,
+              ]}
             >
               <Ionicons name="time-outline" size={18} color="#023047" />
-              <Text style={cStyles.historyInlineButtonText}>Historial</Text>
+              <Text
+                style={[
+                  cStyles.historyInlineButtonText,
+                  (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonTextCompact,
+                ]}
+              >
+                Historial
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

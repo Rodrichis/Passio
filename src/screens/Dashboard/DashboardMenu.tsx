@@ -30,7 +30,7 @@ export default function DashboardMenu({
   const activeKey =
     selected === "Logs" || selected === "EmpresasAdmin"
       ? "Admin"
-      : selected === "HistorialNotificaciones"
+      : selected === "HistorialNotificaciones" || selected === "GeoNotificacion"
         ? "Clientes"
         : selected;
 
