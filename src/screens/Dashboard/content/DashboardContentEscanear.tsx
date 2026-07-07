@@ -231,7 +231,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
       clearReaderTimers();
       processingRef.current = false;
       setLoading(false);
-      setScanned(false);
+      setScanned(true);
       setReaderInputValue("");
       setPendingConfirmation(null);
       setFeedback(null);
@@ -318,6 +318,14 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
       readerInputRef.current?.focus();
     }, 120);
   }, [enableExternalReader, loading, pendingConfirmation, scanError, scanned, selectedAction]);
+
+  const closeScanError = useCallback(() => {
+    setScanError(null);
+    setScanned(false);
+    setReaderInputValue("");
+    setStatus(getStatusForAction(selectedAction));
+    focusExternalReader();
+  }, [focusExternalReader, getStatusForAction, selectedAction]);
 
   useEffect(() => {
     if (!enableExternalReader) return;
@@ -607,7 +615,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
           </TouchableOpacity>
         </View>
 
-        <Modal visible={Boolean(scanError)} transparent animationType="fade" onRequestClose={() => setScanError(null)}>
+        <Modal visible={Boolean(scanError)} transparent animationType="fade" onRequestClose={closeScanError}>
           <View style={styles.modalBackdrop}>
             <View style={[styles.modalCard, ELEVATED_CARD, { maxWidth: 460 }]}>
               <View style={[styles.modalHeader, { backgroundColor: "#FFF4E8" }]}>
@@ -637,7 +645,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
               ) : null}
 
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={() => setScanError(null)}>
+                <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={closeScanError}>
                   <Text style={styles.modalConfirmText}>Entendido</Text>
                 </TouchableOpacity>
               </View>
@@ -857,7 +865,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
         visible={Boolean(scanError)}
         transparent
         animationType="fade"
-        onRequestClose={() => setScanError(null)}
+        onRequestClose={closeScanError}
       >
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, ELEVATED_CARD, { maxWidth: 460 }]}>
@@ -888,7 +896,7 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
             ) : null}
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={() => setScanError(null)}>
+              <TouchableOpacity style={styles.modalConfirmButtonNeutral} onPress={closeScanError}>
                 <Text style={styles.modalConfirmText}>Entendido</Text>
               </TouchableOpacity>
             </View>
