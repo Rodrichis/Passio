@@ -34,7 +34,8 @@ async function callWalletApi(
     | "/firma"
     | "/actualizar"
     | "/actualizarEstado"
-    | "/actualizarGeoreferencia",
+    | "/actualizarGeoreferencia"
+    | "/borrarGeoreferencia",
   body: any
 ): Promise<WalletApiResponse> {
   if (!ANDROID_PREFIX) {
@@ -225,7 +226,12 @@ type ApplePassResponse = WalletApiResponse & {
 };
 
 async function callAppleApi(
-  path: "/v1/crearPasses" | "/v1/actualizarPase" | "/v1/notificacion" | "/v1/actualizarGeoreferencia",
+  path:
+    | "/v1/crearPasses"
+    | "/v1/actualizarPase"
+    | "/v1/notificacion"
+    | "/v1/actualizarGeoreferencia"
+    | "/v1/borrarGeoreferencia",
   body: any
 ): Promise<ApplePassResponse> {
   if (!APPLE_BASE_URL) {
@@ -403,6 +409,14 @@ export async function updateAndroidGeoReference(params: {
   longitude: number;
 }): Promise<WalletApiResponse> {
   const { idUsuario, latitude, longitude } = params;
+  if (!idUsuario || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      errorText: "Datos de georeferencia incompletos",
+    };
+  }
 
   return callWalletApi("/actualizarGeoreferencia", {
     idUsuario,
@@ -415,6 +429,22 @@ export async function updateAndroidGeoReference(params: {
   });
 }
 
+export async function deleteAndroidGeoReference(params: {
+  idUsuario: string;
+}): Promise<WalletApiResponse> {
+  const { idUsuario } = params;
+  if (!idUsuario) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      errorText: "ID de usuario no disponible",
+    };
+  }
+
+  return callWalletApi("/borrarGeoreferencia", { idUsuario });
+}
+
 export async function updateAppleGeoReference(params: {
   idUsuario: number | string;
   latitude: number;
@@ -422,6 +452,14 @@ export async function updateAppleGeoReference(params: {
   mensaje: string;
 }): Promise<ApplePassResponse> {
   const { idUsuario, latitude, longitude, mensaje } = params;
+  if (!idUsuario || !Number.isFinite(latitude) || !Number.isFinite(longitude) || !mensaje.trim()) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      errorText: "Datos de georeferencia incompletos",
+    };
+  }
 
   return callAppleApi("/v1/actualizarGeoreferencia", {
     idUsuario,
@@ -433,4 +471,20 @@ export async function updateAppleGeoReference(params: {
       },
     ],
   });
+}
+
+export async function deleteAppleGeoReference(params: {
+  idUsuario: number | string;
+}): Promise<ApplePassResponse> {
+  const { idUsuario } = params;
+  if (!idUsuario) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      errorText: "ID de usuario no disponible",
+    };
+  }
+
+  return callAppleApi("/v1/borrarGeoreferencia", { idUsuario });
 }

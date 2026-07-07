@@ -14,7 +14,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../../services/firebaseConfig";
-import { updateAndroidGeoReference, updateAppleGeoReference } from "../../../services/apiWallet";
+import {
+  deleteAndroidGeoReference,
+  deleteAppleGeoReference,
+  updateAndroidGeoReference,
+  updateAppleGeoReference,
+} from "../../../services/apiWallet";
 import GeoMapPicker, { GeoPoint } from "../../../components/geo/GeoMapPicker";
 import { Cliente, mapDoc } from "../../../utils/clientesHelpers";
 
@@ -28,6 +33,8 @@ type SendResult = {
   sent: number;
   failed: number;
 };
+
+type GeoAction = "configurar" | "quitar";
 
 const BATCH_SIZE = 5;
 const IS_WEB = Platform.OS === "web";
@@ -47,7 +54,7 @@ async function runInBatches<T>(items: T[], batchSize: number, task: (item: T) =>
         try {
           return await task(item);
         } catch (error) {
-          console.log("No se pudo enviar georeferencia:", error);
+          console.log("No se pudo procesar georeferencia:", error);
           return false;
         }
       })
@@ -84,9 +91,11 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
   const [point, setPoint] = useState<GeoPoint | null>(null);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [processingAction, setProcessingAction] = useState<GeoAction | null>(null);
   const [status, setStatus] = useState("");
   const [result, setResult] = useState<SendResult | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [locating, setLocating] = useState(false);
 
   const trimmedMessage = message.trim();
@@ -99,7 +108,8 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
     () => clients.filter((client) => normalizeOS(client.so) === "android").length,
     [clients]
   );
-  const canSend = IS_WEB && !!uid && !!point && trimmedMessage.length > 0 && selectedCount > 0 && !sending;
+  const canConfigure = IS_WEB && !!uid && !!point && trimmedMessage.length > 0 && selectedCount > 0 && !sending;
+  const canDelete = !!uid && selectedCount > 0 && !sending;
 
   useEffect(() => {
     let active = true;
@@ -143,15 +153,13 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
   }, [clientIds, uid]);
 
   const saveHistory = useCallback(
-    async (sendResult: SendResult) => {
-      if (!uid || !point) return;
+    async (sendResult: SendResult, action: GeoAction) => {
+      if (!uid) return;
 
       try {
-        await addDoc(collection(db, "Empresas", uid, "HistorialNotificaciones"), {
+        const payload: Record<string, any> = {
           tipo: "georeferencia",
-          mensaje: trimmedMessage,
-          latitude: point.latitude,
-          longitude: point.longitude,
+          accion: action,
           totalClientes: sendResult.total,
           totalEnviados: sendResult.sent,
           totalFallidos: sendResult.failed,
@@ -159,7 +167,15 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
             sendResult.failed === 0 ? "completada" : sendResult.sent > 0 ? "parcial" : "fallida",
           fechaEnvio: serverTimestamp(),
           creadoEn: serverTimestamp(),
-        });
+        };
+
+        if (action === "configurar" && point) {
+          payload.mensaje = trimmedMessage;
+          payload.latitude = point.latitude;
+          payload.longitude = point.longitude;
+        }
+
+        await addDoc(collection(db, "Empresas", uid, "HistorialNotificaciones"), payload);
       } catch (error) {
         console.log("No se pudo guardar historial de georeferencia:", error);
       }
@@ -186,7 +202,8 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
     }
 
     setSending(true);
-    setStatus("Enviando notificación georeferenciada...");
+    setProcessingAction("configurar");
+    setStatus("Configurando alerta georeferenciada...");
     setResult(null);
 
     const sendResult = await runInBatches(clients, BATCH_SIZE, async (client) => {
@@ -220,16 +237,68 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
       failed: sendResult.failed,
     };
 
-    await saveHistory(finalResult);
+    await saveHistory(finalResult, "configurar");
 
     setResult(finalResult);
     setStatus(
       finalResult.failed === 0
-        ? "Notificación georeferenciada enviada."
-        : `Envío parcial: ${finalResult.sent} enviados y ${finalResult.failed} fallidos.`
+        ? `Alerta configurada para ${finalResult.sent} destinatarios.`
+        : `Configuración parcial: ${finalResult.sent} configuradas y ${finalResult.failed} fallidas.`
     );
     setSending(false);
+    setProcessingAction(null);
   }, [clients, point, saveHistory, trimmedMessage, uid]);
+
+  const handleDelete = useCallback(async () => {
+    setConfirmDeleteOpen(false);
+
+    if (!uid) {
+      setStatus("Debes iniciar sesión para continuar.");
+      return;
+    }
+    if (!clients.length) {
+      setStatus("Selecciona al menos un cliente antes de quitar alertas.");
+      return;
+    }
+
+    setSending(true);
+    setProcessingAction("quitar");
+    setStatus("Quitando alertas georeferenciadas...");
+    setResult(null);
+
+    const deleteResult = await runInBatches(clients, BATCH_SIZE, async (client) => {
+      const so = normalizeOS(client.so);
+
+      if (so === "ios") {
+        const response = await deleteAppleGeoReference({ idUsuario: client.id });
+        return response.ok;
+      }
+
+      if (so === "android") {
+        const response = await deleteAndroidGeoReference({ idUsuario: client.id });
+        return response.ok;
+      }
+
+      return false;
+    });
+
+    const finalResult = {
+      total: clients.length,
+      sent: deleteResult.sent,
+      failed: deleteResult.failed,
+    };
+
+    await saveHistory(finalResult, "quitar");
+
+    setResult(finalResult);
+    setStatus(
+      finalResult.failed === 0
+        ? `Alertas quitadas para ${finalResult.sent} destinatarios.`
+        : `Eliminación parcial: ${finalResult.sent} quitadas y ${finalResult.failed} fallidas.`
+    );
+    setSending(false);
+    setProcessingAction(null);
+  }, [clients, saveHistory, uid]);
 
   const handleUseCurrentLocation = useCallback(() => {
     if (!IS_WEB || !("geolocation" in navigator)) {
@@ -357,7 +426,7 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
             <View style={styles.disclaimer}>
               <Ionicons name="information-circle-outline" size={18} color="#D97706" />
               <Text style={styles.disclaimerText}>
-                El mensaje personalizado solo se mostrará en Apple Wallet. En Google Wallet se mostrará un mensaje predeterminado por Google.
+                Esta acción configura o actualiza una alerta por cercanía. El mensaje personalizado solo se mostrará en Apple Wallet. En Google Wallet se mostrará un mensaje predeterminado por Google.
               </Text>
             </View>
 
@@ -373,23 +442,35 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
                   {status}
                 </Text>
               ) : (
-                <Text style={styles.statusText}>Completa la ubicación y el mensaje para enviar.</Text>
+                <Text style={styles.statusText}>Completa la ubicación y el mensaje para configurar la alerta.</Text>
               )}
 
               {result ? (
                 <View style={styles.resultBox}>
-                  <Text style={styles.resultText}>{`Enviados: ${result.sent}`}</Text>
+                  <Text style={styles.resultText}>{`Procesados: ${result.sent}`}</Text>
                   <Text style={styles.resultText}>{`Fallidos: ${result.failed}`}</Text>
                 </View>
               ) : null}
 
               <TouchableOpacity
                 onPress={handleSend}
-                disabled={!canSend}
-                style={[styles.primaryButton, !canSend && styles.primaryButtonDisabled]}
+                disabled={!canConfigure}
+                style={[styles.primaryButton, !canConfigure && styles.primaryButtonDisabled]}
               >
-                {sending ? <ActivityIndicator color="#FFFFFF" /> : null}
-                <Text style={styles.primaryButtonText}>{sending ? "Enviando..." : "Enviar georeferencia"}</Text>
+                {processingAction === "configurar" ? <ActivityIndicator color="#FFFFFF" /> : null}
+                <Text style={styles.primaryButtonText}>
+                  {processingAction === "configurar" ? "Configurando..." : "Configurar alerta"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setConfirmDeleteOpen(true)}
+                disabled={!canDelete}
+                style={[styles.secondaryButton, !canDelete && styles.secondaryButtonDisabled]}
+              >
+                <Ionicons name="trash-outline" size={17} color={canDelete ? "#B45309" : "#8AA0AE"} />
+                <Text style={[styles.secondaryButtonText, !canDelete && styles.secondaryButtonTextDisabled]}>
+                  {processingAction === "quitar" ? "Quitando..." : "Quitar alertas"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -407,11 +488,45 @@ export default function DashboardContentGeoNotificacion({ clientIds, onBack }: P
               </TouchableOpacity>
             </View>
             <Text style={styles.infoModalText}>
-              Puedes generar una notificación por georeferencia. Selecciona un punto en el mapa; cuando un cliente pase por ahí, el sistema le enviará la notificación.
+              Puedes configurar una alerta por georeferencia. Selecciona un punto en el mapa; cuando un cliente pase cerca, Wallet podrá mostrarle la alerta. Si ya tenía una alerta, esta acción la actualizará.
             </Text>
             <TouchableOpacity onPress={() => setInfoOpen(false)} style={styles.infoModalButton}>
               <Text style={styles.infoModalButtonText}>Entendido</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={confirmDeleteOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmDeleteOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={styles.modalDismissLayer}
+            activeOpacity={1}
+            onPress={() => setConfirmDeleteOpen(false)}
+          />
+          <View style={styles.infoModalCard}>
+            <View style={styles.infoModalHeader}>
+              <Text style={styles.infoModalTitle}>Quitar alertas</Text>
+              <TouchableOpacity onPress={() => setConfirmDeleteOpen(false)} style={styles.infoModalClose}>
+                <Ionicons name="close" size={18} color="#023047" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.infoModalText}>
+              ¿Deseas quitar las alertas de georeferencia? Esto quitará las alertas configuradas para los destinatarios seleccionados.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity onPress={() => setConfirmDeleteOpen(false)} style={styles.confirmCancelButton}>
+                <Text style={styles.confirmCancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleDelete} style={styles.confirmDeleteButton}>
+                <Text style={styles.confirmDeleteButtonText}>Quitar alertas</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -696,6 +811,30 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 15,
   },
+  secondaryButton: {
+    minHeight: 46,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F3C27A",
+    backgroundColor: "#FFF8E1",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  secondaryButtonDisabled: {
+    borderColor: "#DDEAF2",
+    backgroundColor: "#F7FBFF",
+  },
+  secondaryButtonText: {
+    color: "#B45309",
+    fontWeight: "900",
+    fontSize: 14,
+  },
+  secondaryButtonTextDisabled: {
+    color: "#8AA0AE",
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(7, 24, 39, 0.42)",
@@ -759,6 +898,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   infoModalButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 4,
+  },
+  confirmCancelButton: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#D6E4ED",
+    backgroundColor: "#FFFFFF",
+  },
+  confirmCancelButtonText: {
+    color: "#023047",
+    fontWeight: "900",
+  },
+  confirmDeleteButton: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#B45309",
+  },
+  confirmDeleteButtonText: {
     color: "#FFFFFF",
     fontWeight: "900",
   },

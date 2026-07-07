@@ -20,6 +20,8 @@ type NotificationStatus = "completada" | "parcial" | "erronea";
 type NotificationHistoryItem = {
   id: string;
   mensaje: string;
+  tipo: string;
+  accion: string;
   totalClientes: number;
   totalEnviados: number;
   totalFallidos: number;
@@ -77,6 +79,11 @@ function formatClientTitle(totalClientes: number) {
     : `Notificación a ${totalClientes} clientes`;
 }
 
+function getTypeLabel(item: NotificationHistoryItem) {
+  if (item.tipo !== "georeferencia") return "";
+  return item.accion === "quitar" ? "Geo quitada" : "Geo configurada";
+}
+
 function getStatusLabel(status: NotificationStatus) {
   if (status === "completada") return "Completada";
   if (status === "parcial") return "Parcial";
@@ -105,6 +112,8 @@ function mapNotification(docSnap: any): NotificationHistoryItem {
   return {
     id: docSnap.id,
     mensaje: normalizeString(data.mensaje),
+    tipo: normalizeString(data.tipo),
+    accion: normalizeString(data.accion),
     totalClientes,
     totalEnviados,
     totalFallidos,
@@ -169,6 +178,7 @@ export default function NotificationHistoryScreen({ onBack, companyName }: Props
     return items.filter((item) => {
       return (
         item.mensaje.toLowerCase().includes(needle) ||
+        getTypeLabel(item).toLowerCase().includes(needle) ||
         String(item.totalClientes).includes(needle) ||
         getStatusLabel(item.estado).toLowerCase().includes(needle)
       );
@@ -257,6 +267,12 @@ export default function NotificationHistoryScreen({ onBack, companyName }: Props
                   </View>
 
                   <View style={styles.itemStatusWrap}>
+                    {getTypeLabel(item) ? (
+                      <View style={styles.geoTypeChip}>
+                        <Ionicons name="location-outline" size={12} color="#A86D00" />
+                        <Text style={styles.geoTypeChipText}>{getTypeLabel(item)}</Text>
+                      </View>
+                    ) : null}
                     <View
                       style={[
                         styles.statusChip,
@@ -550,6 +566,22 @@ const styles = StyleSheet.create({
   },
   statusChipText: {
     fontWeight: "700",
+    fontSize: 11,
+  },
+  geoTypeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderColor: "#FFE2A3",
+    backgroundColor: "#FFF8E1",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  geoTypeChipText: {
+    color: "#A86D00",
+    fontWeight: "800",
     fontSize: 11,
   },
   itemDate: {
