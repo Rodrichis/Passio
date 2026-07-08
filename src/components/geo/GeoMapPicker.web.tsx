@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import "./leaflet-passio.css";
 
 export type GeoPoint = {
@@ -15,6 +16,163 @@ type Props = {
 };
 
 const DEFAULT_CENTER: [number, number] = [-33.4489, -70.6693];
+const LEAFLET_STYLE_ID = "passio-leaflet-runtime-styles";
+const LEAFLET_RUNTIME_CSS = `
+.leaflet-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #eaf5fb;
+  outline: 0;
+  font-family: inherit;
+  touch-action: none;
+}
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.leaflet-tile {
+  filter: inherit;
+  visibility: hidden;
+  border: 0;
+}
+.leaflet-container img.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+}
+.leaflet-tile-loaded {
+  visibility: inherit;
+}
+.leaflet-map-pane {
+  z-index: 400;
+}
+.leaflet-tile-pane {
+  z-index: 200;
+}
+.leaflet-overlay-pane {
+  z-index: 400;
+}
+.leaflet-marker-pane {
+  z-index: 600;
+}
+.leaflet-tooltip-pane {
+  z-index: 650;
+}
+.leaflet-popup-pane {
+  z-index: 700;
+}
+.leaflet-control {
+  position: relative;
+  z-index: 800;
+  pointer-events: auto;
+  float: left;
+  clear: both;
+}
+.leaflet-top,
+.leaflet-bottom {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+}
+.leaflet-top {
+  top: 0;
+}
+.leaflet-right {
+  right: 0;
+}
+.leaflet-bottom {
+  bottom: 0;
+}
+.leaflet-left {
+  left: 0;
+}
+.leaflet-top .leaflet-control {
+  margin-top: 10px;
+}
+.leaflet-bottom .leaflet-control {
+  margin-bottom: 10px;
+}
+.leaflet-left .leaflet-control {
+  margin-left: 10px;
+}
+.leaflet-right .leaflet-control {
+  margin-right: 10px;
+  float: right;
+}
+.leaflet-control-zoom {
+  border: 1px solid rgba(2, 48, 71, 0.16);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(2, 48, 71, 0.12);
+}
+.leaflet-control-zoom a {
+  display: block;
+  width: 32px;
+  height: 32px;
+  line-height: 31px;
+  background: #ffffff;
+  color: #023047;
+  text-align: center;
+  text-decoration: none;
+  font-size: 20px;
+  font-weight: 800;
+  border-bottom: 1px solid #d6e4ed;
+}
+.leaflet-control-zoom a:last-child {
+  border-bottom: 0;
+}
+.leaflet-control-zoom a:hover {
+  background: #f3f9fd;
+}
+.leaflet-control-attribution {
+  margin: 0;
+  padding: 3px 7px;
+  border-radius: 10px 0 0 0;
+  background: rgba(255, 255, 255, 0.82);
+  color: #607d8b;
+  font-size: 10px;
+}
+.leaflet-control-attribution a {
+  color: #023047;
+  text-decoration: none;
+}
+.leaflet-grab {
+  cursor: grab;
+}
+.leaflet-dragging .leaflet-grab {
+  cursor: move;
+}
+.leaflet-interactive {
+  cursor: pointer;
+}
+`;
+
+function ensureLeafletStyles() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(LEAFLET_STYLE_ID)) return;
+
+  const style = document.createElement("style");
+  style.id = LEAFLET_STYLE_ID;
+  style.textContent = LEAFLET_RUNTIME_CSS;
+  document.head.appendChild(style);
+}
 
 function createMarkerIcon() {
   const markerSize = 22;
@@ -47,6 +205,7 @@ export default function GeoMapPicker({ value, onChange, disabled, height = 360 }
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    ensureLeafletStyles();
 
     const map = L.map(containerRef.current, {
       center: DEFAULT_CENTER,
