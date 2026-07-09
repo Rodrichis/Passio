@@ -37,6 +37,8 @@ type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
 type SO = "ios" | "android";
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PHONE_MIN_DIGITS = 8;
+const PHONE_MAX_DIGITS = 11;
 
 function detectarSO(): SO | null {
   try {
@@ -251,6 +253,12 @@ export default function RegisterClientScreen({ route }: Props) {
       return;
     }
 
+    const phoneDigits = telefono.replace(/\D+/g, "");
+    if (phoneDigits.length < PHONE_MIN_DIGITS || phoneDigits.length > PHONE_MAX_DIGITS) {
+      setFormError("Ingresa un teléfono válido.");
+      return;
+    }
+
     if (!so) {
       setFormError("Selecciona tu sistema: iPhone o Android.");
       return;
@@ -387,7 +395,7 @@ export default function RegisterClientScreen({ route }: Props) {
           nombre: walletNombre,
           apellido: walletApellido,
           email: normalizedEmail,
-          telefono: telefono.trim(),
+          telefono: phoneDigits,
           applePassUrl: walletLinkLocal || null,
           empresaUid: empresaId,
           creadoEn: serverTimestamp(),
@@ -617,12 +625,13 @@ export default function RegisterClientScreen({ route }: Props) {
                         style={[styles.input, AUTH_WEB_INPUT_RESET]}
                         value={telefono}
                         onChangeText={(val) => {
-                          const digitsOnly = val.replace(/\D+/g, "");
+                          const digitsOnly = val.replace(/\D+/g, "").slice(0, PHONE_MAX_DIGITS);
                           setTelefono(digitsOnly);
                         }}
-                        placeholder="9 123456789"
+                        placeholder="Ej: 56912345678"
                         placeholderTextColor={placeholderColor}
                         keyboardType="phone-pad"
+                        maxLength={PHONE_MAX_DIGITS}
                         autoComplete="tel"
                         textContentType="telephoneNumber"
                         importantForAutofill="yes"
