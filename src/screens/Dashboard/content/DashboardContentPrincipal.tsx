@@ -514,19 +514,17 @@ export default function DashboardContentPrincipal({
   ];
 
   const highlightCards = [
-    birthdayClients.length > 0
-      ? {
-          key: "birthday",
-          title: "Cumplea\u00F1os hoy",
-          primary: String(birthdayNames.length),
-          secondary: birthdayNames.join(", "),
-          icon: "gift-outline" as const,
-          iconColor: "#7C3AED",
-          iconBg: "#F3E8FF",
-          primaryColor: "#6D28D9",
-          onPress: () => setShowBirthdayModal(true),
-        }
-      : null,
+    {
+      key: "birthday",
+      title: "Cumpleaños hoy",
+      primary: String(birthdayNames.length),
+      secondary: birthdayNames.length > 0 ? birthdayNames.join(", ") : "Sin clientes de cumpleaños hoy",
+      icon: "gift-outline" as const,
+      iconColor: "#7C3AED",
+      iconBg: "#F3E8FF",
+      primaryColor: "#6D28D9",
+      onPress: birthdayClients.length > 0 ? () => setShowBirthdayModal(true) : undefined,
+    },
     {
       key: "top",
       title: "Cliente top visitas",
