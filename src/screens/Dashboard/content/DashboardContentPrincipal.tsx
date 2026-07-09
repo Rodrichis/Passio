@@ -197,7 +197,8 @@ export default function DashboardContentPrincipal({
           };
         });
 
-        const totalCount = allClients.length;
+        const activeClients = allClients.filter((client) => client.activo !== false);
+        const totalCount = activeClients.length;
         setTotalClientes(totalCount);
 
         const limitNum =
@@ -209,17 +210,17 @@ export default function DashboardContentPrincipal({
         const hasLimit = limitNum != null && !isNaN(limitNum);
         setAtUserLimit(hasLimit ? totalCount >= limitNum : false);
 
-        const androidTotal = allClients.filter(
+        const androidTotal = activeClients.filter(
           (client) => String(client.so || "").toLowerCase() === "android"
         ).length;
-        const iosTotal = allClients.filter(
+        const iosTotal = activeClients.filter(
           (client) => String(client.so || "").toLowerCase() === "ios"
         ).length;
         setAndroidCount(androidTotal);
         setIosCount(iosTotal);
 
         const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const nuevosUltimos7Dias = allClients.filter((client) => {
+        const nuevosUltimos7Dias = activeClients.filter((client) => {
           return client.creadoEn instanceof Date && client.creadoEn.getTime() > oneWeekAgo.getTime();
         }).length;
         setNuevosSemana(nuevosUltimos7Dias);
@@ -227,12 +228,12 @@ export default function DashboardContentPrincipal({
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
 
-        const visitasRegistradasHoy = allClients.filter((client) => {
+        const visitasRegistradasHoy = activeClients.filter((client) => {
           return client.ultimaVisita instanceof Date && client.ultimaVisita.getTime() > startOfDay.getTime();
         }).length;
         setPuntosHoy(visitasRegistradasHoy);
 
-        const birthdaysToday = allClients
+        const birthdaysToday = activeClients
           .filter((client) => {
             return (
               client.fechaNacimiento instanceof Date &&
@@ -246,7 +247,7 @@ export default function DashboardContentPrincipal({
           }));
         setBirthdayClients(birthdaysToday);
 
-        const rankedTopVisited = allClients
+        const rankedTopVisited = activeClients
           .map((client) => ({
             id: client.id,
             name: client.nombreCompleto || "Cliente sin nombre",
@@ -296,7 +297,7 @@ export default function DashboardContentPrincipal({
           return age >= 0 ? age : null;
         };
 
-        allClients.forEach((client) => {
+        activeClients.forEach((client) => {
           const age = getAge(client.fechaNacimiento);
           if (age == null) return;
 
@@ -319,11 +320,11 @@ export default function DashboardContentPrincipal({
             })
         );
 
-        const withRewards = allClients.filter((client) => Number(client.premiosDisponibles ?? 0) > 0).length;
+        const withRewards = activeClients.filter((client) => Number(client.premiosDisponibles ?? 0) > 0).length;
         setClientsWithRewardsCount(withRewards);
         setClientsWithoutRewardsCount(Math.max(0, totalCount - withRewards));
 
-        const recent = allClients
+        const recent = activeClients
           .slice()
           .sort((a, b) => {
             const aTime = a.creadoEn instanceof Date ? a.creadoEn.getTime() : 0;

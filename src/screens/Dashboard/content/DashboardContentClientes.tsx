@@ -22,7 +22,6 @@ import {
   addDoc,
   collection,
   query,
-  orderBy,
   limit,
   getDocs,
   startAfter,
@@ -40,6 +39,7 @@ import { mapDoc, filterItems, sortItems, Cliente } from "../../../utils/clientes
 const PAGE_SIZE = 20;
 const PUSH_BATCH_SIZE = 6;
 const IS_WEB = Platform.OS === "web";
+type ClientViewMode = "active" | "inactive";
 
 function osIconName(so?: string) {
   const s = (so || "").toLowerCase();
@@ -65,6 +65,36 @@ function formatDate(d?: Date | null) {
   } catch {
     return "--";
   }
+}
+
+async function getUserLimitForCompany(uid: string) {
+  const empSnap = await getDoc(doc(db, "Empresas", uid));
+  const empresaData = empSnap.exists() ? (empSnap.data() as any) : null;
+  const planName = empresaData?.plan ?? null;
+
+  if (!planName) return null;
+
+  let planSnap = await getDocs(
+    query(collection(db, "Planes"), where("nombrePlan", "==", planName))
+  );
+  if (!planSnap.docs[0]) {
+    planSnap = await getDocs(collection(db, "Planes"));
+    const lower = String(planName).toLowerCase();
+    const match = planSnap.docs.find(
+      (planDoc) => String(planDoc.data().nombrePlan || "").toLowerCase() === lower
+    );
+    if (!match) return null;
+    const limitValue = match.data().limiteUsuarios;
+    return typeof limitValue === "number" ? limitValue : null;
+  }
+
+  const limitValue = planSnap.docs[0].data().limiteUsuarios;
+  return typeof limitValue === "number" ? limitValue : null;
+}
+
+async function countActiveClients(uid: string) {
+  const snap = await getDocs(collection(db, "Empresas", uid, "Clientes"));
+  return snap.docs.filter((clientDoc) => (clientDoc.data() as any)?.activo !== false).length;
 }
 
 type Props = {
@@ -111,6 +141,8 @@ export default function DashboardContentClientes({
     IS_WEB && typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent || "");
   const useStaticSendingStatus = isIOSWeb && useCompactWebLayout;
   const contentPadding = useCompactLayout ? 16 : 28;
+  const [clientViewMode, setClientViewMode] = useState<ClientViewMode>("active");
+  const viewingInactive = clientViewMode === "inactive";
 
   const [items, setItems] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +166,7 @@ export default function DashboardContentClientes({
   };
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reactivatingIds, setReactivatingIds] = useState<Set<string>>(new Set());
 
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
@@ -248,7 +281,7 @@ export default function DashboardContentClientes({
     try {
       const q = query(
         collection(db, "Empresas", uid, "Clientes"),
-        orderBy("creadoEn", "desc"),
+        where("activo", "==", !viewingInactive),
         limit(PAGE_SIZE)
       );
       const snap = await getDocs(q);
@@ -263,7 +296,7 @@ export default function DashboardContentClientes({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [uid]);
+  }, [uid, viewingInactive]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -276,7 +309,7 @@ export default function DashboardContentClientes({
     try {
       const q = query(
         collection(db, "Empresas", uid, "Clientes"),
-        orderBy("creadoEn", "desc"),
+        where("activo", "==", !viewingInactive),
         startAfter(lastDoc),
         limit(PAGE_SIZE)
       );
@@ -290,11 +323,19 @@ export default function DashboardContentClientes({
     } finally {
       setLoadingMore(false);
     }
-  }, [uid, hasMore, lastDoc, loadingMore]);
+  }, [uid, hasMore, lastDoc, loadingMore, viewingInactive]);
 
   useEffect(() => {
     loadFirstPage();
   }, [loadFirstPage]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setFilterOS("all");
+    setFilterPremios("all");
+    setShowFilter(false);
+    closeDropdowns();
+  }, [clientViewMode]);
 
   useEffect(() => {
     if (!notificationDraft) return;
@@ -649,9 +690,7 @@ export default function DashboardContentClientes({
         activo: false,
       });
 
-      setItems((prev) =>
-        prev.map((it) => (it.id === detailClient.id ? { ...it, activo: false } : it))
-      );
+      setItems((prev) => prev.filter((it) => it.id !== detailClient.id));
       setDetailClient((prev) => (prev ? { ...prev, activo: false } : prev));
       setDeactivateDone(true);
       setConfirmDeactivate(false);
@@ -662,6 +701,53 @@ export default function DashboardContentClientes({
       setDeactivating(false);
     }
   }, [uid, detailClient?.id]);
+
+  const reactivateClient = useCallback(
+    async (client: Cliente) => {
+      if (!uid || !client.id || reactivatingIds.has(client.id)) return;
+
+      setReactivatingIds((prev) => {
+        const next = new Set(prev);
+        next.add(client.id);
+        return next;
+      });
+      setError(null);
+
+      try {
+        const [userLimit, activeCount] = await Promise.all([
+          getUserLimitForCompany(uid),
+          countActiveClients(uid),
+        ]);
+
+        if (typeof userLimit === "number" && activeCount >= userLimit) {
+          setError("No puedes reactivar este cliente porque alcanzaste el límite de usuarios activos de tu plan.");
+          return;
+        }
+
+        const ref = doc(db, "Empresas", uid, "Clientes", client.id);
+        await updateDoc(ref, {
+          activo: true,
+        });
+        setItems((prev) => prev.filter((it) => it.id !== client.id));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(client.id);
+          return next;
+        });
+        setDetailClient((prev) => (prev?.id === client.id ? { ...prev, activo: true } : prev));
+      } catch (e) {
+        console.error("Error reactivando cliente:", e);
+        setError("No se pudo reactivar el cliente. Intenta nuevamente.");
+      } finally {
+        setReactivatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(client.id);
+          return next;
+        });
+      }
+    },
+    [reactivatingIds, uid]
+  );
 
   const handleSendEmail = async () => {
     const recipientCount = emailMode === "single" ? (emailTarget ? 1 : 0) : selectedCount;
@@ -782,9 +868,11 @@ export default function DashboardContentClientes({
 
   const HeaderWeb = () => (
     <View style={cStyles.headerRow}>
-      <TouchableOpacity onPress={toggleSelectAll} style={cStyles.checkboxHitbox}>
-        <Checkbox checked={allVisibleSelected} />
-      </TouchableOpacity>
+      {!viewingInactive ? (
+        <TouchableOpacity onPress={toggleSelectAll} style={cStyles.checkboxHitbox}>
+          <Checkbox checked={allVisibleSelected} />
+        </TouchableOpacity>
+      ) : null}
 
       <View style={cStyles.headerNameCell}>
         <Text style={cStyles.headerText}>Cliente</Text>
@@ -812,7 +900,9 @@ export default function DashboardContentClientes({
         </View>
       ) : null}
 
-      <Text style={[cStyles.headerText, cStyles.headerActionsCell]}>Acciones</Text>
+      <Text style={[cStyles.headerText, cStyles.headerActionsCell]}>
+        {viewingInactive ? "Reactivaci\u00F3n" : "Acciones"}
+      </Text>
     </View>
   );
 
@@ -835,12 +925,14 @@ export default function DashboardContentClientes({
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => toggleSelect(item.id)}
+        onPress={viewingInactive ? () => openDetail(item) : () => toggleSelect(item.id)}
         style={[cStyles.row, index % 2 === 0 && cStyles.rowEven, selected && cStyles.cardSelected]}
       >
-        <View style={cStyles.checkboxHitbox}>
-          <Checkbox checked={selected} />
-        </View>
+        {!viewingInactive ? (
+          <View style={cStyles.checkboxHitbox}>
+            <Checkbox checked={selected} />
+          </View>
+        ) : null}
 
         <View style={cStyles.rowIdentityCell}>
           <View style={cStyles.rowAvatar}>
@@ -880,18 +972,33 @@ export default function DashboardContentClientes({
 
         <View style={cStyles.rowActionsCell}>
           <View style={cStyles.rowActions}>
-            <ActionIconButton
-              icon="notifications-outline"
-              label="Enviar notificación"
-              onPress={() => openPush(item)}
-            />
-            <ActionIconButton
-              icon="mail-outline"
-              label="Enviar correo"
-              tooltipText="Próximamente"
-              onPress={() => {}}
-              disabled
-            />
+            {viewingInactive ? (
+              <TouchableOpacity
+                onPress={() => reactivateClient(item)}
+                disabled={reactivatingIds.has(item.id)}
+                style={[cStyles.reactivateButton, reactivatingIds.has(item.id) && { opacity: 0.65 }]}
+              >
+                <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+                <Text style={cStyles.reactivateButtonText}>
+                  {reactivatingIds.has(item.id) ? "Reactivando..." : "Reactivar"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <ActionIconButton
+                  icon="notifications-outline"
+                  label="Enviar notificación"
+                  onPress={() => openPush(item)}
+                />
+                <ActionIconButton
+                  icon="mail-outline"
+                  label="Enviar correo"
+                  tooltipText="Próximamente"
+                  onPress={() => {}}
+                  disabled
+                />
+              </>
+            )}
             <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
               <Text style={cStyles.detailsButtonText}>Ver detalle</Text>
             </TouchableOpacity>
@@ -918,12 +1025,12 @@ export default function DashboardContentClientes({
     return (
       <TouchableOpacity
         activeOpacity={0.9}
-        onPress={() => toggleSelect(item.id)}
+        onPress={viewingInactive ? () => openDetail(item) : () => toggleSelect(item.id)}
         style={[cStyles.card, selected && cStyles.cardSelected]}
       >
         <View style={cStyles.cardHeader}>
           <View style={cStyles.cardHeaderLeft}>
-            <Checkbox checked={selected} />
+            {!viewingInactive ? <Checkbox checked={selected} /> : null}
             <View style={cStyles.rowAvatar}>
               <Ionicons
                 name={icon}
@@ -967,18 +1074,33 @@ export default function DashboardContentClientes({
         </View>
 
         <View style={cStyles.cardActionsRow}>
-          <ActionIconButton
-            icon="notifications-outline"
-            label="Enviar notificación"
-            onPress={() => openPush(item)}
-          />
-          <ActionIconButton
-            icon="mail-outline"
-            label="Enviar correo"
-            tooltipText="Próximamente"
-            onPress={() => {}}
-            disabled
-          />
+          {viewingInactive ? (
+            <TouchableOpacity
+              onPress={() => reactivateClient(item)}
+              disabled={reactivatingIds.has(item.id)}
+              style={[cStyles.reactivateButton, reactivatingIds.has(item.id) && { opacity: 0.65 }]}
+            >
+              <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
+              <Text style={cStyles.reactivateButtonText}>
+                {reactivatingIds.has(item.id) ? "Reactivando..." : "Reactivar"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <ActionIconButton
+                icon="notifications-outline"
+                label="Enviar notificación"
+                onPress={() => openPush(item)}
+              />
+              <ActionIconButton
+                icon="mail-outline"
+                label="Enviar correo"
+                tooltipText="Próximamente"
+                onPress={() => {}}
+                disabled
+              />
+            </>
+          )}
           <TouchableOpacity onPress={() => openDetail(item)} style={cStyles.detailsButton}>
             <Text style={cStyles.detailsButtonText}>Ver detalle</Text>
           </TouchableOpacity>
@@ -994,7 +1116,7 @@ export default function DashboardContentClientes({
         (prev, next) =>
           prev.item === next.item && prev.selected === next.selected && prev.index === next.index
       ),
-    [openDetail, openPush, toggleSelect]
+    [openDetail, openPush, reactivateClient, reactivatingIds, toggleSelect, viewingInactive]
   );
 
   const CardMobile = useMemo(
@@ -1003,12 +1125,12 @@ export default function DashboardContentClientes({
         CardMobileBase,
         (prev, next) => prev.item === next.item && prev.selected === next.selected
       ),
-    [openDetail, openPush, toggleSelect]
+    [openDetail, openPush, reactivateClient, reactivatingIds, toggleSelect, viewingInactive]
   );
 
   const renderItem = useCallback(
     ({ item, index }: { item: Cliente; index: number }) => {
-      const selected = selectedIds.has(item.id);
+      const selected = !viewingInactive && selectedIds.has(item.id);
       return (
         <View style={{ paddingHorizontal: contentPadding }}>
           {useDesktopWebLayout ? (
@@ -1019,7 +1141,7 @@ export default function DashboardContentClientes({
         </View>
       );
     },
-    [selectedIds, RowWeb, CardMobile, useDesktopWebLayout, contentPadding]
+    [selectedIds, RowWeb, CardMobile, useDesktopWebLayout, contentPadding, viewingInactive]
   );
 
   const listHeader = (
@@ -1044,13 +1166,25 @@ export default function DashboardContentClientes({
               />
             </View>
 
-            <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
-              <Ionicons name="options-outline" size={18} color="#023047" />
-              <Text style={cStyles.filterButtonText}>Filtros</Text>
-            </TouchableOpacity>
+            {!viewingInactive ? (
+              <>
+                <TouchableOpacity onPress={() => setShowFilter(true)} style={cStyles.filterButton}>
+                  <Ionicons name="options-outline" size={18} color="#023047" />
+                  <Text style={cStyles.filterButtonText}>Filtros</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setClientViewMode("active")}
+                style={[cStyles.filterButton, cStyles.activeViewButton]}
+              >
+                <Ionicons name="arrow-back-outline" size={18} color="#023047" />
+                <Text style={cStyles.filterButtonText}>Volver activos</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {(search.trim() || filterOS !== "all" || filterPremios !== "all") && (
+          {!viewingInactive && (search.trim() || filterOS !== "all" || filterPremios !== "all") && (
             <View style={cStyles.chipsRow}>
               <Text style={cStyles.chipsLabel}>Filtros aplicados:</Text>
 
@@ -1078,151 +1212,167 @@ export default function DashboardContentClientes({
             </View>
           )}
 
-          <View style={cStyles.toolbarFooter}>
-            <View style={cStyles.selectionMetaWrap}>
-              <Text style={cStyles.metaText}>
-                {`${useCompactWebLayout || useCompactLayout ? "Total" : "Total cargados"}: ${items.length}`}
-              </Text>
-              {selectedCount || (!useCompactWebLayout && !useCompactLayout) ? (
-                <Text style={cStyles.metaDivider}>{"\u2022"}</Text>
-              ) : null}
-              {selectedCount ? (
-                <Text style={cStyles.metaText}>{`${selectedCount} seleccionados`}</Text>
-              ) : !useCompactWebLayout && !useCompactLayout ? (
-                <Text style={cStyles.metaText}>Sin selección activa</Text>
-              ) : null}
+          {viewingInactive ? (
+            <View style={cStyles.toolbarFooter}>
+              <View style={cStyles.selectionMetaWrap}>
+                <Text style={cStyles.metaText}>{`Inactivos cargados: ${items.length}`}</Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={toggleSortField} style={cStyles.selectAllButton}>
-              <Text style={cStyles.selectAllButtonText}>
-                {sortField === "lastVisit" ? "Orden: \u00FAltima visita" : "Orden: visitas"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleSortOrder} style={cStyles.selectAllButton}>
-              <Text style={cStyles.selectAllButtonText}>
-                {sortField === "lastVisit"
-                  ? sortOrder === "desc"
-                    ? "M\u00E1s reciente"
-                    : "M\u00E1s antigua"
-                  : sortOrder === "desc"
-                    ? "Mayor"
-                    : "Menor"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
-              <Text style={cStyles.selectAllButtonText}>
-                {allVisibleSelected ? "Quitar selección" : "Seleccionar todo"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <>
+              <View style={cStyles.toolbarFooter}>
+                <View style={cStyles.selectionMetaWrap}>
+                  <Text style={cStyles.metaText}>
+                    {`${useCompactWebLayout || useCompactLayout ? "Total" : "Total cargados"}: ${items.length}`}
+                  </Text>
+                  {selectedCount || (!useCompactWebLayout && !useCompactLayout) ? (
+                    <Text style={cStyles.metaDivider}>{"\u2022"}</Text>
+                  ) : null}
+                  {selectedCount ? (
+                    <Text style={cStyles.metaText}>{`${selectedCount} seleccionados`}</Text>
+                  ) : !useCompactWebLayout && !useCompactLayout ? (
+                    <Text style={cStyles.metaText}>Sin selección activa</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={toggleSortField} style={cStyles.selectAllButton}>
+                  <Text style={cStyles.selectAllButtonText}>
+                    {sortField === "lastVisit" ? "Orden: \u00FAltima visita" : "Orden: visitas"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={toggleSortOrder} style={cStyles.selectAllButton}>
+                  <Text style={cStyles.selectAllButtonText}>
+                    {sortField === "lastVisit"
+                      ? sortOrder === "desc"
+                        ? "M\u00E1s reciente"
+                        : "M\u00E1s antigua"
+                      : sortOrder === "desc"
+                        ? "Mayor"
+                        : "Menor"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
+                  <Text style={cStyles.selectAllButtonText}>
+                    {allVisibleSelected ? "Quitar selección" : "Seleccionar todo"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setClientViewMode("inactive")}
+                  style={[cStyles.selectAllButton, cStyles.inactiveViewButton]}
+                >
+                  <Text style={cStyles.selectAllButtonText}>Inactivos</Text>
+                </TouchableOpacity>
+              </View>
 
-          <View style={cStyles.bulkActionsRow}>
-            <Text style={[cStyles.bulkActionsLabel, (useCompactWebLayout || useCompactLayout) && cStyles.bulkActionsLabelCompact]}>
-              {useCompactWebLayout || useCompactLayout ? "Acción" : "Acción masiva"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => {}}
-              disabled
-              style={[
-                cStyles.massActionButton,
-                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
-                cStyles.massActionButtonMuted,
-              ]}
-              accessibilityLabel={`Correo próximamente (${selectedCount})`}
-            >
-              <Ionicons name="mail-outline" size={18} color="#607d8b" />
-              <View style={[cStyles.massActionCount, cStyles.massActionCountMuted]}>
-                <Text style={cStyles.massActionCountTextMuted}>{selectedCount}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setPushMode("bulk");
-                setPushTarget(null);
-                setPushStatus("");
-                setPushBody("");
-                setPushSent(false);
-                setSendingPush(false);
-                setShowPushModal(true);
-              }}
-              disabled={selectedCount === 0}
-              style={[
-                cStyles.massActionButton,
-                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
-                selectedCount === 0 && cStyles.massActionButtonDisabled,
-              ]}
-              accessibilityLabel={`Enviar notificación (${selectedCount})`}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={18}
-                color={selectedCount === 0 ? "#8AA0AE" : "#fff"}
-              />
-              <View
-                style={[
-                  cStyles.massActionCount,
-                  selectedCount === 0 && cStyles.massActionCountDisabled,
-                ]}
-              >
-                <Text
+              <View style={cStyles.bulkActionsRow}>
+                <Text style={[cStyles.bulkActionsLabel, (useCompactWebLayout || useCompactLayout) && cStyles.bulkActionsLabelCompact]}>
+                  {useCompactWebLayout || useCompactLayout ? "Acción" : "Acción masiva"}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {}}
+                  disabled
                   style={[
-                    cStyles.massActionCountText,
-                    selectedCount === 0 && cStyles.massActionCountTextDisabled,
+                    cStyles.massActionButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
+                    cStyles.massActionButtonMuted,
+                  ]}
+                  accessibilityLabel={`Correo próximamente (${selectedCount})`}
+                >
+                  <Ionicons name="mail-outline" size={18} color="#607d8b" />
+                  <View style={[cStyles.massActionCount, cStyles.massActionCountMuted]}>
+                    <Text style={cStyles.massActionCountTextMuted}>{selectedCount}</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPushMode("bulk");
+                    setPushTarget(null);
+                    setPushStatus("");
+                    setPushBody("");
+                    setPushSent(false);
+                    setSendingPush(false);
+                    setShowPushModal(true);
+                  }}
+                  disabled={selectedCount === 0}
+                  style={[
+                    cStyles.massActionButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
+                    selectedCount === 0 && cStyles.massActionButtonDisabled,
+                  ]}
+                  accessibilityLabel={`Enviar notificación (${selectedCount})`}
+                >
+                  <Ionicons
+                    name="notifications-outline"
+                    size={18}
+                    color={selectedCount === 0 ? "#8AA0AE" : "#fff"}
+                  />
+                  <View
+                    style={[
+                      cStyles.massActionCount,
+                      selectedCount === 0 && cStyles.massActionCountDisabled,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        cStyles.massActionCountText,
+                        selectedCount === 0 && cStyles.massActionCountTextDisabled,
+                      ]}
+                    >
+                      {selectedCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => onOpenGeoNotification?.(Array.from(selectedIds))}
+                  disabled={selectedCount === 0 || !onOpenGeoNotification}
+                  style={[
+                    cStyles.massActionButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
+                    (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionButtonDisabled,
+                  ]}
+                  accessibilityLabel={`Notificaci\u00F3n georeferenciada (${selectedCount})`}
+                >
+                  <Ionicons
+                    name="location-outline"
+                    size={18}
+                    color={selectedCount === 0 || !onOpenGeoNotification ? "#8AA0AE" : "#fff"}
+                  />
+                  <View
+                    style={[
+                      cStyles.massActionCount,
+                      (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionCountDisabled,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        cStyles.massActionCountText,
+                        (selectedCount === 0 || !onOpenGeoNotification) &&
+                          cStyles.massActionCountTextDisabled,
+                      ]}
+                    >
+                      {selectedCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onOpenNotificationHistory}
+                  style={[
+                    cStyles.historyInlineButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonCompact,
                   ]}
                 >
-                  {selectedCount}
-                </Text>
+                  <Ionicons name="time-outline" size={18} color="#023047" />
+                  <Text
+                    style={[
+                      cStyles.historyInlineButtonText,
+                      (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonTextCompact,
+                    ]}
+                  >
+                    Historial
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => onOpenGeoNotification?.(Array.from(selectedIds))}
-              disabled={selectedCount === 0 || !onOpenGeoNotification}
-              style={[
-                cStyles.massActionButton,
-                (useCompactWebLayout || useCompactLayout) && cStyles.massActionButtonCompact,
-                (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionButtonDisabled,
-              ]}
-              accessibilityLabel={`Notificaci\u00F3n georeferenciada (${selectedCount})`}
-            >
-              <Ionicons
-                name="location-outline"
-                size={18}
-                color={selectedCount === 0 || !onOpenGeoNotification ? "#8AA0AE" : "#fff"}
-              />
-              <View
-                style={[
-                  cStyles.massActionCount,
-                  (selectedCount === 0 || !onOpenGeoNotification) && cStyles.massActionCountDisabled,
-                ]}
-              >
-                <Text
-                  style={[
-                    cStyles.massActionCountText,
-                    (selectedCount === 0 || !onOpenGeoNotification) &&
-                      cStyles.massActionCountTextDisabled,
-                  ]}
-                >
-                  {selectedCount}
-                </Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onOpenNotificationHistory}
-              style={[
-                cStyles.historyInlineButton,
-                (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonCompact,
-              ]}
-            >
-              <Ionicons name="time-outline" size={18} color="#023047" />
-              <Text
-                style={[
-                  cStyles.historyInlineButtonText,
-                  (useCompactWebLayout || useCompactLayout) && cStyles.historyInlineButtonTextCompact,
-                ]}
-              >
-                Historial
-              </Text>
-            </TouchableOpacity>
-          </View>
+            </>
+          )}
         </View>
 
         {useDesktopWebLayout && sortedItems.length > 0 ? <HeaderWeb /> : null}
@@ -1748,7 +1898,7 @@ export default function DashboardContentClientes({
         keyExtractor={(it) => it.id}
         ListHeaderComponent={listHeader}
         renderItem={renderItem as any}
-        extraData={selectedIds}
+        extraData={{ selectedIds, viewingInactive, reactivatingIds }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         initialNumToRender={10}
         maxToRenderPerBatch={10}
@@ -1763,11 +1913,17 @@ export default function DashboardContentClientes({
                 <Ionicons name="people-outline" size={28} color="#023047" />
               </View>
               <Text style={cStyles.emptyStateTitle}>
-                {items.length === 0 ? "Todavía no tienes clientes registrados" : "No encontramos coincidencias"}
+                {items.length === 0
+                  ? viewingInactive
+                    ? "No hay clientes inactivos"
+                    : "Todavía no tienes clientes registrados"
+                  : "No encontramos coincidencias"}
               </Text>
               <Text style={cStyles.emptyStateDescription}>
                 {items.length === 0
-                  ? "Cuando una persona complete el registro aparecerá aquí para que puedas gestionarla."
+                  ? viewingInactive
+                    ? "Cuando desactives un cliente aparecerá aquí para que puedas reactivarlo."
+                    : "Cuando una persona complete el registro aparecerá aquí para que puedas gestionarla."
                   : "Prueba con otra búsqueda o ajusta los filtros para volver a ver resultados."}
               </Text>
             </View>

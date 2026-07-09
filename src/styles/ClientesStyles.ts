@@ -60,6 +60,14 @@ export const clientesStyles = StyleSheet.create({
     color: "#023047",
     fontWeight: "700",
   },
+  inactiveViewButton: {
+    backgroundColor: "#FFF8E1",
+    borderColor: "#F3C27A",
+  },
+  activeViewButton: {
+    backgroundColor: "#EAF5FB",
+    borderColor: "#D2E2EE",
+  },
   chipsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -512,6 +520,21 @@ export const clientesStyles = StyleSheet.create({
     color: "#023047",
     fontWeight: "800",
     fontSize: 11,
+  },
+  reactivateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "#2196F3",
+  },
+  reactivateButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 12,
   },
 
   modalBackdrop: {

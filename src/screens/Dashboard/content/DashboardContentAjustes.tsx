@@ -90,6 +90,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
   const [empresa, setEmpresa] = useState<any>(null);
   const [planData, setPlanData] = useState<PlanInfo | null>(null);
   const [contadores, setContadores] = useState<any>(null);
+  const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
@@ -147,6 +148,16 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
             }
           } catch (e) {
             console.log("No se pudo leer contadores:", e);
+          }
+
+          try {
+            const clientesSnap = await getDocs(collection(db, "Empresas", uid, "Clientes"));
+            const activos = clientesSnap.docs.filter(
+              (clientDoc) => (clientDoc.data() as any)?.activo !== false
+            ).length;
+            setActiveUsersCount(activos);
+          } catch (e) {
+            console.log("No se pudo leer clientes activos:", e);
           }
         } else {
           console.warn("No se encontró información de la empresa");
@@ -365,7 +376,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
   );
 
   const usados = {
-    usuarios: contadores?.totalUsuarios ?? 0,
+    usuarios: activeUsersCount,
     notificaciones: contadores?.notificacionesMes ?? 0,
     correos: contadores?.correosMes ?? 0,
   };
