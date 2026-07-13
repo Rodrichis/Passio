@@ -1221,7 +1221,12 @@ export default function DashboardContentClientes({
           ) : (
             <>
               <View style={cStyles.toolbarFooter}>
-                <View style={cStyles.selectionMetaWrap}>
+                <View
+                  style={[
+                    cStyles.selectionMetaWrap,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.selectionMetaWrapCompact,
+                  ]}
+                >
                   <Text style={cStyles.metaText}>
                     {`${useCompactWebLayout || useCompactLayout ? "Total" : "Total cargados"}: ${items.length}`}
                   </Text>
@@ -1234,12 +1239,30 @@ export default function DashboardContentClientes({
                     <Text style={cStyles.metaText}>Sin selección activa</Text>
                   ) : null}
                 </View>
-                <TouchableOpacity onPress={toggleSortField} style={cStyles.selectAllButton}>
+                <TouchableOpacity
+                  onPress={toggleSortField}
+                  style={[
+                    cStyles.selectAllButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.selectAllButtonCompact,
+                  ]}
+                >
                   <Text style={cStyles.selectAllButtonText}>
-                    {sortField === "lastVisit" ? "Orden: \u00FAltima visita" : "Orden: visitas"}
+                    {useCompactWebLayout || useCompactLayout
+                      ? sortField === "lastVisit"
+                        ? "\u00DAltima visita"
+                        : "Visitas"
+                      : sortField === "lastVisit"
+                        ? "Orden: \u00FAltima visita"
+                        : "Orden: visitas"}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleSortOrder} style={cStyles.selectAllButton}>
+                <TouchableOpacity
+                  onPress={toggleSortOrder}
+                  style={[
+                    cStyles.selectAllButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.selectAllButtonCompact,
+                  ]}
+                >
                   <Text style={cStyles.selectAllButtonText}>
                     {sortField === "lastVisit"
                       ? sortOrder === "desc"
@@ -1250,14 +1273,30 @@ export default function DashboardContentClientes({
                         : "Menor"}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleSelectAll} style={cStyles.selectAllButton}>
+                <TouchableOpacity
+                  onPress={toggleSelectAll}
+                  style={[
+                    cStyles.selectAllButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.selectAllButtonCompact,
+                  ]}
+                >
                   <Text style={cStyles.selectAllButtonText}>
-                    {allVisibleSelected ? "Quitar selección" : "Seleccionar todo"}
+                    {useCompactWebLayout || useCompactLayout
+                      ? allVisibleSelected
+                        ? "Quitar"
+                        : "Todos"
+                      : allVisibleSelected
+                        ? "Quitar selección"
+                        : "Seleccionar todo"}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setClientViewMode("inactive")}
-                  style={[cStyles.selectAllButton, cStyles.inactiveViewButton]}
+                  style={[
+                    cStyles.selectAllButton,
+                    (useCompactWebLayout || useCompactLayout) && cStyles.selectAllButtonCompact,
+                    cStyles.inactiveViewButton,
+                  ]}
                 >
                   <Text style={cStyles.selectAllButtonText}>Inactivos</Text>
                 </TouchableOpacity>

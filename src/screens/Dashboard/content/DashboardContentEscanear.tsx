@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { updateAndroidWalletState, updateApplePass, type WalletApiResponse } from "../../../services/apiWallet";
 import { auth, db } from "../../../services/firebaseConfig";
-import { doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getWalletConfig } from "../../../services/walletOnboarding/getWalletConfig";
 
 type ParsedPayload = {
@@ -566,6 +566,29 @@ export default function DashboardContentEscanear({ companyName: _companyName }: 
         premiosCanjeados: pendingConfirmation.premiosCanjeadosNext,
         ultimaVisita: serverTimestamp(),
       });
+
+      try {
+        await addDoc(collection(db, "Empresas", empresaId, "HistorialEventos"), {
+          tipo: pendingConfirmation.action,
+          origen: "scanner",
+          clienteId: pendingConfirmation.idUsuario,
+          clienteNombre: pendingConfirmation.nombreCliente,
+          clienteSo: pendingConfirmation.soCliente,
+          fecha: serverTimestamp(),
+          visitasTotalesAntes: pendingConfirmation.visitasTotalesPrev,
+          visitasTotalesDespues: pendingConfirmation.visitasTotalesNext,
+          cicloAntes: pendingConfirmation.cicloPrev,
+          cicloDespues: pendingConfirmation.cicloVisitasNext,
+          premiosDisponiblesAntes: pendingConfirmation.premiosDisponiblesPrev,
+          premiosDisponiblesDespues: pendingConfirmation.premiosDisponiblesNext,
+          premiosCanjeadosAntes: pendingConfirmation.premiosCanjeadosPrev,
+          premiosCanjeadosDespues: pendingConfirmation.premiosCanjeadosNext,
+          actorUid: empresaId,
+          actorTipo: "empresa",
+        });
+      } catch (historyError) {
+        console.log("No se pudo registrar historial de evento:", historyError);
+      }
 
       resetToChooser(
         pendingConfirmation.action === "premio"

@@ -114,6 +114,12 @@ export const clientesStyles = StyleSheet.create({
     flexWrap: "wrap",
     flex: 1,
   },
+  selectionMetaWrapCompact: {
+    width: "100%",
+    flexBasis: "100%",
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   metaText: {
     color: "#4C6575",
     fontSize: 13,
@@ -130,6 +136,10 @@ export const clientesStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D2E2EE",
     backgroundColor: "#FFFFFF",
+  },
+  selectAllButtonCompact: {
+    paddingVertical: 9,
+    paddingHorizontal: 10,
   },
   selectAllButtonText: {
     color: "#023047",

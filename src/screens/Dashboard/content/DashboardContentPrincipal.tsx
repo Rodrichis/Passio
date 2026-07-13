@@ -64,14 +64,10 @@ type BirthdayClient = {
   name: string;
 };
 
-type AgeRangeStat = {
-  label: string;
-  count: number;
-};
-
 type Props = {
   goToClientes?: () => void;
   companyName?: string;
+  onOpenStats?: () => void;
   onOpenBirthdayGreeting?: (clientIds: string[], message: string) => void;
   onOpenNotificationHistory?: () => void;
   onOpenNotificationComposer?: () => void;
@@ -91,6 +87,7 @@ const ELEVATED_CARD = {
 export default function DashboardContentPrincipal({
   goToClientes,
   companyName,
+  onOpenStats,
   onOpenBirthdayGreeting,
   onOpenNotificationHistory,
   onOpenNotificationComposer,
@@ -116,9 +113,6 @@ export default function DashboardContentPrincipal({
   const [birthdayClients, setBirthdayClients] = React.useState<BirthdayClient[]>([]);
   const [topVisitedClient, setTopVisitedClient] = React.useState<HighlightClient | null>(null);
   const [topVisitedClients, setTopVisitedClients] = React.useState<TopVisitedClient[]>([]);
-  const [ageRanges, setAgeRanges] = React.useState<AgeRangeStat[]>([]);
-  const [clientsWithRewardsCount, setClientsWithRewardsCount] = React.useState(0);
-  const [clientsWithoutRewardsCount, setClientsWithoutRewardsCount] = React.useState(0);
   const [lastNotification, setLastNotification] = React.useState<LatestNotification | null>(null);
   const [showBirthdayModal, setShowBirthdayModal] = React.useState(false);
   const [showTopVisitedModal, setShowTopVisitedModal] = React.useState(false);
@@ -270,60 +264,6 @@ export default function DashboardContentPrincipal({
             : null
         );
 
-        const ageRangesBase: AgeRangeStat[] = [
-          { label: "Menores de 18", count: 0 },
-          { label: "18-24", count: 0 },
-          { label: "25-34", count: 0 },
-          { label: "35-44", count: 0 },
-          { label: "45-54", count: 0 },
-          { label: "55+", count: 0 },
-        ];
-
-        const getAge = (birthDate: Date | null) => {
-          if (!(birthDate instanceof Date) || Number.isNaN(birthDate.getTime())) {
-            return null;
-          }
-
-          const today = new Date();
-          let age = today.getFullYear() - birthDate.getFullYear();
-          const monthDiff = today.getMonth() - birthDate.getMonth();
-          const hasNotHadBirthdayYet =
-            monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate());
-
-          if (hasNotHadBirthdayYet) {
-            age -= 1;
-          }
-
-          return age >= 0 ? age : null;
-        };
-
-        activeClients.forEach((client) => {
-          const age = getAge(client.fechaNacimiento);
-          if (age == null) return;
-
-          if (age < 18) ageRangesBase[0].count += 1;
-          else if (age <= 24) ageRangesBase[1].count += 1;
-          else if (age <= 34) ageRangesBase[2].count += 1;
-          else if (age <= 44) ageRangesBase[3].count += 1;
-          else if (age <= 54) ageRangesBase[4].count += 1;
-          else ageRangesBase[5].count += 1;
-        });
-
-        setAgeRanges(
-          ageRangesBase
-            .filter((item) => item.count > 0)
-            .sort((a, b) => {
-              if (b.count !== a.count) {
-                return b.count - a.count;
-              }
-              return a.label.localeCompare(b.label, "es", { sensitivity: "base" });
-            })
-        );
-
-        const withRewards = activeClients.filter((client) => Number(client.premiosDisponibles ?? 0) > 0).length;
-        setClientsWithRewardsCount(withRewards);
-        setClientsWithoutRewardsCount(Math.max(0, totalCount - withRewards));
-
         const recent = activeClients
           .slice()
           .sort((a, b) => {
@@ -380,9 +320,6 @@ export default function DashboardContentPrincipal({
         setError("No se pudieron cargar las metricas.");
         setTopVisitedClients([]);
         setTopVisitedClient(null);
-        setAgeRanges([]);
-        setClientsWithRewardsCount(0);
-        setClientsWithoutRewardsCount(0);
       } finally {
         setLoading(false);
       }
@@ -472,48 +409,6 @@ export default function DashboardContentPrincipal({
   };
 
   const birthdayNames = birthdayClients.map((client) => client.name);
-  const topAgeRanges = ageRanges.slice(0, 3);
-  const analyticsCards = [
-    {
-      key: "ages",
-      title: "Rangos etarios",
-      primary: loading ? "..." : topAgeRanges[0]?.label || "Sin datos",
-      secondary: loading
-        ? "Cargando..."
-        : topAgeRanges[0]
-          ? `${topAgeRanges[0].count} clientes en el rango principal`
-          : "A\u00FAn no hay edades registradas",
-      icon: "bar-chart-outline" as const,
-      iconColor: "#8B5CF6",
-      iconBg: "#F3E8FF",
-      rows: loading
-        ? []
-        : topAgeRanges.map((item) => ({
-            label: item.label,
-            value: String(item.count),
-          })),
-    },
-    {
-      key: "rewards",
-      title: "Clientes con premios",
-      primary: loading ? "..." : String(clientsWithRewardsCount),
-      secondary: loading
-        ? "Cargando..."
-        : clientsWithRewardsCount > 0
-          ? "Con premios disponibles"
-          : "A\u00FAn no hay premios disponibles",
-      icon: "gift-outline" as const,
-      iconColor: "#D97706",
-      iconBg: "#FFF4DB",
-      rows: loading
-        ? []
-        : [
-            { label: "Con premios", value: String(clientsWithRewardsCount) },
-            { label: "Sin premios", value: String(clientsWithoutRewardsCount) },
-          ],
-    },
-  ];
-
   const highlightCards = [
     {
       key: "birthday",
@@ -534,7 +429,7 @@ export default function DashboardContentPrincipal({
         ? "Cargando..."
         : topVisitedClient
           ? `${topVisitedClient.visits} visitas en total`
-          : "A\u00FAn no hay clientes registrados",
+          : "Aún no hay clientes registrados",
       icon: "trophy-outline" as const,
       iconColor: "#16A34A",
       iconBg: "#E8F7EE",
@@ -880,25 +775,6 @@ export default function DashboardContentPrincipal({
         ))}
       </View>
 
-      <>
-        <Text style={styles.sectionTitle}>{"Anal\u00EDtica r\u00E1pida"}</Text>
-        <View style={{ flexDirection: "row", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-          {analyticsCards.map((card) => (
-            <AnalyticsCard
-              key={card.key}
-              title={card.title}
-              primary={card.primary}
-              secondary={card.secondary}
-              icon={card.icon}
-              iconColor={card.iconColor}
-              iconBg={card.iconBg}
-              rows={card.rows}
-              compact={isCompactLayout}
-            />
-          ))}
-        </View>
-      </>
-
       <View
         style={{
           flexDirection: "row",
@@ -910,17 +786,35 @@ export default function DashboardContentPrincipal({
         }}
       >
         <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Resumen de clientes</Text>
-        <TouchableOpacity
-          onPress={goToClientes}
-          style={{
-            backgroundColor: "#2196F3",
-            paddingVertical: 12,
-            paddingHorizontal: 18,
-            borderRadius: 12,
-          }}
-        >
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Ver clientes</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
+          <TouchableOpacity
+            onPress={onOpenStats}
+            style={{
+              backgroundColor: "#0A6F88",
+              paddingVertical: 12,
+              paddingHorizontal: 18,
+              borderRadius: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Ionicons name="bar-chart-outline" size={17} color="#FFFFFF" />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Ver estadísticas</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={goToClientes}
+            style={{
+              backgroundColor: "#2196F3",
+              paddingVertical: 12,
+              paddingHorizontal: 18,
+              borderRadius: 12,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Ver clientes</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ flexDirection: "row", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
@@ -1235,93 +1129,6 @@ function HighlightCard({
         {showChevron ? <Ionicons name="chevron-forward-outline" size={18} color="#A3B1BA" /> : null}
       </View>
     </Container>
-  );
-}
-
-function AnalyticsCard({
-  title,
-  primary,
-  secondary,
-  icon,
-  iconColor,
-  iconBg,
-  rows,
-  compact,
-}: {
-  title: string;
-  primary: string;
-  secondary: string;
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  iconColor: string;
-  iconBg: string;
-  rows: Array<{ label: string; value: string }>;
-  compact?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flexBasis: compact ? "47%" : "30%",
-        flexGrow: 1,
-        minWidth: compact ? 0 : 220,
-        borderRadius: 20,
-        padding: compact ? 16 : 18,
-        ...ELEVATED_CARD,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: "#51616F", fontSize: 13, fontWeight: "700" }}>{title}</Text>
-          <Text
-            numberOfLines={2}
-            ellipsizeMode="tail"
-            style={{ color: "#023047", fontSize: compact ? 18 : 20, fontWeight: "800", marginTop: 8 }}
-          >
-            {primary}
-          </Text>
-          <Text
-            numberOfLines={2}
-            ellipsizeMode="tail"
-            style={{ color: "#617483", fontSize: 13, lineHeight: 19, marginTop: 4 }}
-          >
-            {secondary}
-          </Text>
-        </View>
-
-        <View
-          style={{
-            width: compact ? 46 : 52,
-            height: compact ? 46 : 52,
-            borderRadius: 16,
-            backgroundColor: iconBg,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Ionicons name={icon} size={compact ? 22 : 24} color={iconColor} />
-        </View>
-      </View>
-
-      <View style={{ marginTop: 16, gap: 8 }}>
-        {rows.length > 0 ? (
-          rows.map((row) => (
-            <View
-              key={`${title}-${row.label}`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <Text style={{ color: "#607381", fontSize: 13 }}>{row.label}</Text>
-              <Text style={{ color: "#023047", fontSize: 13, fontWeight: "800" }}>{row.value}</Text>
-            </View>
-          ))
-        ) : (
-          <Text style={{ color: "#607381", fontSize: 13 }}>Sin datos disponibles.</Text>
-        )}
-      </View>
-    </View>
   );
 }
 

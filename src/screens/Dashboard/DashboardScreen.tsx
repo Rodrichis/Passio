@@ -24,6 +24,7 @@ import DashboardContentClientes from "./content/DashboardContentClientes";
 import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 import DashboardContentGeoNotificacion from "./content/DashboardContentGeoNotificacion";
+import DashboardContentEstadisticas from "./content/DashboardContentEstadisticas";
 import AdminHomeScreen from "../admin/AdminHomeScreen";
 import AdminLogsScreen from "../logs/AdminLogsScreen";
 import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
@@ -102,6 +103,7 @@ const DASHBOARD_NEWS_ITEMS = [
 
 export default function Dashboard({ navigation }: any) {
   const [selected, setSelected] = useState("Principal");
+  const [principalView, setPrincipalView] = useState<"home" | "stats">("home");
   const [isAdmin, setIsAdmin] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [companyReady, setCompanyReady] = useState(false);
@@ -125,7 +127,7 @@ export default function Dashboard({ navigation }: any) {
   const getPageTitle = () => {
     switch (selected) {
       case "Principal":
-        return "Principal";
+        return principalView === "stats" ? "Estadísticas" : "Principal";
       case "Clientes":
         return "Clientes";
       case "Escanear":
@@ -289,13 +291,23 @@ export default function Dashboard({ navigation }: any) {
     });
   };
 
+  const handleSelectMenu = (nextSelected: string) => {
+    setSelected(nextSelected);
+    setPrincipalView("home");
+  };
+
   const renderContent = () => {
     switch (selected) {
       case "Principal":
+        if (principalView === "stats") {
+          return <DashboardContentEstadisticas onBack={() => setPrincipalView("home")} />;
+        }
+
         return (
           <DashboardContentPrincipal
             goToClientes={() => setSelected("Clientes")}
             companyName={companyName}
+            onOpenStats={() => setPrincipalView("stats")}
             onOpenBirthdayGreeting={(clientIds, message) => {
               setClientesNotificationDraft({
                 clientIds,
@@ -449,7 +461,7 @@ export default function Dashboard({ navigation }: any) {
         {!isMobileLayout ? (
           <DashboardMenu
             selected={selected}
-            setSelected={setSelected}
+            setSelected={handleSelectMenu}
             isAdmin={isAdmin}
             onLogout={handleLogout}
           />
@@ -509,7 +521,7 @@ export default function Dashboard({ navigation }: any) {
       {isMobileLayout ? (
         <DashboardMenu
           selected={selected}
-          setSelected={setSelected}
+          setSelected={handleSelectMenu}
           isMobile
           isAdmin={isAdmin}
           onLogout={handleLogout}

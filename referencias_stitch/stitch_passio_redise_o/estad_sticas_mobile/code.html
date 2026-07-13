@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Estadísticas - Passio Mobile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-primary": "#ffffff",
+                "surface-container-lowest": "#ffffff",
+                "surface-bright": "#f6faff",
+                "surface-container-low": "#ebf5ff",
+                "primary-fixed-dim": "#69d4f4",
+                "on-error-container": "#93000a",
+                "on-primary-container": "#002f3a",
+                "secondary": "#7d5800",
+                "surface-tint": "#00677d",
+                "on-surface": "#001e2f",
+                "tertiary-container": "#df7500",
+                "on-error": "#ffffff",
+                "surface-container-high": "#d4ebff",
+                "tertiary-fixed": "#ffdcc4",
+                "outline-variant": "#bdc8cd",
+                "surface-container-highest": "#c8e6ff",
+                "on-primary-fixed": "#001f27",
+                "on-secondary-container": "#6b4b00",
+                "primary": "#00677d",
+                "primary-container": "#219ebc",
+                "on-tertiary": "#ffffff",
+                "inverse-surface": "#07344b",
+                "error": "#ba1a1a",
+                "primary-fixed": "#b2ebff",
+                "on-primary-fixed-variant": "#004e5f",
+                "on-tertiary-fixed": "#301400",
+                "on-surface-variant": "#3e484d",
+                "tertiary": "#934b00",
+                "on-tertiary-fixed-variant": "#703800",
+                "surface-container": "#e0f0ff",
+                "surface-variant": "#c8e6ff",
+                "on-secondary-fixed": "#271900",
+                "surface-dim": "#b9dffc",
+                "on-background": "#001e2f",
+                "inverse-primary": "#69d4f4",
+                "secondary-container": "#ffb702",
+                "outline": "#6e797d",
+                "secondary-fixed": "#ffdea9",
+                "surface": "#f6faff",
+                "on-tertiary-container": "#452000",
+                "on-secondary": "#ffffff",
+                "error-container": "#ffdad6",
+                "secondary-fixed-dim": "#ffba27",
+                "on-secondary-fixed-variant": "#5e4100",
+                "tertiary-fixed-dim": "#ffb781",
+                "background": "#f6faff",
+                "inverse-on-surface": "#e5f2ff"
+            },
+            "fontFamily": {
+                "title-sm": ["Hanken Grotesk"],
+                "body-md": ["Hanken Grotesk"],
+                "label-md": ["Hanken Grotesk"],
+                "display-lg": ["Hanken Grotesk"],
+                "headline-md-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                "title-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                "display-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "headline-md-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Hanken Grotesk', sans-serif; background-color: #f6faff; color: #001e2f; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; vertical-align: middle; }
+        .elevation-1 { shadow-sm: 0px 4px 12px rgba(0, 0, 0, 0.05); }
+        .chart-bar { transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen pb-24 overflow-x-hidden">
+<!-- Header Compacto -->
+<header class="sticky top-0 z-50 bg-surface-container-lowest/90 backdrop-blur-md px-4 h-16 flex items-center justify-between border-b border-outline-variant/30">
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center rounded-full active:bg-surface-variant/20 transition-colors">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="font-headline-md-mobile text-headline-md-mobile text-on-surface">Estadísticas</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant active:bg-surface-variant/20 transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</header>
+<main class="px-4 pt-6 space-y-6">
+<!-- Grid de Métricas 2x2 -->
+<section class="grid grid-cols-2 gap-4">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-size: 18px;">group</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Visitas</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="text-2xl font-bold text-on-surface">1,284</span>
+<span class="text-[10px] text-primary font-bold">+12%</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-size: 18px;">timer</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Sesión</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="text-2xl font-bold text-on-surface">4m 32s</span>
+<span class="text-[10px] text-error font-bold">-2%</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-size: 18px;">trending_up</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Conversión</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="text-2xl font-bold text-on-surface">8.4%</span>
+<span class="text-[10px] text-primary font-bold">+0.5</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-4 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary text-sm" style="font-size: 18px;">shopping_bag</span>
+<span class="font-label-md text-label-md text-on-surface-variant">Ingresos</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="text-2xl font-bold text-on-surface">$2.4k</span>
+<span class="text-[10px] text-primary font-bold">+5%</span>
+</div>
+</div>
+</section>
+<!-- Gráfico de Barras Verticales -->
+<section class="bg-surface-container-lowest p-5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-title-sm text-title-sm text-on-surface">Actividad por fecha</h3>
+<select class="bg-surface-variant/20 border-none rounded-lg text-xs font-semibold px-3 py-1 text-primary focus:ring-0">
+<option>Siete días</option>
+<option>Este mes</option>
+<option>Año</option>
+</select>
+</div>
+<div class="h-48 flex items-end justify-between gap-2 px-1">
+<!-- Bar 1 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 40%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">L</span>
+</div>
+<!-- Bar 2 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 65%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">M</span>
+</div>
+<!-- Bar 3 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 55%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">X</span>
+</div>
+<!-- Bar 4 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 90%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">J</span>
+</div>
+<!-- Bar 5 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-secondary-container rounded-t-sm" style="height: 100%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">V</span>
+</div>
+<!-- Bar 6 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 45%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">S</span>
+</div>
+<!-- Bar 7 -->
+<div class="flex-1 flex flex-col items-center gap-2">
+<div class="chart-bar w-full bg-primary-container rounded-t-sm" style="height: 30%"></div>
+<span class="text-[10px] font-medium text-on-surface-variant">D</span>
+</div>
+</div>
+</section>
+<!-- Top Visitas List -->
+<section class="bg-surface-container-lowest p-5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<h3 class="font-title-sm text-title-sm text-on-surface mb-4">Top visitas</h3>
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container-high rounded-lg flex items-center justify-center text-primary font-bold text-xs">01</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">Dashboard Principal</p>
+<p class="text-[11px] text-on-surface-variant">/admin/dashboard</p>
+</div>
+</div>
+<span class="text-xs font-bold text-on-surface">842</span>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container-high rounded-lg flex items-center justify-center text-primary font-bold text-xs">02</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">Catálogo de Productos</p>
+<p class="text-[11px] text-on-surface-variant">/shop/view-all</p>
+</div>
+</div>
+<span class="text-xs font-bold text-on-surface">615</span>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container-high rounded-lg flex items-center justify-center text-primary font-bold text-xs">03</div>
+<div>
+<p class="text-sm font-semibold text-on-surface">Perfil de Usuario</p>
+<p class="text-[11px] text-on-surface-variant">/account/settings</p>
+</div>
+</div>
+<span class="text-xs font-bold text-on-surface">293</span>
+</div>
+</div>
+<button class="w-full mt-6 py-3 bg-surface-variant/20 rounded-lg text-primary text-xs font-bold active:bg-surface-variant/40 transition-colors">
+                VER TODOS LOS REPORTES
+            </button>
+</section>
+<!-- Horas Activas Visualizer -->
+<section class="bg-surface-container-lowest p-5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.05)] border border-outline-variant/10">
+<h3 class="font-title-sm text-title-sm text-on-surface mb-4">Horas activas</h3>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<span class="w-8 text-[10px] text-on-surface-variant">AM</span>
+<div class="flex-1 h-3 bg-surface-container-low rounded-full overflow-hidden flex">
+<div class="h-full bg-primary/20 w-[10%]"></div>
+<div class="h-full bg-primary/40 w-[20%]"></div>
+<div class="h-full bg-primary w-[40%]"></div>
+<div class="h-full bg-primary-container w-[30%]"></div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-8 text-[10px] text-on-surface-variant">PM</span>
+<div class="flex-1 h-3 bg-surface-container-low rounded-full overflow-hidden flex">
+<div class="h-full bg-secondary-container w-[60%]"></div>
+<div class="h-full bg-primary w-[30%]"></div>
+<div class="h-full bg-primary/10 w-[10%]"></div>
+</div>
+</div>
+</div>
+<p class="mt-4 text-[11px] text-on-surface-variant leading-relaxed">
+                El pico de actividad se registra entre las <span class="font-bold text-primary">14:00 y las 16:00</span>, coincidiendo con la franja de mayor conversión.
+            </p>
+</section>
+</main>
+<!-- Bottom Navigation Mock (For Context) -->
+<nav class="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant/20 px-6 py-3 flex items-center justify-between z-50">
+<div class="flex flex-col items-center gap-1 opacity-40">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-bold">Inicio</span>
+</div>
+<div class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="text-[10px] font-bold">Stats</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-40">
+<span class="material-symbols-outlined">group</span>
+<span class="text-[10px] font-bold">Equipo</span>
+</div>
+<div class="flex flex-col items-center gap-1 opacity-40">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-bold">Ajustes</span>
+</div>
+</nav>
+<script>
+        // Simple Micro-interaction: Update chart bar heights on load for a "popping" effect
+        window.addEventListener('DOMContentLoaded', () => {
+            const bars = document.querySelectorAll('.chart-bar');
+            bars.forEach(bar => {
+                const finalHeight = bar.style.height;
+                bar.style.height = '0px';
+                setTimeout(() => {
+                    bar.style.height = finalHeight;
+                }, 100);
+            });
+        });
+    </script>
+</body></html>
