@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import {
   ScrollView,
   View,
@@ -429,7 +429,7 @@ export default function DashboardContentPrincipal({
         ? "Cargando..."
         : topVisitedClient
           ? `${topVisitedClient.visits} visitas en total`
-          : "Aún no hay clientes registrados",
+          : "AÃºn no hay clientes registrados",
       icon: "trophy-outline" as const,
       iconColor: "#16A34A",
       iconBg: "#E8F7EE",
@@ -595,17 +595,17 @@ export default function DashboardContentPrincipal({
                 <View style={[modalStyles.headerBadge, { backgroundColor: "#F3E8FF" }]}>
                   <Ionicons name="gift-outline" size={24} color="#7C3AED" />
                 </View>
-                <Text style={modalStyles.title}>{"Cumplea\u00F1os de hoy"}</Text>
+                <Text style={modalStyles.title}>{"Cumpleaños de hoy"}</Text>
               </View>
               <TouchableOpacity onPress={() => setShowBirthdayModal(false)} style={modalStyles.closeButton}>
                 <Ionicons name="close" size={20} color="#51616F" />
               </TouchableOpacity>
             </View>
             <Text style={modalStyles.text}>
-              {"Estas personas est\u00E1n de cumplea\u00F1os hoy. Puedes enviarles un saludo en pocos pasos."}
+              {"Estas personas est\u00E1n de cumpleaños hoy. Puedes enviarles un saludo en pocos pasos."}
             </Text>
             <View style={modalStyles.statBox}>
-              <Text style={modalStyles.statLabel}>{"Clientes de cumplea\u00F1os"}</Text>
+              <Text style={modalStyles.statLabel}>{"Clientes de cumpleaños"}</Text>
               <Text style={modalStyles.statValue}>{String(birthdayClients.length)}</Text>
             </View>
             <View style={modalStyles.listBox}>
@@ -787,21 +787,23 @@ export default function DashboardContentPrincipal({
       >
         <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Resumen de clientes</Text>
         <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-          <TouchableOpacity
-            onPress={onOpenStats}
-            style={{
-              backgroundColor: "#0A6F88",
-              paddingVertical: 12,
-              paddingHorizontal: 18,
-              borderRadius: 12,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <Ionicons name="bar-chart-outline" size={17} color="#FFFFFF" />
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Ver estadísticas</Text>
-          </TouchableOpacity>
+          {false ? (
+            <TouchableOpacity
+              onPress={onOpenStats}
+              style={{
+                backgroundColor: "#FFB703",
+                paddingVertical: 12,
+                paddingHorizontal: 18,
+                borderRadius: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Ionicons name="bar-chart-outline" size={17} color="#023047" />
+              <Text style={{ color: "#023047", fontWeight: "700", fontSize: 14 }}>Ver estadísticas</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity
             onPress={goToClientes}
