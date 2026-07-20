@@ -33,8 +33,9 @@ export function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
     .trim()
     .toLowerCase();
   const expiresAt = normalizeEmpresaDate(data?.expiraEl);
+  const expiredByDate = Boolean(expiresAt && expiresAt.getTime() < Date.now());
 
-  if (estado === ESTADO_SUSCRIPCION.CADUCADA) {
+  if (estado === ESTADO_SUSCRIPCION.CADUCADA || estado === "expired") {
     return {
       blocked: true,
       reason: "caducada",
@@ -43,13 +44,23 @@ export function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
   }
 
   if (
-    estado === ESTADO_SUSCRIPCION.PRUEBA &&
-    expiresAt &&
-    expiresAt.getTime() < Date.now()
+    (estado === ESTADO_SUSCRIPCION.PRUEBA || estado === "trialing") &&
+    expiredByDate
   ) {
     return {
       blocked: true,
       reason: "prueba_vencida",
+      expiresAt,
+    };
+  }
+
+  if (
+    ["active", "past_due", "canceled"].includes(estado) &&
+    expiredByDate
+  ) {
+    return {
+      blocked: true,
+      reason: "caducada",
       expiresAt,
     };
   }

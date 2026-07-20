@@ -25,6 +25,7 @@ import DashboardContentEscanear from "./content/DashboardContentEscanear";
 import DashboardContentAjustes from "./content/DashboardContentAjustes";
 import DashboardContentGeoNotificacion from "./content/DashboardContentGeoNotificacion";
 import DashboardContentEstadisticas from "./content/DashboardContentEstadisticas";
+import DashboardContentSuscripcion from "./content/DashboardContentSuscripcion";
 import AdminHomeScreen from "../admin/AdminHomeScreen";
 import AdminLogsScreen from "../logs/AdminLogsScreen";
 import AdminCompaniesScreen from "../admin/AdminCompaniesScreen";
@@ -138,6 +139,8 @@ export default function Dashboard({ navigation }: any) {
         return isMobileLayout ? "Georeferencia" : "Notificación georeferenciada";
       case "Ajustes":
         return "Ajustes de Empresa";
+      case "Suscripcion":
+        return "Suscripción";
       case "Admin":
         return "Admin";
       case "Logs":
@@ -357,7 +360,15 @@ export default function Dashboard({ navigation }: any) {
       case "HistorialNotificaciones":
         return <NotificationHistoryScreen onBack={() => setSelected("Clientes")} companyName={companyName} />;
       case "Ajustes":
-        return <DashboardContentAjustes navigation={navigation} onOpenSupport={handleOpenSupport} />;
+        return (
+          <DashboardContentAjustes
+            navigation={navigation}
+            onOpenSupport={handleOpenSupport}
+            onOpenSubscription={() => setSelected("Suscripcion")}
+          />
+        );
+      case "Suscripcion":
+        return <DashboardContentSuscripcion onBack={() => setSelected("Ajustes")} />;
       case "Admin":
         return (
           <AdminHomeScreen
@@ -404,7 +415,7 @@ export default function Dashboard({ navigation }: any) {
     );
   }
 
-  if (subscriptionBlock.blocked) {
+  if (subscriptionBlock.blocked && selected !== "Suscripcion") {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F6FAFF" }}>
         <View
@@ -447,6 +458,15 @@ export default function Dashboard({ navigation }: any) {
 
               <TouchableOpacity onPress={handleOpenSupportEmail} style={overlayStyles.primaryButton}>
                 <Text style={overlayStyles.primaryButtonText}>Contactar soporte</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setSelected("Suscripcion")}
+                style={[overlayStyles.primaryButton, { backgroundColor: "#FFB703" }]}
+              >
+                <Text style={[overlayStyles.primaryButtonText, { color: "#023047" }]}>
+                  Gestionar suscripción
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

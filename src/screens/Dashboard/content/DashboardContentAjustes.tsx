@@ -28,16 +28,6 @@ import {
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
 import {
-  fetchOfferings,
-  getCustomerInfoSafe,
-  hasProEntitlement,
-  presentRCPlaywall,
-  openRevenueCatCustomerCenter,
-  isRevenueCatAvailable,
-  hasRevenueCatApiKey,
-  isRevenueCatCustomerCenterAvailable,
-} from "../../../services/revenuecat";
-import {
   isGenericStampPack,
   resolveStampPackLabel,
 } from "../../../utils/walletOnboarding/stampPacks";
@@ -52,6 +42,7 @@ type RootStackParamList = {
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Dashboard">;
   onOpenSupport?: () => void;
+  onOpenSubscription?: () => void;
 };
 
 type PlanInfo = {
@@ -86,14 +77,13 @@ function formatExpiryDate(value: any) {
   }
 }
 
-export default function DashboardContentAjustes({ navigation, onOpenSupport }: Props) {
+export default function DashboardContentAjustes({ navigation, onOpenSupport, onOpenSubscription }: Props) {
   const [empresa, setEmpresa] = useState<any>(null);
   const [planData, setPlanData] = useState<PlanInfo | null>(null);
   const [contadores, setContadores] = useState<any>(null);
   const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const { width } = useWindowDimensions();
@@ -172,48 +162,6 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
     fetchEmpresa();
   }, [uid]);
 
-  const loadPlanDataByName = async (planName?: string) => {
-    if (!planName) return;
-
-    const q = query(collection(db, "Planes"), where("nombrePlan", "==", planName));
-    const res = await getDocs(q);
-    const first = res.docs[0];
-    if (first) {
-      setPlanData(first.data() as PlanInfo);
-      return;
-    }
-
-    const all = await getDocs(collection(db, "Planes"));
-    const lower = String(planName || "").toLowerCase();
-    const match = all.docs.find(
-      (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
-    );
-    if (match) setPlanData(match.data() as PlanInfo);
-  };
-
-  const applyPlanState = async (hasPro: boolean) => {
-    if (!uid) return;
-
-    const nextPlan = hasPro ? PLAN.PRO : PLAN.FREE;
-    const nextState = hasPro
-      ? ESTADO_SUSCRIPCION.ACTIVA
-      : ESTADO_SUSCRIPCION.INACTIVA;
-
-    await setDoc(
-      doc(db, "Empresas", uid),
-      { plan: nextPlan, estadoSuscripcion: nextState },
-      { merge: true }
-    );
-
-    setEmpresa((prev: any) => ({
-      ...prev,
-      plan: nextPlan,
-      estadoSuscripcion: nextState,
-    }));
-
-    await loadPlanDataByName(nextPlan);
-  };
-
   const handleSave = async () => {
     if (!uid || !empresa) return;
     setSaving(true);
@@ -242,104 +190,6 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
       await auth.signOut();
     } catch (err) {
       console.log("Error al cerrar sesión:", err);
-    }
-  };
-
-  const handleUpgrade = async () => {
-    const rcAvailable = isRevenueCatAvailable();
-    const rcApiKey = hasRevenueCatApiKey();
-    const isAlreadyPro =
-      String(empresa?.plan || "").toLowerCase() === PLAN.PRO.toLowerCase();
-
-    if (!rcAvailable || !rcApiKey) {
-      const reason = !rcAvailable
-        ? "El módulo nativo de RevenueCat no está disponible en esta build."
-        : "REVENUECAT_API_KEY no se cargó en runtime.";
-
-      alert(
-        `${reason}\n\nChecks:\n1) Recompila APK release despu\u00E9s de editar .env\n2) Ejecuta prebuild --clean\n3) Usa la Public SDK Key Android de tu app en RevenueCat`
-      );
-      return;
-    }
-
-    if (isAlreadyPro) {
-      alert(
-        "Tu cuenta ya tiene plan Pro. Usa 'Gestionar suscripción' para administrarla."
-      );
-      return;
-    }
-
-    if (!uid) return;
-
-    setUpgrading(true);
-    try {
-      const offering = await fetchOfferings();
-      if (!offering) {
-        alert(
-          "No encontramos ofertas disponibles. Revisa Offerings/Packages en RevenueCat."
-        );
-        return;
-      }
-
-      const paywallResult = await presentRCPlaywall(offering || undefined);
-      const info = await getCustomerInfoSafe();
-      const hasPro = hasProEntitlement(info);
-
-      if (hasPro) {
-        await applyPlanState(true);
-        alert("Suscripción Pro activada correctamente.");
-      } else {
-        console.log("Paywall result:", paywallResult);
-        alert(
-          "No se completó la compra. Si cancelaste el pago, tu plan sigue igual."
-        );
-      }
-    } catch (e) {
-      console.log("Paywall error:", e);
-      alert("No se pudo completar el flujo de pago. Intenta de nuevo.");
-    } finally {
-      setUpgrading(false);
-    }
-  };
-
-  const handleManageSubscription = async () => {
-    const rcAvailable = isRevenueCatAvailable();
-    const rcApiKey = hasRevenueCatApiKey();
-
-    if (!rcAvailable || !rcApiKey) {
-      alert(
-        "RevenueCat no está disponible para gestionar la suscripción en esta build."
-      );
-      return;
-    }
-
-    setUpgrading(true);
-    try {
-      if (isRevenueCatCustomerCenterAvailable()) {
-        await openRevenueCatCustomerCenter();
-      } else if (Platform.OS === "android") {
-        await Linking.openURL("https://play.google.com/store/account/subscriptions");
-      }
-
-      const info = await getCustomerInfoSafe();
-      if (info) {
-        await applyPlanState(hasProEntitlement(info));
-      }
-    } catch (e) {
-      console.log("Customer center error:", e);
-      if (Platform.OS === "android") {
-        try {
-          await Linking.openURL(
-            "https://play.google.com/store/account/subscriptions"
-          );
-          return;
-        } catch {
-          // no-op
-        }
-      }
-      alert("No se pudo abrir la gestión de suscripción.");
-    } finally {
-      setUpgrading(false);
     }
   };
 
@@ -519,6 +369,22 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport }: P
               </View>
             ))}
           </View>
+
+          <TouchableOpacity
+            onPress={onOpenSubscription}
+            style={ajustesStyles.subscriptionButton}
+          >
+            <View style={ajustesStyles.subscriptionButtonIcon}>
+              <Ionicons name="card-outline" size={18} color="#023047" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={ajustesStyles.subscriptionButtonTitle}>Gestionar suscripción</Text>
+              <Text style={ajustesStyles.subscriptionButtonSubtitle}>
+                Revisa tu plan, paga con Mercado Pago o cancela la renovación.
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward-outline" size={18} color="#023047" />
+          </TouchableOpacity>
 
           {atUserLimit ? (
             <View style={ajustesStyles.warningBox}>
@@ -870,6 +736,37 @@ const ajustesStyles = StyleSheet.create({
     color: "#102A43",
     fontSize: 18,
     fontWeight: "800",
+  },
+  subscriptionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: "#FFFCF2",
+    borderWidth: 1,
+    borderColor: "#F3C27A",
+  },
+  subscriptionButtonIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFB703",
+  },
+  subscriptionButtonTitle: {
+    color: "#023047",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  subscriptionButtonSubtitle: {
+    color: "#6C4B00",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 3,
+    lineHeight: 17,
   },
   warningBox: {
     marginTop: 2,

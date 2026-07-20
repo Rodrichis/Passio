@@ -32,6 +32,8 @@ export default function DashboardMenu({
       ? "Admin"
       : selected === "HistorialNotificaciones" || selected === "GeoNotificacion"
         ? "Clientes"
+        : selected === "Suscripcion"
+          ? "Ajustes"
         : selected;
 
   const getItemColors = (isActive: boolean) => ({

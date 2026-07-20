@@ -198,6 +198,22 @@ export default function CompanyGateScreen({ navigation }: Props) {
             >
               <Text style={globalStyles.buttonText}>Contactar soporte</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.replace("Dashboard")}
+              style={[
+                globalStyles.primaryButton,
+                {
+                  marginBottom: 0,
+                  paddingHorizontal: 18,
+                  backgroundColor: "#FFB703",
+                },
+              ]}
+            >
+              <Text style={[globalStyles.buttonText, { color: "#023047" }]}>
+                Gestionar suscripción
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
