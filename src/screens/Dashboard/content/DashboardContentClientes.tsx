@@ -35,6 +35,8 @@ import {
 } from "firebase/firestore";
 import { clientesStyles as cStyles } from "../../../styles/ClientesStyles";
 import { mapDoc, filterItems, sortItems, Cliente } from "../../../utils/clientesHelpers";
+import { getPlanByName, getUserLimitByPlanName } from "../../../services/plansService";
+import { getEmpresaSuscripcion } from "../../../utils/subscription";
 
 const PAGE_SIZE = 20;
 const PUSH_BATCH_SIZE = 6;
@@ -70,31 +72,20 @@ function formatDate(d?: Date | null) {
 async function getUserLimitForCompany(uid: string) {
   const empSnap = await getDoc(doc(db, "Empresas", uid));
   const empresaData = empSnap.exists() ? (empSnap.data() as any) : null;
-  const planName = empresaData?.plan ?? null;
-
-  if (!planName) return null;
-
-  let planSnap = await getDocs(
-    query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-  );
-  if (!planSnap.docs[0]) {
-    planSnap = await getDocs(collection(db, "Planes"));
-    const lower = String(planName).toLowerCase();
-    const match = planSnap.docs.find(
-      (planDoc) => String(planDoc.data().nombrePlan || "").toLowerCase() === lower
-    );
-    if (!match) return null;
-    const limitValue = match.data().limiteUsuarios;
-    return typeof limitValue === "number" ? limitValue : null;
-  }
-
-  const limitValue = planSnap.docs[0].data().limiteUsuarios;
-  return typeof limitValue === "number" ? limitValue : null;
+  const planName = getEmpresaSuscripcion(empresaData).nombrePlan;
+  return getUserLimitByPlanName(planName);
 }
 
 async function countActiveClients(uid: string) {
   const snap = await getDocs(collection(db, "Empresas", uid, "Clientes"));
   return snap.docs.filter((clientDoc) => (clientDoc.data() as any)?.activo !== false).length;
+}
+
+function mergeClientes(current: Cliente[], incoming: Cliente[]) {
+  const byId = new Map<string, Cliente>();
+  current.forEach((client) => byId.set(client.id, client));
+  incoming.forEach((client) => byId.set(client.id, client));
+  return Array.from(byId.values());
 }
 
 type Props = {
@@ -150,6 +141,8 @@ export default function DashboardContentClientes({
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [allItemsLoaded, setAllItemsLoaded] = useState(false);
+  const [loadingAll, setLoadingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -166,6 +159,7 @@ export default function DashboardContentClientes({
   };
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedClientsById, setSelectedClientsById] = useState<Map<string, Cliente>>(new Map());
   const [reactivatingIds, setReactivatingIds] = useState<Set<string>>(new Set());
 
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -278,6 +272,9 @@ export default function DashboardContentClientes({
     if (!uid) return;
     setLoading(true);
     setError(null);
+    setAllItemsLoaded(false);
+    setLastDoc(null);
+    setHasMore(true);
     try {
       const q = query(
         collection(db, "Empresas", uid, "Clientes"),
@@ -289,6 +286,7 @@ export default function DashboardContentClientes({
       setItems(list);
       setLastDoc(snap.docs.length ? snap.docs[snap.docs.length - 1] : null);
       setHasMore(snap.docs.length === PAGE_SIZE);
+      setAllItemsLoaded(snap.docs.length < PAGE_SIZE);
     } catch (e: any) {
       console.error(e);
       setError("No se pudieron cargar los clientes.");
@@ -318,6 +316,7 @@ export default function DashboardContentClientes({
       setItems((prev) => [...prev, ...more]);
       setLastDoc(snap.docs.length ? snap.docs[snap.docs.length - 1] : null);
       setHasMore(snap.docs.length === PAGE_SIZE);
+      setAllItemsLoaded(snap.docs.length < PAGE_SIZE);
     } catch (e) {
       console.error(e);
     } finally {
@@ -325,12 +324,40 @@ export default function DashboardContentClientes({
     }
   }, [uid, hasMore, lastDoc, loadingMore, viewingInactive]);
 
+  const loadAllClients = useCallback(async () => {
+    if (!uid) return items;
+    if (allItemsLoaded && !hasMore) return items;
+
+    setLoadingAll(true);
+    setError(null);
+    try {
+      const q = query(
+        collection(db, "Empresas", uid, "Clientes"),
+        where("activo", "==", !viewingInactive)
+      );
+      const snap = await getDocs(q);
+      const list = snap.docs.map(mapDoc);
+      setItems((prev) => mergeClientes(prev, list));
+      setLastDoc(null);
+      setHasMore(false);
+      setAllItemsLoaded(true);
+      return list;
+    } catch (e) {
+      console.error(e);
+      setError("No se pudo cargar la lista completa de clientes.");
+      return items;
+    } finally {
+      setLoadingAll(false);
+    }
+  }, [uid, items, allItemsLoaded, hasMore, viewingInactive]);
+
   useEffect(() => {
     loadFirstPage();
   }, [loadFirstPage]);
 
   useEffect(() => {
     setSelectedIds(new Set());
+    setSelectedClientsById(new Map());
     setFilterOS("all");
     setFilterPremios("all");
     setShowFilter(false);
@@ -341,6 +368,7 @@ export default function DashboardContentClientes({
     if (!notificationDraft) return;
 
     setSelectedIds(new Set(notificationDraft.clientIds.filter(Boolean)));
+    setSelectedClientsById(new Map());
     setPushMode("bulk");
     setPushTarget(null);
     setPushStatus("");
@@ -350,6 +378,12 @@ export default function DashboardContentClientes({
     setShowPushModal(true);
     onConsumeNotificationDraft?.();
   }, [notificationDraft, onConsumeNotificationDraft]);
+
+  useEffect(() => {
+    const hasSearchOrFilters = Boolean(search.trim()) || filterOS !== "all" || filterPremios !== "all";
+    if (!hasSearchOrFilters || allItemsLoaded || loading || loadingAll) return;
+    void loadAllClients();
+  }, [search, filterOS, filterPremios, allItemsLoaded, loading, loadingAll, loadAllClients]);
 
   useEffect(() => {
     if (!IS_WEB || !useCompactWebLayout || !isIOSWeb || !showPushModal || typeof document === "undefined") {
@@ -483,27 +517,12 @@ export default function DashboardContentClientes({
       try {
         const empSnap = await getDoc(doc(db, "Empresas", uid));
         const empresaData = empSnap.exists() ? (empSnap.data() as any) : null;
-        const planName = empresaData?.plan ?? null;
         const nombreEmpresa = String(empresaData?.nombre || "").trim();
+        const planName = getEmpresaSuscripcion(empresaData).nombrePlan;
         setEmpresaNombre(nombreEmpresa);
-        if (planName) {
-          let planData: any = null;
-          let planSnap = await getDocs(
-            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-          );
-          if (planSnap.docs[0]) {
-            planData = planSnap.docs[0].data();
-          } else {
-            planSnap = await getDocs(collection(db, "Planes"));
-            const lower = String(planName).toLowerCase();
-            const match = planSnap.docs.find(
-              (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
-            );
-            if (match) planData = match.data();
-          }
-          if (planData && typeof planData.limiteNotificacion === "number") {
-            setLimitePush(planData.limiteNotificacion);
-          }
+        const planData = await getPlanByName(planName);
+        if (typeof planData?.limiteNotificacion === "number") {
+          setLimitePush(planData.limiteNotificacion);
         }
       } catch (e) {
         console.log("No se pudo cargar limite de notificaciones:", e);
@@ -622,25 +641,89 @@ export default function DashboardContentClientes({
     []
   );
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleSelect = useCallback(
+    (id: string) => {
+      const client = items.find((it) => it.id === id);
+      const isSelected = selectedIds.has(id);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setSelectedClientsById((prev) => {
+        const next = new Map(prev);
+        if (isSelected) {
+          next.delete(id);
+        } else if (client) {
+          next.set(id, client);
+        }
+        return next;
+      });
+    },
+    [items, selectedIds]
+  );
 
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      const allIds = sortedItems.map((it) => it.id);
-      const next = new Set(prev);
-      const allSelected = allIds.length > 0 && allIds.every((id) => next.has(id));
-      if (allSelected) allIds.forEach((id) => next.delete(id));
-      else allIds.forEach((id) => next.add(id));
-      return next;
+  const toggleSelectAll = useCallback(async () => {
+    if (viewingInactive || loadingAll) return;
+
+    const sourceItems = allItemsLoaded ? items : await loadAllClients();
+    const targetItems = sortItems(filterItems(sourceItems, search, filterOS, filterPremios), sortField, sortOrder);
+    const targetIds = targetItems.map((it) => it.id);
+    if (targetIds.length === 0) return;
+
+    const allSelected = targetIds.every((id) => selectedIds.has(id));
+    const nextIds = new Set(selectedIds);
+    const nextClients = new Map(selectedClientsById);
+
+    if (allSelected) {
+      targetIds.forEach((id) => {
+        nextIds.delete(id);
+        nextClients.delete(id);
+      });
+    } else {
+      targetItems.forEach((client) => {
+        nextIds.add(client.id);
+        nextClients.set(client.id, client);
+      });
+    }
+
+    setSelectedIds(nextIds);
+    setSelectedClientsById(nextClients);
+  }, [
+    viewingInactive,
+    loadingAll,
+    allItemsLoaded,
+    items,
+    loadAllClients,
+    search,
+    filterOS,
+    filterPremios,
+    sortField,
+    sortOrder,
+    selectedIds,
+    selectedClientsById,
+  ]);
+
+  const getSelectedClientTargets = useCallback(async () => {
+    const currentTargets = Array.from(selectedIds)
+      .map((id) => selectedClientsById.get(id) || items.find((it) => it.id === id))
+      .filter(Boolean) as Cliente[];
+
+    if (currentTargets.length === selectedIds.size) {
+      return currentTargets;
+    }
+
+    const allClients = await loadAllClients();
+    const nextClients = new Map(selectedClientsById);
+    const targets = allClients.filter((client) => {
+      const selected = selectedIds.has(client.id);
+      if (selected) nextClients.set(client.id, client);
+      return selected;
     });
-  }, [sortedItems]);
+    setSelectedClientsById(nextClients);
+    return targets;
+  }, [selectedIds, selectedClientsById, items, loadAllClients]);
 
   const selectedCount = selectedIds.size;
   const allVisibleSelected =
@@ -1275,9 +1358,11 @@ export default function DashboardContentClientes({
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={toggleSelectAll}
+                  disabled={loadingAll}
                   style={[
                     cStyles.selectAllButton,
                     (useCompactWebLayout || useCompactLayout) && cStyles.selectAllButtonCompact,
+                    loadingAll && cStyles.selectAllButtonDisabled,
                   ]}
                 >
                   <Text style={cStyles.selectAllButtonText}>
@@ -1766,7 +1851,7 @@ export default function DashboardContentClientes({
                         const targets =
                           pushMode === "single" && pushTarget
                             ? [pushTarget]
-                            : items.filter((it) => selectedIds.has(it.id));
+                            : await getSelectedClientTargets();
                         if (targets.length === 0) {
                           setPushStatus("No hay destinatarios.");
                           return;
@@ -1972,9 +2057,31 @@ export default function DashboardContentClientes({
           sortedItems.length > 0 ? (
             <View style={[cStyles.scrollSection, { paddingHorizontal: contentPadding }]}>
               {hasMore ? (
-                <TouchableOpacity onPress={loadMore} style={cStyles.loadMoreButton}>
-                  <Text style={cStyles.loadMoreText}>{loadingMore ? "Cargando..." : "Cargar más"}</Text>
-                </TouchableOpacity>
+                <View style={cStyles.loadMoreActions}>
+                  <TouchableOpacity
+                    onPress={loadMore}
+                    disabled={loadingMore || loadingAll}
+                    style={[
+                      cStyles.loadMoreButton,
+                      (loadingMore || loadingAll) && cStyles.loadMoreButtonDisabled,
+                    ]}
+                  >
+                    <Text style={cStyles.loadMoreText}>{loadingMore ? "Cargando..." : "Cargar más"}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={loadAllClients}
+                    disabled={loadingAll || loadingMore}
+                    style={[
+                      cStyles.loadMoreButton,
+                      cStyles.loadAllButton,
+                      (loadingAll || loadingMore) && cStyles.loadMoreButtonDisabled,
+                    ]}
+                  >
+                    <Text style={[cStyles.loadMoreText, cStyles.loadAllText]}>
+                      {loadingAll ? "Cargando..." : "Cargar todos"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <Text style={cStyles.endOfListText}>Fin de la lista</Text>
               )}

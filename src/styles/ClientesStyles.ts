@@ -141,6 +141,9 @@ export const clientesStyles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
   },
+  selectAllButtonDisabled: {
+    opacity: 0.65,
+  },
   selectAllButtonText: {
     color: "#023047",
     fontWeight: "700",
@@ -938,6 +941,14 @@ export const clientesStyles = StyleSheet.create({
   listContent: {
     paddingBottom: 24,
   },
+  loadMoreActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
   loadMoreButton: {
     alignSelf: "center",
     paddingVertical: 12,
@@ -948,9 +959,19 @@ export const clientesStyles = StyleSheet.create({
     borderColor: "#D2E2EE",
     marginTop: 8,
   },
+  loadAllButton: {
+    backgroundColor: "#023047",
+    borderColor: "#023047",
+  },
+  loadMoreButtonDisabled: {
+    opacity: 0.65,
+  },
   loadMoreText: {
     color: "#023047",
     fontWeight: "800",
+  },
+  loadAllText: {
+    color: "#FFFFFF",
   },
   endOfListText: {
     textAlign: "center",

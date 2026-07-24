@@ -14,19 +14,23 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../../../constants/empresa";
+import { ESTADO_WALLET } from "../../../constants/empresa";
 import { auth, db } from "../../../services/firebaseConfig";
 import {
   doc,
   getDoc,
   setDoc,
   collection,
-  query,
-  where,
   getDocs,
 } from "firebase/firestore";
+import { getPlanByName, PlanInfo } from "../../../services/plansService";
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
+import {
+  formatPlanName,
+  formatSubscriptionStatus,
+  getEmpresaSuscripcion,
+} from "../../../utils/subscription";
 import {
   isGenericStampPack,
   resolveStampPackLabel,
@@ -43,14 +47,6 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Dashboard">;
   onOpenSupport?: () => void;
   onOpenSubscription?: () => void;
-};
-
-type PlanInfo = {
-  nombrePlan?: string;
-  limiteUsuarios?: number;
-  limiteNotificacion?: number;
-  limiteCorreo?: number;
-  precio?: number;
 };
 
 function formatExpiryDate(value: any) {
@@ -97,6 +93,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
   const compactMetricLayout = !isDesktop;
   const twoColumnLayout = width >= 1024;
   const companyInfoTwoColumns = width >= 760;
+  const suscripcion = useMemo(() => getEmpresaSuscripcion(empresa), [empresa]);
 
   useEffect(() => {
     if (!copiedLink) return;
@@ -114,21 +111,8 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
           const data = snap.data();
           setEmpresa(data);
 
-          if (data?.plan) {
-            const q = query(collection(db, "Planes"), where("nombrePlan", "==", data.plan));
-            const res = await getDocs(q);
-            const first = res.docs[0];
-            if (first) {
-              setPlanData(first.data() as PlanInfo);
-            } else {
-              const all = await getDocs(collection(db, "Planes"));
-              const lower = String(data.plan || "").toLowerCase();
-              const match = all.docs.find(
-                (d) => String(d.data().nombrePlan || "").toLowerCase() === lower
-              );
-              if (match) setPlanData(match.data() as PlanInfo);
-            }
-          }
+          const suscripcion = getEmpresaSuscripcion(data);
+          setPlanData(await getPlanByName(suscripcion.nombrePlan));
 
           try {
             const contColl = await getDocs(collection(db, "Empresas", uid, "Contador"));
@@ -215,14 +199,14 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
 
   const planInfo: PlanInfo = useMemo(
     () => ({
-      nombrePlan: planData?.nombrePlan || empresa?.plan,
+      nombrePlan: planData?.nombrePlan || suscripcion.nombrePlan,
       limiteUsuarios: planData?.limiteUsuarios ?? empresa?.limiteUsuarios,
       limiteNotificacion:
         planData?.limiteNotificacion ?? empresa?.limiteNotificacion,
       limiteCorreo: planData?.limiteCorreo ?? empresa?.limiteCorreo,
       precio: planData?.precio ?? empresa?.precio,
     }),
-    [empresa, planData]
+    [empresa, planData, suscripcion.nombrePlan]
   );
 
   const usados = {
@@ -234,9 +218,6 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
   const limiteUsuarios = planInfo.limiteUsuarios;
   const atUserLimit =
     typeof limiteUsuarios === "number" && usados.usuarios >= limiteUsuarios;
-  const isProPlan =
-    String(planInfo?.nombrePlan || empresa?.plan || "").toLowerCase() ===
-    PLAN.PRO.toLowerCase();
   const rawStampPack =
     typeof empresa?.paqueteSellosWallet === "string" &&
     empresa.paqueteSellosWallet.trim().length > 0
@@ -309,15 +290,12 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
               <Text style={ajustesStyles.planTitle}>
                 Plan actual:{" "}
                 <Text style={ajustesStyles.planTitleAccent}>
-                  {planInfo?.nombrePlan || "No definido"}
+                  {formatPlanName(planInfo?.nombrePlan)}
                 </Text>
               </Text>
               <Text style={ajustesStyles.planSubtitle}>
                 Estado suscripción:{" "}
-                {empresa?.estadoSuscripcion ||
-                  (isProPlan
-                    ? ESTADO_SUSCRIPCION.ACTIVA
-                  : ESTADO_SUSCRIPCION.INACTIVA)}
+                {formatSubscriptionStatus(suscripcion.estadoSuscripcion)}
               </Text>
               <Text
                 style={[
@@ -325,7 +303,7 @@ export default function DashboardContentAjustes({ navigation, onOpenSupport, onO
                   showExpiryInline && ajustesStyles.planSubtitleRight,
                 ]}
               >
-                Expira el: {formatExpiryDate(empresa?.expiraEl)}
+                Expira el: {formatExpiryDate(suscripcion.expiraEl)}
               </Text>
             </View>
 

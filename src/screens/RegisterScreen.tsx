@@ -18,10 +18,11 @@ import { Ionicons } from "@expo/vector-icons";
 
 import LegalDocumentModal from "../components/legal/LegalDocumentModal";
 import { LEGAL_DOCUMENT_VERSION } from "../content/legalDocument";
-import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../constants/empresa";
+import { ESTADO_WALLET } from "../constants/empresa";
 import { auth, db } from "../services/firebaseConfig";
 import { RootStackParamList } from "../types/navigation";
 import { buildRegistrationUrl } from "../utils/publicUrls";
+import { DEFAULT_FREE_SUBSCRIPTION } from "../utils/subscription";
 import { resolveWalletClassIdFromName } from "../utils/walletOnboarding/walletClassId";
 import { AUTH_WEB_INPUT_RESET, authStyles } from "../styles/authStyles";
 
@@ -168,8 +169,6 @@ export default function RegisterScreen({ navigation }: Props) {
       }
 
       const now = new Date();
-      const expira = new Date(now.getTime());
-      expira.setDate(expira.getDate() + 14);
 
       await setDoc(doc(db, "Empresas", user.uid), {
         uid: user.uid,
@@ -184,9 +183,7 @@ export default function RegisterScreen({ navigation }: Props) {
         LinkRegistro: buildRegistrationUrl(user.uid),
         Activo: true,
         FechaRegistro: now,
-        plan: PLAN.FREE,
-        estadoSuscripcion: ESTADO_SUSCRIPCION.PRUEBA,
-        expiraEl: Timestamp.fromDate(expira),
+        suscripcion: DEFAULT_FREE_SUBSCRIPTION,
         aceptoTerminos: true,
         versionTerminos: LEGAL_DOCUMENT_VERSION,
         aceptoTerminosEl: Timestamp.fromDate(now),

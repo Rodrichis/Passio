@@ -22,10 +22,17 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
-import { ESTADO_SUSCRIPCION, ESTADO_WALLET, PLAN } from "../../constants/empresa";
+import { ESTADO_WALLET } from "../../constants/empresa";
 import DashboardViewHeader from "../../components/dashboard/DashboardViewHeader";
 import { db } from "../../services/firebaseConfig";
 import { clientesStyles as cStyles } from "../../styles/ClientesStyles";
+import {
+  formatPlanName,
+  formatSubscriptionStatus,
+  getEmpresaSuscripcion,
+  normalizeEstadoSuscripcion,
+  normalizeNombrePlan,
+} from "../../utils/subscription";
 
 type Props = {
   onBack: () => void;
@@ -87,23 +94,16 @@ type AdminHistoryItem = {
 
 type ModalView = "detail" | "clients" | "history";
 
-const PLAN_OPTIONS = [PLAN.FREE, PLAN.PRO] as const;
-const SUBSCRIPTION_OPTIONS = [
-  ESTADO_SUSCRIPCION.PRUEBA,
-  ESTADO_SUSCRIPCION.ACTIVA,
-  ESTADO_SUSCRIPCION.CANCELADA,
-  ESTADO_SUSCRIPCION.CADUCADA,
-  ESTADO_SUSCRIPCION.INACTIVA,
-] as const;
+const PLAN_OPTIONS = ["free", "pro"] as const;
+const SUBSCRIPTION_OPTIONS = ["active", "pending", "past_due", "expired", "trialing"] as const;
 type PlanOption = (typeof PLAN_OPTIONS)[number];
 type SubscriptionOption = (typeof SUBSCRIPTION_OPTIONS)[number];
 
 function normalizeSubscriptionOption(value: unknown): SubscriptionOption {
-  const normalized = normalizeString(value).toLowerCase();
-  if (SUBSCRIPTION_OPTIONS.includes(normalized as SubscriptionOption)) {
-    return normalized as SubscriptionOption;
-  }
-  return ESTADO_SUSCRIPCION.INACTIVA;
+  const normalized = normalizeEstadoSuscripcion(value, "free");
+  return SUBSCRIPTION_OPTIONS.includes(normalized as SubscriptionOption)
+    ? (normalized as SubscriptionOption)
+    : "expired";
 }
 
 function normalizeString(value: unknown) {
@@ -195,21 +195,7 @@ function walletStatusColors(configured: boolean, status: string) {
 }
 
 function subscriptionStatusLabel(value: string) {
-  const normalized = normalizeString(value).toLowerCase();
-  switch (normalized) {
-    case ESTADO_SUSCRIPCION.PRUEBA:
-      return "Prueba";
-    case ESTADO_SUSCRIPCION.ACTIVA:
-      return "Activa";
-    case ESTADO_SUSCRIPCION.CANCELADA:
-      return "Cancelada";
-    case ESTADO_SUSCRIPCION.CADUCADA:
-      return "Caducada";
-    case ESTADO_SUSCRIPCION.INACTIVA:
-      return "Inactiva";
-    default:
-      return value || "--";
-  }
+  return formatSubscriptionStatus(value);
 }
 
 function historyStatusLabel(value: string) {
@@ -313,9 +299,9 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
   const [selectedView, setSelectedView] = useState<ModalView>("detail");
   const [showEmulationInfo, setShowEmulationInfo] = useState(false);
 
-  const [editPlan, setEditPlan] = useState<PlanOption>(PLAN.FREE);
+  const [editPlan, setEditPlan] = useState<PlanOption>("free");
   const [editSubscriptionStatus, setEditSubscriptionStatus] = useState<SubscriptionOption>(
-    ESTADO_SUSCRIPCION.INACTIVA
+    "active"
   );
   const [editExpiryInput, setEditExpiryInput] = useState("");
   const [savingSubscription, setSavingSubscription] = useState(false);
@@ -346,17 +332,18 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
         snap.docs.map(async (companyDoc) => {
           const data = companyDoc.data() || {};
           const counters = await loadCountersForCompany(companyDoc.id);
+          const suscripcion = getEmpresaSuscripcion(data);
 
           return {
             id: companyDoc.id,
             nombre: normalizeString(data.nombre) || "Empresa sin nombre",
             email: normalizeString(data.Mail),
             telefono: normalizeString(data.telefono),
-            plan: normalizeString(data.plan) || "--",
-            estadoSuscripcion: normalizeString(data.estadoSuscripcion),
+            plan: suscripcion.nombrePlan,
+            estadoSuscripcion: suscripcion.estadoSuscripcion,
             activa: data.Activo !== false,
             fechaRegistro: normalizeDate(data.FechaRegistro),
-            expiraEl: normalizeDate(data.expiraEl),
+            expiraEl: suscripcion.expiraEl,
             walletConfigurado: data.walletConfigurado === true,
             estadoWallet: normalizeString(data.estadoWallet),
             walletClassId: normalizeString(data["wallet-class-id"]),
@@ -412,7 +399,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
   const openCompanyDetail = (item: CompanyItem) => {
     setSelectedItem(item);
     setSelectedView("detail");
-    setEditPlan(item.plan === PLAN.PRO ? PLAN.PRO : PLAN.FREE);
+    setEditPlan(normalizeNombrePlan(item.plan) === "pro" ? "pro" : "free");
     setEditSubscriptionStatus(normalizeSubscriptionOption(item.estadoSuscripcion));
     setEditExpiryInput(formatInputDate(item.expiraEl));
     setSaveError("");
@@ -440,6 +427,16 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
       return;
     }
 
+    if (
+      editPlan !== "free" &&
+      (editSubscriptionStatus === "active" || editSubscriptionStatus === "trialing") &&
+      !parsedDate
+    ) {
+      setSaveError("Un plan Pro manual activo debe tener fecha de expiraci\u00F3n.");
+      setSaveSuccess("");
+      return;
+    }
+
     setSavingSubscription(true);
     setSaveError("");
     setSaveSuccess("");
@@ -448,9 +445,23 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
       await setDoc(
         doc(db, "Empresas", selectedItem.id),
         {
-          plan: editPlan,
-          estadoSuscripcion: editSubscriptionStatus,
-          expiraEl: parsedDate ? Timestamp.fromDate(parsedDate) : null,
+          suscripcion: {
+            nombrePlan: editPlan,
+            estadoSuscripcion: editSubscriptionStatus,
+            renovacionAutomatica: false,
+            expiraEl: parsedDate ? Timestamp.fromDate(parsedDate) : null,
+            trialTerminaEl:
+              editSubscriptionStatus === "trialing" && parsedDate
+                ? Timestamp.fromDate(parsedDate)
+                : null,
+            tipoPagoPlan: "none",
+            suscripcionOrigen: "manual",
+            mercadoPagoPreapprovalId: null,
+            mercadoPagoPlanId: null,
+            mercadoPagoPreferenceId: null,
+            mercadoPagoPaymentId: null,
+            ultimaSyncSuscripcion: Timestamp.fromDate(new Date()),
+          },
         },
         { merge: true }
       );
@@ -563,7 +574,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
 
             <View style={adminStyles.chipsRow}>
               <View style={adminStyles.infoChip}>
-                <Text style={adminStyles.infoChipText}>{`Plan: ${selectedItem.plan}`}</Text>
+                <Text style={adminStyles.infoChipText}>{`Plan: ${formatPlanName(selectedItem.plan)}`}</Text>
               </View>
               <View style={adminStyles.infoChip}>
                 <Text style={adminStyles.infoChipText}>
@@ -600,7 +611,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
                     style={[adminStyles.optionPill, selected && adminStyles.optionPillActive]}
                   >
                     <Text style={[adminStyles.optionPillText, selected && adminStyles.optionPillTextActive]}>
-                      {option}
+                      {formatPlanName(option)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -901,7 +912,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
                       {item.email || item.id}
                     </Text>
                     <Text style={adminStyles.smallMutedText}>
-                      {`Plan: ${item.plan} | Registro: ${formatShortDate(item.fechaRegistro)}`}
+                      {`Plan: ${formatPlanName(item.plan)} | Registro: ${formatShortDate(item.fechaRegistro)}`}
                     </Text>
                   </View>
 
@@ -924,7 +935,7 @@ export default function AdminCompaniesScreen({ onBack, companyName }: Props) {
                     <Text style={adminStyles.infoChipText}>{`Push: ${item.counters.notificacionesMes}`}</Text>
                   </View>
                   <View style={adminStyles.infoChip}>
-                    <Text style={adminStyles.infoChipText}>{`Plan: ${item.plan}`}</Text>
+                    <Text style={adminStyles.infoChipText}>{`Plan: ${formatPlanName(item.plan)}`}</Text>
                   </View>
                   <View style={adminStyles.infoChip}>
                     <Text style={adminStyles.infoChipText}>

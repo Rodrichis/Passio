@@ -7,9 +7,10 @@ export type TipoPagoPlanCobro = "pro_monthly" | "pro_yearly";
 
 export type SubscriptionStatus = {
   empresaUid: string;
-  plan: string | null;
+  nombrePlan: string | null;
   tipoPagoPlan: string | null;
   estadoSuscripcion: string | null;
+  renovacionAutomatica: boolean;
   expiraEl: string | null;
   trialTerminaEl: string | null;
   suscripcionOrigen: string | null;
@@ -18,6 +19,7 @@ export type SubscriptionStatus = {
   mercadoPagoPreferenceId: string | null;
   mercadoPagoPaymentId: string | null;
   ultimaSyncSuscripcion: string | null;
+  esProActivo: boolean;
   tieneAcceso: boolean;
 };
 

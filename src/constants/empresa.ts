@@ -1,14 +1,14 @@
 export const PLAN = {
-  FREE: "Free",
-  PRO: "Pro",
+  FREE: "free",
+  PRO: "pro",
 } as const;
 
 export const ESTADO_SUSCRIPCION = {
-  PRUEBA: "prueba",
-  ACTIVA: "activa",
-  INACTIVA: "inactiva",
-  CANCELADA: "cancelada",
-  CADUCADA: "caducada",
+  ACTIVA: "active",
+  PENDIENTE: "pending",
+  PAGO_PENDIENTE: "past_due",
+  CADUCADA: "expired",
+  PRUEBA: "trialing",
 } as const;
 
 export const ESTADO_WALLET = {

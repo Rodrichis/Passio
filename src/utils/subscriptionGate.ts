@@ -1,6 +1,6 @@
-import { ESTADO_SUSCRIPCION } from "../constants/empresa";
+import { getEmpresaSuscripcion } from "./subscription";
 
-export type SubscriptionBlockReason = "caducada" | "prueba_vencida" | null;
+export type SubscriptionBlockReason = "caducada" | "pendiente" | "prueba_vencida" | null;
 
 export type SubscriptionBlockState = {
   blocked: boolean;
@@ -14,28 +14,25 @@ export const EMPTY_SUBSCRIPTION_BLOCK: SubscriptionBlockState = {
   expiresAt: null,
 };
 
-export function normalizeEmpresaDate(value: any): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof value?.toDate === "function") {
-    const parsed = value.toDate();
-    return parsed instanceof Date && !Number.isNaN(parsed.getTime()) ? parsed : null;
-  }
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  return null;
-}
-
 export function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
-  const estado = String(data?.estadoSuscripcion || "")
-    .trim()
-    .toLowerCase();
-  const expiresAt = normalizeEmpresaDate(data?.expiraEl);
+  const suscripcion = getEmpresaSuscripcion(data);
+  const estado = suscripcion.estadoSuscripcion;
+  const expiresAt = suscripcion.expiraEl;
   const expiredByDate = Boolean(expiresAt && expiresAt.getTime() < Date.now());
+  const paidPlanWithoutValidExpiry =
+    suscripcion.nombrePlan !== "free" &&
+    ["active", "trialing", "past_due"].includes(estado) &&
+    !expiresAt;
 
-  if (estado === ESTADO_SUSCRIPCION.CADUCADA || estado === "expired") {
+  if (estado === "pending") {
+    return {
+      blocked: true,
+      reason: "pendiente",
+      expiresAt,
+    };
+  }
+
+  if (estado === "expired" || paidPlanWithoutValidExpiry) {
     return {
       blocked: true,
       reason: "caducada",
@@ -44,7 +41,7 @@ export function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
   }
 
   if (
-    (estado === ESTADO_SUSCRIPCION.PRUEBA || estado === "trialing") &&
+    estado === "trialing" &&
     expiredByDate
   ) {
     return {
@@ -55,8 +52,8 @@ export function resolveSubscriptionBlock(data: any): SubscriptionBlockState {
   }
 
   if (
-    ["active", "past_due", "canceled"].includes(estado) &&
-    expiredByDate
+    ["active", "past_due"].includes(estado) &&
+    (expiredByDate || estado === "past_due")
   ) {
     return {
       blocked: true,
@@ -82,6 +79,15 @@ export function formatSubscriptionBlockDate(value: Date | null) {
 
 export function getSubscriptionBlockCopy(block: SubscriptionBlockState) {
   const formattedDate = formatSubscriptionBlockDate(block.expiresAt);
+
+  if (block.reason === "pendiente") {
+    return {
+      title: "Pago pendiente de confirmación",
+      description:
+        "Estamos esperando la confirmación de Mercado Pago. Cuando el pago sea confirmado, tu acceso se actualizará automáticamente.",
+      statusLabel: "Pendiente",
+    };
+  }
 
   if (block.reason === "prueba_vencida") {
     return {

@@ -25,13 +25,13 @@ import {
   DocumentReference,
   getDoc,
   getDocs,
-  query,
   runTransaction,
   serverTimestamp,
-  where,
 } from "firebase/firestore";
 import { createAndSignWallet } from "../services/apiWallet";
+import { getPlanByName } from "../services/plansService";
 import { AUTH_WEB_INPUT_RESET } from "../styles/authStyles";
+import { getEmpresaSuscripcion } from "../utils/subscription";
 
 type Props = NativeStackScreenProps<RootStackParamList, "RegisterClient">;
 type SO = "ios" | "android";
@@ -287,20 +287,18 @@ export default function RegisterClientScreen({ route }: Props) {
       const clientesRef = collection(db, "Empresas", empresaId, "Clientes");
 
       let limiteUsuarios: number | null = null;
+      let activeClientsCount = 0;
       try {
-        const planName = empresa?.plan;
-        if (planName) {
-          const planRes = await getDocs(
-            query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-          );
-          const planDoc = planRes.docs[0];
-          if (planDoc) {
-            const data = planDoc.data() as any;
-            if (typeof data.limiteUsuarios === "number") {
-              limiteUsuarios = data.limiteUsuarios;
-            }
-          }
+        const planName = getEmpresaSuscripcion(empresa).nombrePlan;
+        const plan = await getPlanByName(planName);
+        if (typeof plan?.limiteUsuarios === "number") {
+          limiteUsuarios = plan.limiteUsuarios;
         }
+
+        const clientesSnap = await getDocs(clientesRef);
+        activeClientsCount = clientesSnap.docs.filter(
+          (clientDoc) => (clientDoc.data() as any)?.activo !== false
+        ).length;
       } catch (planErr) {
         console.log("No se pudieron leer los límites del plan:", planErr);
       }
@@ -446,7 +444,7 @@ export default function RegisterClientScreen({ route }: Props) {
             const nextNoti = resetMonthly ? 0 : currentNoti;
             const nextMail = resetMonthly ? 0 : currentMail;
 
-            if (limiteUsuarios != null && current >= limiteUsuarios) {
+            if (limiteUsuarios != null && activeClientsCount >= limiteUsuarios) {
               throw new Error("LIMIT_REACHED");
             }
 

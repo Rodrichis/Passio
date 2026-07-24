@@ -17,6 +17,8 @@ import DashboardViewHeader from "../../../components/dashboard/DashboardViewHead
 import RegistrationQrModal from "../../../components/registration/RegistrationQrModal";
 import { auth, db } from "../../../services/firebaseConfig";
 import { buildRegistrationUrl } from "../../../utils/publicUrls";
+import { getUserLimitByPlanName } from "../../../services/plansService";
+import { getEmpresaSuscripcion } from "../../../utils/subscription";
 import {
   collection,
   getDocs,
@@ -24,7 +26,6 @@ import {
   limit,
   orderBy,
   query,
-  where,
   Timestamp,
   doc,
 } from "firebase/firestore";
@@ -145,7 +146,7 @@ export default function DashboardContentPrincipal({
           const empSnap = await getDoc(doc(db, "Empresas", uid));
           if (empSnap.exists()) {
             const empresaData = empSnap.data() as any;
-            planName = empresaData?.plan || null;
+            planName = getEmpresaSuscripcion(empresaData).nombrePlan;
             const savedRegistrationUrl =
               typeof empresaData?.LinkRegistro === "string" ? empresaData.LinkRegistro.trim() : "";
 
@@ -156,20 +157,9 @@ export default function DashboardContentPrincipal({
         } catch {}
 
         let limitePlan: number | null = null;
-        if (planName) {
-          try {
-            const planSnap = await getDocs(
-              query(collection(db, "Planes"), where("nombrePlan", "==", planName))
-            );
-            const first = planSnap.docs[0];
-            if (first) {
-              const data = first.data() as any;
-              if (typeof data.limiteUsuarios === "number") {
-                limitePlan = data.limiteUsuarios;
-              }
-            }
-          } catch {}
-        }
+        try {
+          limitePlan = await getUserLimitByPlanName(planName);
+        } catch {}
         setLimiteUsuarios(limitePlan);
 
         const allClientsSnap = await getDocs(col);
@@ -429,7 +419,7 @@ export default function DashboardContentPrincipal({
         ? "Cargando..."
         : topVisitedClient
           ? `${topVisitedClient.visits} visitas en total`
-          : "AÃºn no hay clientes registrados",
+          : "A\u00FAn no hay clientes registrados",
       icon: "trophy-outline" as const,
       iconColor: "#16A34A",
       iconBg: "#E8F7EE",

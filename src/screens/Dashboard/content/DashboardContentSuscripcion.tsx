@@ -21,6 +21,12 @@ import {
   SubscriptionStatus,
   TipoPagoPlanCobro,
 } from "../../../services/subscriptionsApi";
+import {
+  formatPlanName,
+  getEmpresaSuscripcion,
+  hasActiveProAccess,
+  hasValidPaidAccess,
+} from "../../../utils/subscription";
 
 type Props = {
   onBack: () => void;
@@ -31,47 +37,25 @@ const YEARLY_PRICE = "458.019 CLP";
 
 type ActionState = "refresh" | "monthly" | "yearly" | "cancel" | null;
 
-function parseEmpresaDate(value: any): string | null {
-  if (!value) return null;
-
-  try {
-    const date =
-      typeof value?.toDate === "function"
-        ? value.toDate()
-        : value instanceof Date
-          ? value
-          : new Date(value);
-
-    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-      return null;
-    }
-
-    return date.toISOString();
-  } catch {
-    return null;
-  }
-}
-
 function buildStatusFromEmpresa(empresaUid: string, data: any): SubscriptionStatus {
-  const suscripcion = data?.suscripcion || {};
+  const suscripcion = getEmpresaSuscripcion(data);
 
   return {
     empresaUid,
-    plan: data?.plan ?? null,
-    tipoPagoPlan: data?.tipoPagoPlan ?? null,
-    estadoSuscripcion: suscripcion?.estadoSuscripcion ?? data?.estadoSuscripcion ?? null,
-    expiraEl: parseEmpresaDate(suscripcion?.expiraEl ?? data?.expiraEl),
-    trialTerminaEl: parseEmpresaDate(suscripcion?.trialTerminaEl),
-    suscripcionOrigen: suscripcion?.suscripcionOrigen ?? null,
-    mercadoPagoPreapprovalId: suscripcion?.mercadoPagoPreapprovalId ?? null,
-    mercadoPagoPlanId: suscripcion?.mercadoPagoPlanId ?? null,
-    mercadoPagoPreferenceId: suscripcion?.mercadoPagoPreferenceId ?? null,
-    mercadoPagoPaymentId: suscripcion?.mercadoPagoPaymentId ?? null,
-    ultimaSyncSuscripcion: parseEmpresaDate(suscripcion?.ultimaSyncSuscripcion),
-    tieneAcceso: Boolean(
-      parseEmpresaDate(suscripcion?.expiraEl ?? data?.expiraEl) &&
-        new Date(parseEmpresaDate(suscripcion?.expiraEl ?? data?.expiraEl) as string).getTime() > Date.now()
-    ),
+    nombrePlan: suscripcion.nombrePlan,
+    tipoPagoPlan: suscripcion.tipoPagoPlan,
+    estadoSuscripcion: suscripcion.estadoSuscripcion,
+    renovacionAutomatica: suscripcion.renovacionAutomatica,
+    expiraEl: suscripcion.expiraEl?.toISOString() ?? null,
+    trialTerminaEl: suscripcion.trialTerminaEl?.toISOString() ?? null,
+    suscripcionOrigen: suscripcion.suscripcionOrigen,
+    mercadoPagoPreapprovalId: suscripcion.mercadoPagoPreapprovalId,
+    mercadoPagoPlanId: suscripcion.mercadoPagoPlanId,
+    mercadoPagoPreferenceId: suscripcion.mercadoPagoPreferenceId,
+    mercadoPagoPaymentId: suscripcion.mercadoPagoPaymentId,
+    ultimaSyncSuscripcion: suscripcion.ultimaSyncSuscripcion?.toISOString() ?? null,
+    esProActivo: hasActiveProAccess(suscripcion),
+    tieneAcceso: hasValidPaidAccess(suscripcion),
   };
 }
 
@@ -97,8 +81,6 @@ function formatStatus(value?: string | null) {
       return "Activa";
     case "past_due":
       return "Pago pendiente";
-    case "canceled":
-      return "Cancelada";
     case "expired":
       return "Expirada";
     case "activa":
@@ -147,29 +129,40 @@ function isMercadoPagoSubscription(status: SubscriptionStatus | null) {
 function canCancelSubscription(status: SubscriptionStatus | null) {
   return (
     status?.suscripcionOrigen === "mercadopago" &&
+    status.tipoPagoPlan === "pro_monthly" &&
+    status.renovacionAutomatica === true &&
     Boolean(status.mercadoPagoPreapprovalId) &&
-    ["active", "past_due"].includes(String(status.estadoSuscripcion || ""))
+    status.estadoSuscripcion === "active"
   );
 }
 
 function canCreateNewSubscription(status: SubscriptionStatus | null) {
   const state = String(status?.estadoSuscripcion || "").toLowerCase();
-  const plan = String(status?.plan || "").toLowerCase();
+  const plan = String(status?.nombrePlan || "").toLowerCase();
+  const expiresAt = status?.expiraEl ? new Date(status.expiraEl) : null;
+  const expiredByDate = Boolean(
+    expiresAt && !Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()
+  );
 
   if (plan === "pro" && status?.tieneAcceso) {
     return false;
   }
 
+  if (state === "pending") {
+    return false;
+  }
+
   if (
     status?.tieneAcceso &&
-    ["active", "activa", "trialing", "prueba", "canceled", "cancelada"].includes(state)
+    ["active", "trialing"].includes(state)
   ) {
     return false;
   }
 
   if (
     status?.mercadoPagoPreapprovalId &&
-    ["active", "past_due", "canceled"].includes(state)
+    ["active", "past_due"].includes(state) &&
+    !expiredByDate
   ) {
     return false;
   }
@@ -183,6 +176,28 @@ function isYearlyCheckout(status: SubscriptionStatus | null) {
     status?.tipoPagoPlan === "pro_yearly" &&
     Boolean(status.mercadoPagoPreferenceId || status.mercadoPagoPaymentId)
   );
+}
+
+function getManagementText(
+  status: SubscriptionStatus | null,
+  hasCanceledAccess: boolean,
+  hasPendingPayment: boolean,
+) {
+  if (hasPendingPayment) {
+    return "Hay un pago pendiente de confirmación. No se puede cancelar una renovación hasta que Mercado Pago confirme la suscripción mensual.";
+  }
+
+  if (isMercadoPagoSubscription(status)) {
+    return hasCanceledAccess
+      ? "La renovación mensual ya está cancelada. El acceso vigente se mantiene hasta la fecha de expiración."
+      : "Puedes cancelar la renovación automática mensual. El acceso vigente se mantiene hasta la fecha de expiración.";
+  }
+
+  if (isYearlyCheckout(status)) {
+    return "El plan anual es un pago único por 12 meses. No tiene renovación automática para cancelar.";
+  }
+
+  return "No hay una renovación mensual activa para cancelar.";
 }
 
 async function openCheckoutUrl(checkoutUrl: string) {
@@ -200,7 +215,6 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
   const [action, setAction] = useState<ActionState>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const uid = auth.currentUser?.uid || "";
   const userEmail = auth.currentUser?.email || "";
@@ -232,18 +246,23 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
     return unsubscribe;
   }, [uid]);
 
-  const isPro = Boolean(
-    String(status?.plan || "").toLowerCase() === "pro" && status?.tieneAcceso
-  );
+  const selectedPlanName = String(status?.nombrePlan || "free").toLowerCase();
   const canCreate = canCreateNewSubscription(status);
   const canCancel = canCancelSubscription(status);
   const hasCanceledAccess =
-    status?.estadoSuscripcion === "canceled" && status.tieneAcceso;
+    status?.tipoPagoPlan === "pro_monthly" &&
+    status?.estadoSuscripcion === "active" &&
+    status?.renovacionAutomatica === false &&
+    status.tieneAcceso;
+  const hasPendingPayment = status?.estadoSuscripcion === "pending";
+  const createBlockedMessage = hasPendingPayment
+    ? "Estamos esperando la confirmación de Mercado Pago. Cuando se confirme, el acceso se actualizará automáticamente."
+    : "Ya existe un plan Pro activo asociado a esta empresa.";
 
   const statusAccent = useMemo(() => {
     const state = String(status?.estadoSuscripcion || "").toLowerCase();
     if (status?.tieneAcceso && state !== "past_due") return "#087C94";
-    if (state === "past_due" || state === "canceled") return "#C77700";
+    if (state === "past_due") return "#C77700";
     if (state === "expired" || state === "caducada") return "#C62828";
     return "#607381";
   }, [status]);
@@ -252,12 +271,10 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
     if (!uid) return;
     setAction("refresh");
     setError(null);
-    setNotice(null);
 
     try {
       const result = await getSubscriptionStatus(uid);
       setStatus(result);
-      setNotice("Estado actualizado correctamente.");
     } catch (refreshError) {
       setError(getErrorMessage(refreshError));
     } finally {
@@ -275,7 +292,6 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
     setAction(tipoPagoPlan === "pro_monthly" ? "monthly" : "yearly");
     setRedirecting(true);
     setError(null);
-    setNotice(null);
 
     try {
       const result = await createSubscription({
@@ -283,7 +299,6 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
         tipoPagoPlan,
         correoElectronico: userEmail,
       });
-      setNotice("Te estamos redirigiendo a Mercado Pago.");
       await openCheckoutUrl(result.checkoutUrl);
     } catch (paymentError) {
       setRedirecting(false);
@@ -299,12 +314,10 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
     const runCancel = async () => {
       setAction("cancel");
       setError(null);
-      setNotice(null);
 
       try {
         const result = await cancelSubscription(uid);
         setStatus(result);
-        setNotice("Renovación mensual cancelada. Mantendrás acceso hasta la fecha indicada.");
       } catch (cancelError) {
         setError(getErrorMessage(cancelError));
       } finally {
@@ -353,26 +366,17 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
         </View>
       ) : null}
 
-      <View style={[styles.headerRow, compact && styles.headerRowCompact]}>
+      <View style={[styles.statusCard, compact && styles.statusCardCompact]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={20} color="#023047" />
         </TouchableOpacity>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.title}>Suscripción</Text>
-          <Text style={styles.subtitle}>
-            Gestiona tu acceso Pro con Mercado Pago desde la versión web.
-          </Text>
-        </View>
-      </View>
-
-      <View style={[styles.statusCard, compact && styles.statusCardCompact]}>
         <View style={[styles.statusIcon, { backgroundColor: `${statusAccent}16` }]}>
           <Ionicons name="shield-checkmark-outline" size={24} color={statusAccent} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.statusLabel}>Estado actual</Text>
           <Text style={[styles.statusValue, { color: statusAccent }]}>
-            {isPro ? "Pro" : "Free"} · {formatStatus(status?.estadoSuscripcion)}
+            {formatPlanName(status?.nombrePlan)} · {formatStatus(status?.estadoSuscripcion)}
           </Text>
           <Text style={styles.statusMeta}>Expira el: {formatDate(status?.expiraEl)}</Text>
           {hasCanceledAccess ? (
@@ -402,13 +406,6 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
         </View>
       ) : null}
 
-      {notice ? (
-        <View style={styles.noticeBox}>
-          <Ionicons name="checkmark-circle-outline" size={18} color="#087C94" />
-          <Text style={styles.noticeText}>{notice}</Text>
-        </View>
-      ) : null}
-
       {!isWeb ? (
         <View style={styles.mobileNotice}>
           <Ionicons name="desktop-outline" size={22} color="#0A6F88" />
@@ -426,7 +423,7 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
           title="Free"
           icon="leaf-outline"
           tone="muted"
-          current={!isPro}
+          current={selectedPlanName === "free"}
           description="Para empezar y probar Passio con funciones limitadas."
           items={[
             "Clientes y uso limitado",
@@ -438,7 +435,7 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
           title="Pro"
           icon="rocket-outline"
           tone="pro"
-          current={isPro}
+          current={selectedPlanName === "pro"}
           description="Para operar Passio completo con tu empresa."
           items={[
             "Más capacidad para clientes",
@@ -450,9 +447,6 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Planes Pro</Text>
-        <Text style={styles.sectionSubtitle}>
-          El acceso se activa cuando Mercado Pago confirma el pago.
-        </Text>
       </View>
 
       <View style={[styles.planRow, compact && styles.planRowCompact]}>
@@ -471,10 +465,9 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
           title="Pro anual"
           price={`$${YEARLY_PRICE}`}
           period="/ año"
-          description="Pago único por 12 meses. Incluye un mes gratis frente al pago mensual."
+          description="Un pago por 12 meses. Incluye un mes gratis frente al pago mensual. No se renueva automáticamente."
           icon="trophy-outline"
           badge="1 mes gratis"
-          highlighted
           disabled={!isWeb || !canCreate || action !== null}
           loading={action === "yearly"}
           buttonText="Pagar anual"
@@ -484,19 +477,15 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
 
       {!canCreate ? (
         <Text style={styles.helperText}>
-          Ya existe un plan Pro activo asociado a esta empresa.
+          {createBlockedMessage}
         </Text>
       ) : null}
 
       <View style={styles.managementCard}>
         <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.managementTitle}>Renovación</Text>
-        <Text style={styles.managementText}>
-            {isMercadoPagoSubscription(status)
-              ? "Puedes cancelar la renovación automática mensual. El acceso vigente se mantiene hasta la fecha de expiración."
-              : isYearlyCheckout(status)
-                ? "El plan anual es un pago único por 12 meses. No tiene renovación automática para cancelar."
-                : "No hay una renovación mensual activa para cancelar."}
+          <Text style={styles.managementTitle}>Renovación</Text>
+          <Text style={styles.managementText}>
+            {getManagementText(status, hasCanceledAccess, hasPendingPayment)}
           </Text>
         </View>
         <TouchableOpacity
@@ -570,7 +559,6 @@ function PaymentPlanCard({
   description,
   icon,
   badge,
-  highlighted = false,
   disabled,
   loading,
   buttonText,
@@ -582,17 +570,16 @@ function PaymentPlanCard({
   description: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   badge?: string;
-  highlighted?: boolean;
   disabled: boolean;
   loading: boolean;
   buttonText: string;
   onPress: () => void;
 }) {
   return (
-    <View style={[styles.paymentCard, highlighted && styles.paymentCardHighlighted]}>
+    <View style={styles.paymentCard}>
       <View style={styles.paymentHeader}>
-        <View style={[styles.paymentIcon, highlighted && styles.paymentIconHighlighted]}>
-          <Ionicons name={icon} size={22} color={highlighted ? "#6C4B00" : "#0A6F88"} />
+        <View style={styles.paymentIcon}>
+          <Ionicons name={icon} size={22} color="#0A6F88" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.paymentTitle}>{title}</Text>
@@ -611,18 +598,15 @@ function PaymentPlanCard({
         disabled={disabled}
         style={[
           styles.payButton,
-          highlighted && styles.payButtonHighlighted,
           disabled && styles.disabledButton,
         ]}
       >
         {loading ? (
-          <ActivityIndicator size="small" color={highlighted ? "#023047" : "#FFFFFF"} />
+          <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
-          <Ionicons name="card-outline" size={18} color={highlighted ? "#023047" : "#FFFFFF"} />
+          <Ionicons name="card-outline" size={18} color="#FFFFFF" />
         )}
-        <Text style={[styles.payButtonText, highlighted && { color: "#023047" }]}>
-          {buttonText}
-        </Text>
+        <Text style={styles.payButtonText}>{buttonText}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -631,6 +615,7 @@ function PaymentPlanCard({
 const styles = StyleSheet.create({
   container: {
     gap: 18,
+    position: "relative",
   },
   redirectOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -690,14 +675,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  headerRowCompact: {
-    alignItems: "flex-start",
-  },
   backButton: {
     width: 48,
     height: 48,
@@ -707,17 +684,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#DCEAF5",
-  },
-  title: {
-    color: "#023047",
-    fontSize: 26,
-    fontWeight: "900",
-  },
-  subtitle: {
-    color: "#4F6470",
-    fontSize: 15,
-    fontWeight: "600",
-    marginTop: 4,
   },
   statusCard: {
     flexDirection: "row",
@@ -797,22 +763,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#B42318",
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  noticeBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: "#E8F7FB",
-    borderWidth: 1,
-    borderColor: "#BEE7F1",
-  },
-  noticeText: {
-    color: "#075D70",
     flex: 1,
     fontSize: 13,
     fontWeight: "800",
@@ -907,11 +857,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
   },
-  sectionSubtitle: {
-    color: "#4F6470",
-    fontSize: 14,
-    fontWeight: "700",
-  },
   planRow: {
     flexDirection: "row",
     gap: 16,
@@ -933,10 +878,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 22,
     elevation: 3,
-  },
-  paymentCardHighlighted: {
-    borderColor: "#FFB703",
-    backgroundColor: "#FFFCF2",
+    justifyContent: "space-between",
   },
   paymentHeader: {
     flexDirection: "row",
@@ -951,9 +893,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#E8F7FB",
   },
-  paymentIconHighlighted: {
-    backgroundColor: "#FFF0C7",
-  },
   paymentTitle: {
     color: "#023047",
     fontSize: 20,
@@ -966,8 +905,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     borderRadius: 999,
     overflow: "hidden",
-    color: "#6C4B00",
-    backgroundColor: "#FFE3A3",
+    color: "#0A6F88",
+    backgroundColor: "#E8F7FB",
     fontSize: 11,
     fontWeight: "900",
   },
@@ -993,6 +932,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 20,
+    minHeight: 60,
   },
   payButton: {
     marginTop: 4,
@@ -1004,9 +944,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 16,
     backgroundColor: "#0A6F88",
-  },
-  payButtonHighlighted: {
-    backgroundColor: "#FFB703",
   },
   payButtonText: {
     color: "#FFFFFF",
