@@ -1,0 +1,129 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Planes en raiz
+    match /Planes/{planId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /Empresas/{empresaId} {
+      // Perfil publico de lectura.
+      // Importante: esto tambien hace publicos los campos raiz, incluido suscripcion.
+      // Se mantiene asi para no romper el registro publico actual.
+      allow read: if true;
+
+      // Solo la empresa dueña puede escribir su perfil.
+      // No se valida suscripcion aqui para no romper produccion durante la migracion.
+      allow write: if request.auth != null && request.auth.uid == empresaId;
+
+      // Subcoleccion Contador.
+      // Abierto porque el registro usa auth anonima.
+      match /Contador/{docId} {
+        allow read: if true;
+        allow write: if true;
+      }
+
+      // Subcoleccion HistorialNotificaciones.
+      // Usada por notificaciones normales y georeferenciadas.
+      match /HistorialNotificaciones/{historialId} {
+        allow read, create: if request.auth != null && request.auth.uid == empresaId;
+        allow update, delete: if false;
+      }
+
+      // Subcoleccion HistorialEventos.
+      // Usada por scanner para registrar visitas y premios confirmados.
+      match /HistorialEventos/{eventoId} {
+        allow read: if request.auth != null && request.auth.uid == empresaId;
+
+        allow create: if
+          request.auth != null &&
+          request.auth.uid == empresaId &&
+          request.resource.data.keys().hasOnly([
+            'tipo',
+            'origen',
+            'clienteId',
+            'clienteNombre',
+            'clienteSo',
+            'fecha',
+            'visitasTotalesAntes',
+            'visitasTotalesDespues',
+            'cicloAntes',
+            'cicloDespues',
+            'premiosDisponiblesAntes',
+            'premiosDisponiblesDespues',
+            'premiosCanjeadosAntes',
+            'premiosCanjeadosDespues',
+            'actorUid',
+            'actorTipo'
+          ]) &&
+          (request.resource.data.tipo == 'visita' || request.resource.data.tipo == 'premio') &&
+          request.resource.data.origen == 'scanner' &&
+          request.resource.data.clienteId is string &&
+          request.resource.data.clienteId.size() > 0 &&
+          request.resource.data.clienteNombre is string &&
+          request.resource.data.clienteNombre.size() > 0 &&
+          (request.resource.data.clienteSo == 'ios' || request.resource.data.clienteSo == 'android') &&
+          request.resource.data.fecha == request.time &&
+          request.resource.data.visitasTotalesAntes is number &&
+          request.resource.data.visitasTotalesDespues is number &&
+          request.resource.data.cicloAntes is number &&
+          request.resource.data.cicloDespues is number &&
+          request.resource.data.premiosDisponiblesAntes is number &&
+          request.resource.data.premiosDisponiblesDespues is number &&
+          request.resource.data.premiosCanjeadosAntes is number &&
+          request.resource.data.premiosCanjeadosDespues is number &&
+          request.resource.data.actorUid == empresaId &&
+          request.resource.data.actorTipo == 'empresa';
+
+        allow update, delete: if false;
+      }
+
+      // Subcoleccion Clientes.
+      match /Clientes/{clienteId} {
+        // Crear: abierto, validando campos.
+        allow create: if
+          request.resource.data.keys().hasOnly([
+            'nombre','apellido','email','telefono','empresaUid','creadoEn',
+            'so','navegador','activo','fechaNacimiento','applePassUrl',
+            'visitasTotales','cicloVisitas','premiosDisponibles','premiosCanjeados','ultimaVisita'
+          ]) &&
+          request.resource.data.empresaUid == empresaId &&
+          request.resource.data.nombre is string && request.resource.data.nombre.size() > 0 &&
+          request.resource.data.apellido is string && request.resource.data.apellido.size() > 0 &&
+          request.resource.data.email is string && request.resource.data.email.size() > 0 &&
+          request.resource.data.telefono is string && request.resource.data.telefono.size() > 0 &&
+          (request.resource.data.so == 'ios' || request.resource.data.so == 'android') &&
+          request.resource.data.activo == true &&
+          request.resource.data.fechaNacimiento is timestamp &&
+          request.resource.data.fechaNacimiento < request.time &&
+          request.resource.data.visitasTotales is number && request.resource.data.visitasTotales >= 0 &&
+          request.resource.data.cicloVisitas is number && request.resource.data.cicloVisitas >= 0 &&
+          request.resource.data.premiosDisponibles is number && request.resource.data.premiosDisponibles >= 0 &&
+          request.resource.data.premiosCanjeados is number && request.resource.data.premiosCanjeados >= 0 &&
+          request.resource.data.ultimaVisita is timestamp &&
+          (request.resource.data.applePassUrl is string || request.resource.data.applePassUrl == null);
+
+        // Leer/editar/borrar clientes: solo la empresa dueña.
+        allow read: if request.auth != null && request.auth.uid == empresaId;
+        allow update, delete: if
+          request.auth != null &&
+          request.auth.uid == empresaId &&
+          request.resource.data.empresaUid == empresaId &&
+          request.resource.data.keys().hasOnly([
+            'nombre','apellido','email','telefono','so','navegador','activo',
+            'empresaUid','creadoEn','fechaNacimiento','applePassUrl',
+            'visitasTotales','cicloVisitas','premiosDisponibles','premiosCanjeados','ultimaVisita'
+          ]) &&
+          request.resource.data.visitasTotales is number && request.resource.data.visitasTotales >= 0 &&
+          request.resource.data.cicloVisitas is number && request.resource.data.cicloVisitas >= 0 &&
+          request.resource.data.premiosDisponibles is number && request.resource.data.premiosDisponibles >= 0 &&
+          request.resource.data.premiosCanjeados is number && request.resource.data.premiosCanjeados >= 0 &&
+          request.resource.data.ultimaVisita is timestamp &&
+          (request.resource.data.applePassUrl is string || request.resource.data.applePassUrl == null);
+      }
+    }
+  }
+}

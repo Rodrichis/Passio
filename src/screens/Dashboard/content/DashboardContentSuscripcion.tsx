@@ -148,10 +148,6 @@ function canCreateNewSubscription(status: SubscriptionStatus | null) {
     return false;
   }
 
-  if (state === "pending") {
-    return false;
-  }
-
   if (
     status?.tieneAcceso &&
     ["active", "trialing"].includes(state)
@@ -184,7 +180,7 @@ function getManagementText(
   hasPendingPayment: boolean,
 ) {
   if (hasPendingPayment) {
-    return "Hay un pago pendiente de confirmación. No se puede cancelar una renovación hasta que Mercado Pago confirme la suscripción mensual.";
+    return "Hay un pago pendiente. Puedes continuarlo o elegir otro plan.";
   }
 
   if (isMercadoPagoSubscription(status)) {
@@ -207,6 +203,21 @@ async function openCheckoutUrl(checkoutUrl: string) {
   }
 
   await Linking.openURL(checkoutUrl);
+}
+
+function getPaymentButtonText(status: SubscriptionStatus | null, tipoPagoPlan: TipoPagoPlanCobro) {
+  const isMonthly = tipoPagoPlan === "pro_monthly";
+  const state = String(status?.estadoSuscripcion || "").toLowerCase();
+
+  if (state !== "pending") {
+    return isMonthly ? "Pagar mensual" : "Pagar anual";
+  }
+
+  if (status?.tipoPagoPlan === tipoPagoPlan) {
+    return isMonthly ? "Continuar pago mensual" : "Continuar pago anual";
+  }
+
+  return isMonthly ? "Cambiar a mensual" : "Cambiar a anual";
 }
 
 export default function DashboardContentSuscripcion({ onBack }: Props) {
@@ -458,7 +469,7 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
           icon="calendar-outline"
           disabled={!isWeb || !canCreate || action !== null}
           loading={action === "monthly"}
-          buttonText="Pagar mensual"
+          buttonText={getPaymentButtonText(status, "pro_monthly")}
           onPress={() => startPayment("pro_monthly")}
         />
         <PaymentPlanCard
@@ -470,7 +481,7 @@ export default function DashboardContentSuscripcion({ onBack }: Props) {
           badge="1 mes gratis"
           disabled={!isWeb || !canCreate || action !== null}
           loading={action === "yearly"}
-          buttonText="Pagar anual"
+          buttonText={getPaymentButtonText(status, "pro_yearly")}
           onPress={() => startPayment("pro_yearly")}
         />
       </View>
@@ -591,6 +602,7 @@ function PaymentPlanCard({
         <Text style={styles.price}>{price}</Text>
         <Text style={styles.period}>{period}</Text>
       </View>
+      <Text style={styles.taxIncludedText}>IVA incluido</Text>
       <Text style={styles.paymentDescription}>{description}</Text>
 
       <TouchableOpacity
@@ -926,6 +938,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     marginBottom: 4,
+  },
+  taxIncludedText: {
+    color: "#607381",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: -4,
   },
   paymentDescription: {
     color: "#4F6470",
